@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-FoodshareApplication<foodshare>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.datn.foodshare.FoodshareApplication",
+            "projectName": "foodshare",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
