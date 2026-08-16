@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
@@ -46,14 +47,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(value = {
             BadCredentialsException.class,
-            UsernameNotFoundException.class
+            UsernameNotFoundException.class,
+            AuthenticationException.class
     })
     public ResponseEntity<RestResponse<Object>> handleAuthException(Exception ex) {
         RestResponse<Object> res = new RestResponse<>();
-        res.setStatusCode(HttpStatus.BAD_REQUEST.value());
+        res.setStatusCode(HttpStatus.UNAUTHORIZED.value());
         res.setError("Bad Credentials");
         res.setMessage(ex.getMessage() != null ? ex.getMessage() : "Thông tin đăng nhập không chính xác");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(res);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
