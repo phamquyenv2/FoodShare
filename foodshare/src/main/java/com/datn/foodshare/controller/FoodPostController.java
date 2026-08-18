@@ -1,6 +1,7 @@
 package com.datn.foodshare.controller;
 
 import com.datn.foodshare.domain.request.CreateFoodPostRequest;
+import com.datn.foodshare.domain.request.FoodPostFilterRequest;
 import com.datn.foodshare.domain.request.UpdateFoodPostRequest;
 import com.datn.foodshare.domain.response.FoodPostResponse;
 import com.datn.foodshare.service.FoodPostService;
@@ -16,12 +17,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -34,9 +35,9 @@ public class FoodPostController {
     @GetMapping
     @ApiMessage("Lấy danh sách bài đăng thực phẩm thành công")
     public ResponseEntity<Page<FoodPostResponse>> getPublicList(
-            @RequestParam(required = false) Long categoryId,
+            @ModelAttribute FoodPostFilterRequest filter,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(foodPostService.getPublicList(categoryId, pageable));
+        return ResponseEntity.ok(foodPostService.getPublicList(filter, pageable));
     }
 
     @GetMapping("/{id}")
@@ -60,6 +61,13 @@ public class FoodPostController {
     public ResponseEntity<FoodPostResponse> create(@Valid @RequestBody CreateFoodPostRequest request)
             throws PermissionException {
         return ResponseEntity.status(HttpStatus.CREATED).body(foodPostService.create(request));
+    }
+
+    @PatchMapping("/{id}/publish")
+    @Secured("ROLE_SUPPLIER")
+    @ApiMessage("Đăng bài thành công")
+    public ResponseEntity<FoodPostResponse> publish(@PathVariable Long id) throws PermissionException {
+        return ResponseEntity.ok(foodPostService.publish(id));
     }
 
     @PatchMapping("/{id}")

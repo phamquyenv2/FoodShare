@@ -6,12 +6,14 @@ import com.datn.foodshare.domain.entity.FoodPost;
 import com.datn.foodshare.domain.entity.FoodPostImage;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.CreateFoodPostRequest;
+import com.datn.foodshare.domain.request.FoodPostFilterRequest;
 import com.datn.foodshare.domain.request.UpdateFoodPostRequest;
 import com.datn.foodshare.domain.response.FoodPostResponse;
 import com.datn.foodshare.repository.BusinessProfileRepository;
 import com.datn.foodshare.repository.CategoryRepository;
 import com.datn.foodshare.repository.FoodPostRepository;
 import com.datn.foodshare.repository.UserRepository;
+import com.datn.foodshare.repository.specification.FoodPostSpecification;
 import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.PostType;
@@ -19,8 +21,10 @@ import com.datn.foodshare.util.constant.Role;
 import com.datn.foodshare.util.error.BusinessException;
 import com.datn.foodshare.util.error.PermissionException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,12 +36,14 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class FoodPostService {
 
     private final FoodPostRepository foodPostRepository;
     private final CategoryRepository categoryRepository;
     private final BusinessProfileRepository businessProfileRepository;
     private final UserRepository userRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Transactional
     public FoodPostResponse create(CreateFoodPostRequest request) throws PermissionException {
@@ -61,7 +67,7 @@ public class FoodPostService {
                 .availableQuantity(request.getTotalQuantity())
                 .unitPrice(request.getUnitPrice())
                 .postType(request.getPostType())
-                .postStatus(PostStatus.AVAILABLE)
+                .postStatus(PostStatus.DRAFT)
                 .expiresAt(request.getExpiresAt())
                 .pickupAddress(request.getPickupAddress().trim())
                 .pickupStartAt(request.getPickupStartAt())
@@ -73,11 +79,68 @@ public class FoodPostService {
         return FoodPostResponse.from(foodPostRepository.save(post));
     }
 
+    @Transactional
+    public FoodPostResponse publish(Long id) throws PermissionException {
+        User currentUser = getAuthenticatedUser();
+        requireRole(currentUser, Role.SUPPLIER);
+        FoodPost post = findPostOrThrow(id);
+        requireOwnership(currentUser, post);
+
+        if (post.getPostStatus() != PostStatus.DRAFT) {
+            throw new BusinessException("Chỉ có thể đăng bài ở trạng thái nháp");
+        }
+        validateExpiration(post.getExpiresAt(), post.getPickupEndAt());
+
+        post.setPostStatus(PostStatus.AVAILABLE);
+        return FoodPostResponse.from(foodPostRepository.save(post));
+    }
+
+    @Transactional
+    public void decreaseQuantity(Long foodPostId, int quantity) {
+        FoodPost post = findPostOrThrow(foodPostId);
+
+        if (post.getPostStatus() != PostStatus.AVAILABLE) {
+            throw new BusinessException("Bài đăng không ở trạng thái khả dụng");
+        }
+        if (post.getAvailableQuantity() < quantity) {
+            throw new BusinessException("Không đủ số lượng. Còn lại: " + post.getAvailableQuantity());
+        }
+
+        post.setAvailableQuantity(post.getAvailableQuantity() - quantity);
+
+        if (post.getAvailableQuantity() == 0) {
+            post.setPostStatus(PostStatus.OUT_OF_STOCK);
+        }
+
+        foodPostRepository.save(post);
+    }
+
+    @Transactional
+    public void restoreQuantity(Long foodPostId, int quantity) {
+        FoodPost post = findPostOrThrow(foodPostId);
+
+        int newAvailable = post.getAvailableQuantity() + quantity;
+        if (newAvailable > post.getTotalQuantity()) {
+            throw new BusinessException("Số lượng khôi phục vượt quá tổng số lượng");
+        }
+
+        post.setAvailableQuantity(newAvailable);
+
+        if (post.getPostStatus() == PostStatus.OUT_OF_STOCK && newAvailable > 0) {
+            post.setPostStatus(PostStatus.AVAILABLE);
+        }
+
+        foodPostRepository.save(post);
+    }
+
     @Transactional(readOnly = true)
-    public Page<FoodPostResponse> getPublicList(Long categoryId, Pageable pageable) {
-        return foodPostRepository
-                .findPublicPosts(PostStatus.AVAILABLE, categoryId, pageable)
-                .map(FoodPostResponse::from);
+    public Page<FoodPostResponse> getPublicList(FoodPostFilterRequest filter, Pageable pageable) {
+        validateSearchFilters(filter);
+
+        Page<FoodPost> posts = foodPostRepository.findAll(
+                FoodPostSpecification.filterBy(filter, Instant.now()),
+                pageable);
+        return mapPageWithImages(posts);
     }
 
     @Transactional(readOnly = true)
@@ -85,9 +148,8 @@ public class FoodPostService {
         User currentUser = getAuthenticatedUser();
         requireRole(currentUser, Role.SUPPLIER);
         BusinessProfile businessProfile = resolveBusinessProfile(currentUser);
-        return foodPostRepository
-                .findByBusinessProfileId(businessProfile.getId(), pageable)
-                .map(FoodPostResponse::from);
+        Page<FoodPost> posts = foodPostRepository.findByBusinessProfileId(businessProfile.getId(), pageable);
+        return mapPageWithImages(posts);
     }
 
     @Transactional(readOnly = true)
@@ -95,6 +157,9 @@ public class FoodPostService {
         FoodPost post = findPostWithDetails(id);
         if (post.getPostStatus() != PostStatus.AVAILABLE && post.getPostStatus() != PostStatus.OUT_OF_STOCK) {
             throw new BusinessException("Bài đăng không tồn tại hoặc không ở trạng thái công khai");
+        }
+        if (post.getExpiresAt().isBefore(Instant.now())) {
+            throw new BusinessException("Bài đăng đã hết hạn");
         }
         return FoodPostResponse.from(post);
     }
@@ -151,8 +216,12 @@ public class FoodPostService {
         }
 
         if (request.getImages() != null) {
+            List<String> oldUrls = post.getImages().stream()
+                    .map(img -> img.getImageUrl())
+                    .toList();
             post.getImages().clear();
             attachImages(post, request.getImages());
+            oldUrls.forEach(cloudinaryService::deleteFoodPostImage);
         }
 
         return FoodPostResponse.from(foodPostRepository.save(post));
@@ -165,11 +234,17 @@ public class FoodPostService {
         FoodPost post = findPostOrThrow(id);
         requireOwnership(currentUser, post);
 
+        if (post.getPostStatus() == PostStatus.DRAFT) {
+            throw new BusinessException("Bài đăng nháp chưa được đăng, không thể ẩn");
+        }
         if (post.getPostStatus() == PostStatus.HIDDEN) {
             throw new BusinessException("Bài đăng đã được ẩn");
         }
         if (post.getPostStatus() == PostStatus.DELETED) {
             throw new BusinessException("Bài đăng đã bị hủy, không thể ẩn");
+        }
+        if (post.getPostStatus() == PostStatus.EXPIRED) {
+            throw new BusinessException("Bài đăng đã hết hạn, không thể ẩn");
         }
 
         post.setPostStatus(PostStatus.HIDDEN);
@@ -212,7 +287,7 @@ public class FoodPostService {
 
     @Transactional(readOnly = true)
     public Page<FoodPostResponse> adminGetAll(PostStatus status, Pageable pageable) {
-        return foodPostRepository.findAllForAdmin(status, pageable).map(FoodPostResponse::from);
+        return mapPageWithImages(foodPostRepository.findAllForAdmin(status, pageable));
     }
 
     @Transactional(readOnly = true)
@@ -301,6 +376,9 @@ public class FoodPostService {
         if (post.getPostStatus() == PostStatus.DELETED) {
             throw new BusinessException("Bài đăng đã bị hủy, không thể chỉnh sửa");
         }
+        if (post.getPostStatus() == PostStatus.EXPIRED) {
+            throw new BusinessException("Bài đăng đã hết hạn, không thể chỉnh sửa");
+        }
     }
 
     private void validatePrice(PostType postType, BigDecimal unitPrice) {
@@ -344,6 +422,36 @@ public class FoodPostService {
         post.setAvailableQuantity(newAvailable);
     }
 
+    private void validateSearchFilters(FoodPostFilterRequest filter) {
+        if (filter.getMinPrice() != null && filter.getMinPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException("Giá tối thiểu không được âm");
+        }
+        if (filter.getMaxPrice() != null && filter.getMaxPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException("Giá tối đa không được âm");
+        }
+        if (filter.getMinPrice() != null && filter.getMaxPrice() != null
+                && filter.getMinPrice().compareTo(filter.getMaxPrice()) > 0) {
+            throw new BusinessException("Giá tối thiểu không được lớn hơn giá tối đa");
+        }
+        if (filter.getMinAvailableQuantity() != null && filter.getMinAvailableQuantity() < 0) {
+            throw new BusinessException("Số lượng còn lại tối thiểu không được âm");
+        }
+        if (filter.getExpiresFrom() != null && filter.getExpiresTo() != null
+                && filter.getExpiresFrom().isAfter(filter.getExpiresTo())) {
+            throw new BusinessException("Thời gian hết hạn bắt đầu không được sau thời gian kết thúc");
+        }
+    }
+
+    private Page<FoodPostResponse> mapPageWithImages(Page<FoodPost> posts) {
+        if (posts.hasContent()) {
+            List<Long> postIds = posts.getContent().stream()
+                    .map(FoodPost::getId)
+                    .toList();
+            foodPostRepository.findAllWithImagesByIdIn(postIds);
+        }
+        return posts.map(FoodPostResponse::from);
+    }
+
     private void attachImages(FoodPost post, List<String> imageUrls) {
         if (imageUrls == null || imageUrls.isEmpty()) return;
         List<FoodPostImage> images = new ArrayList<>();
@@ -360,5 +468,14 @@ public class FoodPostService {
 
     private String trimToNull(String value) {
         return (value != null && !value.isBlank()) ? value.trim() : null;
+    }
+
+    @Scheduled(fixedRate = 300_000)
+    @Transactional
+    public void markExpiredPosts() {
+        int count = foodPostRepository.markExpired(Instant.now());
+        if (count > 0) {
+            log.info("Đã chuyển {} bài đăng sang trạng thái EXPIRED", count);
+        }
     }
 }

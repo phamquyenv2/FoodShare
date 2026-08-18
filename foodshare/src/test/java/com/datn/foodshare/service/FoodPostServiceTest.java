@@ -3,8 +3,10 @@ package com.datn.foodshare.service;
 import com.datn.foodshare.domain.entity.BusinessProfile;
 import com.datn.foodshare.domain.entity.Category;
 import com.datn.foodshare.domain.entity.FoodPost;
+import com.datn.foodshare.domain.entity.FoodPostImage;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.CreateFoodPostRequest;
+import com.datn.foodshare.domain.request.FoodPostFilterRequest;
 import com.datn.foodshare.domain.request.UpdateFoodPostRequest;
 import com.datn.foodshare.domain.response.FoodPostResponse;
 import com.datn.foodshare.repository.BusinessProfileRepository;
@@ -23,14 +25,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +53,8 @@ class FoodPostServiceTest {
     private BusinessProfileRepository businessProfileRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private CloudinaryService cloudinaryService;
 
     private FoodPostService foodPostService;
 
@@ -58,7 +69,8 @@ class FoodPostServiceTest {
                 foodPostRepository,
                 categoryRepository,
                 businessProfileRepository,
-                userRepository
+                userRepository,
+                cloudinaryService
         );
     }
 
@@ -82,7 +94,7 @@ class FoodPostServiceTest {
             assertEquals("Bánh mì", response.getName());
             assertEquals(10, response.getTotalQuantity());
             assertEquals(10, response.getAvailableQuantity());
-            assertEquals(PostStatus.AVAILABLE, response.getPostStatus());
+            assertEquals(PostStatus.DRAFT, response.getPostStatus());
             verify(foodPostRepository).save(any(FoodPost.class));
         }
     }
@@ -299,6 +311,276 @@ class FoodPostServiceTest {
         when(foodPostRepository.findByIdWithDetails(POST_ID)).thenReturn(Optional.of(post));
 
         assertThrows(BusinessException.class, () -> foodPostService.getDetail(POST_ID));
+    }
+
+    @Test
+    void getDetail_blocksExpiredPost() {
+        FoodPost post = availablePost();
+        post.setExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
+        when(foodPostRepository.findByIdWithDetails(POST_ID)).thenReturn(Optional.of(post));
+
+        assertThrows(BusinessException.class, () -> foodPostService.getDetail(POST_ID));
+    }
+
+    @Test
+    void getPublicList_usesSpecificationAndBulkLoadsImages() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Instant expiresFrom = Instant.now().plus(1, ChronoUnit.DAYS);
+        Instant expiresTo = Instant.now().plus(3, ChronoUnit.DAYS);
+        FoodPost post = availablePost();
+        Page<FoodPost> page = new PageImpl<>(List.of(post), pageable, 1);
+
+        when(foodPostRepository.findAll(
+                org.mockito.ArgumentMatchers.<Specification<FoodPost>>any(),
+                eq(pageable)))
+                .thenReturn(page);
+        when(foodPostRepository.findAllWithImagesByIdIn(List.of(POST_ID))).thenReturn(List.of(post));
+
+        FoodPostFilterRequest filter = new FoodPostFilterRequest();
+        filter.setKeyword("  bread  ");
+        filter.setCategoryId(CATEGORY_ID);
+        filter.setPostType(PostType.PAID);
+        filter.setMinPrice(new BigDecimal("10000"));
+        filter.setMaxPrice(new BigDecimal("20000"));
+        filter.setMinAvailableQuantity(2);
+        filter.setExpiresFrom(expiresFrom);
+        filter.setExpiresTo(expiresTo);
+
+        Page<FoodPostResponse> result = foodPostService.getPublicList(filter, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        verify(foodPostRepository).findAllWithImagesByIdIn(List.of(POST_ID));
+    }
+
+    @Test
+    void getPublicList_rejectsInvalidPriceRange() {
+        FoodPostFilterRequest filter = new FoodPostFilterRequest();
+        filter.setMinPrice(new BigDecimal("20000"));
+        filter.setMaxPrice(new BigDecimal("10000"));
+
+        assertThrows(BusinessException.class,
+                () -> foodPostService.getPublicList(filter, PageRequest.of(0, 20)));
+
+        verifyNoInteractions(foodPostRepository);
+    }
+
+    @Test
+    void getPublicList_rejectsInvalidExpiryRange() {
+        FoodPostFilterRequest filter = new FoodPostFilterRequest();
+        filter.setExpiresFrom(Instant.now().plus(3, ChronoUnit.DAYS));
+        filter.setExpiresTo(Instant.now().plus(1, ChronoUnit.DAYS));
+
+        assertThrows(BusinessException.class,
+                () -> foodPostService.getPublicList(filter, PageRequest.of(0, 20)));
+
+        verifyNoInteractions(foodPostRepository);
+    }
+
+    @Test
+    void update_cleansUpCloudinaryOnImageReplace() throws PermissionException {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
+            when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
+            FoodPost post = availablePost();
+            FoodPostImage oldImg = FoodPostImage.builder()
+                    .foodPost(post)
+                    .imageUrl("https://res.cloudinary.com/old/image.jpg")
+                    .build();
+            post.getImages().add(oldImg);
+            when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+            when(foodPostRepository.save(any(FoodPost.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            UpdateFoodPostRequest req = new UpdateFoodPostRequest();
+            req.setImages(java.util.List.of("https://res.cloudinary.com/new/image.jpg"));
+
+            foodPostService.update(POST_ID, req);
+
+            verify(cloudinaryService).deleteFoodPostImage("https://res.cloudinary.com/old/image.jpg");
+        }
+    }
+
+    // === Publish Tests ===
+
+    @Test
+    void publish_success() throws PermissionException {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
+            when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
+            FoodPost post = availablePost();
+            post.setPostStatus(PostStatus.DRAFT);
+            when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+            when(foodPostRepository.save(post)).thenReturn(post);
+
+            FoodPostResponse response = foodPostService.publish(POST_ID);
+
+            assertEquals(PostStatus.AVAILABLE, response.getPostStatus());
+        }
+    }
+
+    @Test
+    void publish_rejectsNonDraftPost() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
+            when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
+            FoodPost post = availablePost();
+            when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+            assertThrows(BusinessException.class, () -> foodPostService.publish(POST_ID));
+            verify(foodPostRepository, never()).save(any());
+        }
+    }
+
+    // === Decrease / Restore Quantity Tests ===
+
+    @Test
+    void decreaseQuantity_success() {
+        FoodPost post = availablePost();
+        when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+        when(foodPostRepository.save(post)).thenReturn(post);
+
+        foodPostService.decreaseQuantity(POST_ID, 3);
+
+        assertEquals(7, post.getAvailableQuantity());
+        assertEquals(PostStatus.AVAILABLE, post.getPostStatus());
+    }
+
+    @Test
+    void decreaseQuantity_autoOutOfStock() {
+        FoodPost post = availablePost();
+        when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+        when(foodPostRepository.save(post)).thenReturn(post);
+
+        foodPostService.decreaseQuantity(POST_ID, 10);
+
+        assertEquals(0, post.getAvailableQuantity());
+        assertEquals(PostStatus.OUT_OF_STOCK, post.getPostStatus());
+    }
+
+    @Test
+    void decreaseQuantity_rejectsInsufficientStock() {
+        FoodPost post = availablePost();
+        when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+        assertThrows(BusinessException.class, () -> foodPostService.decreaseQuantity(POST_ID, 11));
+        verify(foodPostRepository, never()).save(any());
+    }
+
+    @Test
+    void decreaseQuantity_rejectsNonAvailablePost() {
+        FoodPost post = availablePost();
+        post.setPostStatus(PostStatus.HIDDEN);
+        when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+        assertThrows(BusinessException.class, () -> foodPostService.decreaseQuantity(POST_ID, 1));
+        verify(foodPostRepository, never()).save(any());
+    }
+
+    @Test
+    void restoreQuantity_success() {
+        FoodPost post = availablePost();
+        post.setAvailableQuantity(0);
+        post.setPostStatus(PostStatus.OUT_OF_STOCK);
+        when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+        when(foodPostRepository.save(post)).thenReturn(post);
+
+        foodPostService.restoreQuantity(POST_ID, 5);
+
+        assertEquals(5, post.getAvailableQuantity());
+        assertEquals(PostStatus.AVAILABLE, post.getPostStatus());
+    }
+
+    @Test
+    void restoreQuantity_rejectsExceedingTotal() {
+        FoodPost post = availablePost();
+        when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+        assertThrows(BusinessException.class, () -> foodPostService.restoreQuantity(POST_ID, 5));
+        verify(foodPostRepository, never()).save(any());
+    }
+
+    // === Lifecycle Transition Edge Cases ===
+
+    @Test
+    void hide_rejectsDraftPost() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
+            when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
+            FoodPost post = availablePost();
+            post.setPostStatus(PostStatus.DRAFT);
+            when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+            assertThrows(BusinessException.class, () -> foodPostService.hide(POST_ID));
+            verify(foodPostRepository, never()).save(any());
+        }
+    }
+
+    @Test
+    void hide_rejectsExpiredPost() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
+            when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
+            FoodPost post = availablePost();
+            post.setPostStatus(PostStatus.EXPIRED);
+            when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+            assertThrows(BusinessException.class, () -> foodPostService.hide(POST_ID));
+            verify(foodPostRepository, never()).save(any());
+        }
+    }
+
+    @Test
+    void unhide_restoresToOutOfStock() throws PermissionException {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
+            when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
+            FoodPost post = availablePost();
+            post.setPostStatus(PostStatus.HIDDEN);
+            post.setAvailableQuantity(0);
+            when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+            when(foodPostRepository.save(post)).thenReturn(post);
+
+            FoodPostResponse response = foodPostService.unhide(POST_ID);
+
+            assertEquals(PostStatus.OUT_OF_STOCK, response.getPostStatus());
+        }
+    }
+
+    @Test
+    void adminRestore_rejectsExpiredPost() {
+        FoodPost post = availablePost();
+        post.setPostStatus(PostStatus.HIDDEN);
+        post.setExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
+        when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+        assertThrows(BusinessException.class, () -> foodPostService.adminRestore(POST_ID));
+    }
+
+    @Test
+    void adminRestore_restoresToOutOfStock() {
+        FoodPost post = availablePost();
+        post.setPostStatus(PostStatus.HIDDEN);
+        post.setAvailableQuantity(0);
+        when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+        when(foodPostRepository.save(post)).thenReturn(post);
+
+        FoodPostResponse response = foodPostService.adminRestore(POST_ID);
+
+        assertEquals(PostStatus.OUT_OF_STOCK, response.getPostStatus());
+    }
+
+    @Test
+    void update_rejectsExpiredPost() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
+            when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
+            FoodPost post = availablePost();
+            post.setPostStatus(PostStatus.EXPIRED);
+            when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+            assertThrows(BusinessException.class,
+                    () -> foodPostService.update(POST_ID, new UpdateFoodPostRequest()));
+            verify(foodPostRepository, never()).save(any());
+        }
     }
 
     private User supplierUser() {
