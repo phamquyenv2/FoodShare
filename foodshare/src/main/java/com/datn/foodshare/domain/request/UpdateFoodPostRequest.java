@@ -42,9 +42,5 @@ public class UpdateFoodPostRequest {
 
     private Instant pickupEndAt;
 
-    /**
-     * Full replacement of images. If null, images are not changed.
-     * If provided (even empty list), images are replaced.
-     */
     private List<String> images;
 }

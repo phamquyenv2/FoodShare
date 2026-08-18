@@ -5,26 +5,26 @@ import com.datn.foodshare.util.constant.PostStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface FoodPostRepository extends JpaRepository<FoodPost, Long> {
+public interface FoodPostRepository extends JpaRepository<FoodPost, Long>, JpaSpecificationExecutor<FoodPost> {
 
     @Query("""
-            SELECT fp FROM FoodPost fp
-            JOIN FETCH fp.businessProfile bp
-            JOIN FETCH fp.category c
-            WHERE fp.postStatus = :status
-              AND (:categoryId IS NULL OR c.id = :categoryId)
+            SELECT DISTINCT fp FROM FoodPost fp
+            LEFT JOIN FETCH fp.images
+            WHERE fp.id IN :ids
             """)
-    Page<FoodPost> findPublicPosts(
-            @Param("status") PostStatus status,
-            @Param("categoryId") Long categoryId,
-            Pageable pageable);
+    List<FoodPost> findAllWithImagesByIdIn(@Param("ids") Collection<Long> ids);
 
     @Query("""
             SELECT fp FROM FoodPost fp
@@ -53,4 +53,17 @@ public interface FoodPostRepository extends JpaRepository<FoodPost, Long> {
             WHERE fp.id = :id
             """)
     Optional<FoodPost> findByIdWithDetails(@Param("id") Long id);
+
+    @Modifying
+    @Query("""
+            UPDATE FoodPost fp
+            SET fp.postStatus = 'EXPIRED'
+            WHERE fp.postStatus IN ('AVAILABLE', 'OUT_OF_STOCK')
+              AND fp.expiresAt <= :now
+            """)
+    int markExpired(@Param("now") Instant now);
+
+    List<FoodPost> findAllByPostStatusAndExpiresAtAfterAndAvailableQuantityGreaterThan(
+            PostStatus postStatus, Instant now, int minQuantity);
 }
+
