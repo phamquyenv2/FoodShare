@@ -1,10 +1,10 @@
-package com.datn.foodshare.service;
+package com.datn.foodshare.service.matching;
 
 import com.datn.foodshare.domain.entity.BusinessProfile;
 import com.datn.foodshare.domain.entity.Category;
 import com.datn.foodshare.domain.entity.FoodPost;
 import com.datn.foodshare.repository.FoodPostRepository;
-import com.datn.foodshare.service.FoodPostPriorityQueue.FoodPostPriorityEntry;
+import com.datn.foodshare.service.matching.FoodPostPriorityQueue.FoodPostPriorityEntry;
 import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.PostType;
 import org.junit.jupiter.api.BeforeEach;

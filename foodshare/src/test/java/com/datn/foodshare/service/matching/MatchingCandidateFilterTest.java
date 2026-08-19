@@ -1,9 +1,8 @@
-package com.datn.foodshare.service;
+package com.datn.foodshare.service.matching;
 
 import com.datn.foodshare.domain.entity.BusinessProfile;
 import com.datn.foodshare.domain.entity.FoodPost;
 import com.datn.foodshare.domain.entity.User;
-import com.datn.foodshare.repository.OrderRepository;
 import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.util.constant.Role;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,8 +15,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,7 +30,7 @@ class MatchingCandidateFilterTest {
     private UserRepository userRepository;
 
     @Mock
-    private OrderRepository orderRepository;
+    private ReceiverCapacityService receiverCapacityService;
 
     @InjectMocks
     private MatchingCandidateFilter filter;
@@ -84,7 +83,7 @@ class MatchingCandidateFilterTest {
         User valid2 = createCandidate(2L, Role.ORGANIZATION, true, true, "10.782622", "106.680172"); // ~3km
 
         when(userRepository.findByRoleIn(any())).thenReturn(List.of(valid1, valid2));
-        when(orderRepository.countActiveOrdersByReceiverIds(any(), any())).thenReturn(Collections.emptyList());
+        when(receiverCapacityService.countActiveOrders(any())).thenReturn(Map.of());
 
         List<User> result = filter.filterCandidates(foodPost);
 
@@ -100,7 +99,7 @@ class MatchingCandidateFilterTest {
         User incomplete = createCandidate(3L, Role.ORGANIZATION, true, false, "10.772622", "106.670172");
 
         when(userRepository.findByRoleIn(any())).thenReturn(List.of(valid, inactive, incomplete));
-        when(orderRepository.countActiveOrdersByReceiverIds(any(), any())).thenReturn(Collections.emptyList());
+        when(receiverCapacityService.countActiveOrders(any())).thenReturn(Map.of());
 
         List<User> result = filter.filterCandidates(foodPost);
 
@@ -115,7 +114,7 @@ class MatchingCandidateFilterTest {
         User valid = createCandidate(1L, Role.RECIPIENT, true, true, "10.772622", "106.670172");
 
         when(userRepository.findByRoleIn(any())).thenReturn(List.of(self, valid));
-        when(orderRepository.countActiveOrdersByReceiverIds(any(), any())).thenReturn(Collections.emptyList());
+        when(receiverCapacityService.countActiveOrders(any())).thenReturn(Map.of());
 
         List<User> result = filter.filterCandidates(foodPost);
 
@@ -130,7 +129,7 @@ class MatchingCandidateFilterTest {
         User missingLng = createCandidate(3L, Role.RECIPIENT, true, true, "10.772622", null);
 
         when(userRepository.findByRoleIn(any())).thenReturn(List.of(valid, missingLat, missingLng));
-        when(orderRepository.countActiveOrdersByReceiverIds(any(), any())).thenReturn(Collections.emptyList());
+        when(receiverCapacityService.countActiveOrders(any())).thenReturn(Map.of());
 
         List<User> result = filter.filterCandidates(foodPost);
 
@@ -144,7 +143,7 @@ class MatchingCandidateFilterTest {
         User far = createCandidate(2L, Role.RECIPIENT, true, true, "21.028511", "105.804817"); // Hanoi (~1100km)
 
         when(userRepository.findByRoleIn(any())).thenReturn(List.of(close, far));
-        when(orderRepository.countActiveOrdersByReceiverIds(any(), any())).thenReturn(Collections.emptyList());
+        when(receiverCapacityService.countActiveOrders(any())).thenReturn(Map.of());
 
         List<User> result = filter.filterCandidates(foodPost, 10.0, 5); // max 10km
 
@@ -159,15 +158,25 @@ class MatchingCandidateFilterTest {
 
         when(userRepository.findByRoleIn(any())).thenReturn(List.of(user1, user2));
         // Simulate user1 having 5 active orders, user2 having 1
-        when(orderRepository.countActiveOrdersByReceiverIds(any(), any())).thenReturn(List.of(
-                new Object[]{1L, 5L},
-                new Object[]{2L, 1L}
-        ));
+        when(receiverCapacityService.countActiveOrders(any())).thenReturn(Map.of(1L, 5L, 2L, 1L));
 
         List<User> result = filter.filterCandidates(foodPost, 10.0, 5); // max 5 active orders
 
         assertEquals(1, result.size());
         assertEquals(2L, result.get(0).getId()); // only user2 passes
+    }
+
+    @Test
+    void filter_defaultCapacity_allowsOneActiveOrderAndRejectsTwo() {
+        User belowLimit = createCandidate(1L, Role.RECIPIENT, true, true, "10.772622", "106.670172");
+        User atLimit = createCandidate(2L, Role.RECIPIENT, true, true, "10.772622", "106.670172");
+
+        when(userRepository.findByRoleIn(any())).thenReturn(List.of(belowLimit, atLimit));
+        when(receiverCapacityService.countActiveOrders(any())).thenReturn(Map.of(1L, 1L, 2L, 2L));
+
+        List<User> result = filter.filterCandidates(foodPost);
+
+        assertEquals(List.of(belowLimit), result);
     }
 
     @Test

@@ -1,4 +1,4 @@
-package com.datn.foodshare.service;
+package com.datn.foodshare.service.matching;
 
 import com.datn.foodshare.domain.entity.FoodPost;
 import com.datn.foodshare.repository.FoodPostRepository;
@@ -55,7 +55,7 @@ public class FoodPostPriorityQueue {
         }
 
         double urgency() {
-            return 1.0 / (1.0 + remainingSeconds / 3600.0);
+            return MatchingMetrics.urgency(remainingSeconds);
         }
     }
 
