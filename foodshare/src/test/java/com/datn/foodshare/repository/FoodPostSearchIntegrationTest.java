@@ -9,6 +9,7 @@ import com.datn.foodshare.domain.request.FoodPostFilterRequest;
 import com.datn.foodshare.domain.response.FoodPostResponse;
 import com.datn.foodshare.service.CloudinaryService;
 import com.datn.foodshare.service.FoodPostService;
+import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
 import com.datn.foodshare.util.constant.AuthProvider;
 import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.PostType;
@@ -57,6 +58,9 @@ class FoodPostSearchIntegrationTest {
 
     @MockitoBean
     private CloudinaryService cloudinaryService;
+
+    @MockitoBean
+    private DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
 
     private BusinessProfile supplier;
     private Category bakery;

@@ -5,6 +5,7 @@ import com.datn.foodshare.util.constant.PostStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -31,19 +32,15 @@ public interface FoodPostRepository extends JpaRepository<FoodPost, Long>, JpaSp
             JOIN FETCH fp.category c
             WHERE fp.businessProfile.id = :businessProfileId
             """)
-    Page<FoodPost> findByBusinessProfileId(
-            @Param("businessProfileId") Long businessProfileId,
-            Pageable pageable);
+    Page<FoodPost> findByBusinessProfileId(@Param("businessProfileId") Long businessProfileId, Pageable pageable);
 
     @Query("""
             SELECT fp FROM FoodPost fp
             JOIN FETCH fp.businessProfile bp
             JOIN FETCH fp.category c
-            WHERE (:status IS NULL OR fp.postStatus = :status)
+            WHERE (:status IS NULL  OR fp.postStatus = :status)
             """)
-    Page<FoodPost> findAllForAdmin(
-            @Param("status") PostStatus status,
-            Pageable pageable);
+    Page<FoodPost> findAllForAdmin(@Param("status") PostStatus status, Pageable pageable);
 
     @Query("""
             SELECT fp FROM FoodPost fp
@@ -63,7 +60,29 @@ public interface FoodPostRepository extends JpaRepository<FoodPost, Long>, JpaSp
             """)
     int markExpired(@Param("now") Instant now);
 
-    List<FoodPost> findAllByPostStatusAndExpiresAtAfterAndAvailableQuantityGreaterThan(
-            PostStatus postStatus, Instant now, int minQuantity);
-}
+    List<FoodPost> findAllByPostStatusAndExpiresAtAfterAndAvailableQuantityGreaterThan(PostStatus postStatus, Instant now, int minQuantity);
 
+    @EntityGraph(attributePaths = {"businessProfile", "businessProfile.user"})
+    @Query("""
+            SELECT fp FROM FoodPost fp
+            WHERE fp.postStatus = :status
+              AND fp.expiresAt > :now
+              AND fp.availableQuantity > :minQuantity
+            """)
+    List<FoodPost> findAllForMatchingGraph(
+            @Param("status") PostStatus status,
+            @Param("now") Instant now,
+            @Param("minQuantity") int minQuantity);
+
+    @EntityGraph(attributePaths = {"businessProfile", "businessProfile.user"})
+    @Query("SELECT fp FROM FoodPost fp WHERE fp.id = :id")
+    Optional<FoodPost> findByIdForMatching(@Param("id") Long id);
+
+    @EntityGraph(attributePaths = {"businessProfile", "businessProfile.user"})
+    @Query("SELECT fp FROM FoodPost fp WHERE fp.id IN :ids")
+    List<FoodPost> findAllByIdInForMatching(@Param("ids") Collection<Long> ids);
+
+    @EntityGraph(attributePaths = {"businessProfile", "businessProfile.user"})
+    @Query("SELECT fp FROM FoodPost fp WHERE fp.businessProfile.user.id = :supplierUserId")
+    List<FoodPost> findAllBySupplierUserIdForMatching(@Param("supplierUserId") Long supplierUserId);
+}

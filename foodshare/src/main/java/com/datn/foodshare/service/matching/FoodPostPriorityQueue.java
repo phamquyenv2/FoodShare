@@ -36,22 +36,10 @@ public class FoodPostPriorityQueue {
     private final Map<Long, FoodPostPriorityEntry> entryIndex = new ConcurrentHashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
-    public record FoodPostPriorityEntry(
-            long foodPostId,
-            long remainingSeconds,
-            int availableQuantity,
-            Instant expiresAt,
-            Instant createdAt
-    ) {
+    public record FoodPostPriorityEntry(long foodPostId, long remainingSeconds, int availableQuantity, Instant expiresAt, Instant createdAt) {
         static FoodPostPriorityEntry fromFoodPost(FoodPost post, Instant now) {
             long remaining = Duration.between(now, post.getExpiresAt()).getSeconds();
-            return new FoodPostPriorityEntry(
-                    post.getId(),
-                    Math.max(remaining, 0),
-                    post.getAvailableQuantity(),
-                    post.getExpiresAt(),
-                    post.getCreatedAt()
-            );
+            return new FoodPostPriorityEntry(post.getId(), Math.max(remaining, 0), post.getAvailableQuantity(), post.getExpiresAt(), post.getCreatedAt());
         }
 
         double urgency() {

@@ -20,7 +20,5 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
               AND o.orderStatus IN :statuses
             GROUP BY o.receiver.id
             """)
-    List<Object[]> countActiveOrdersByReceiverIds(
-            @Param("receiverIds") Collection<Long> receiverIds,
-            @Param("statuses") Collection<OrderStatus> statuses);
+    List<Object[]> countActiveOrdersByReceiverIds(@Param("receiverIds") Collection<Long> receiverIds,@Param("statuses") Collection<OrderStatus> statuses);
 }
