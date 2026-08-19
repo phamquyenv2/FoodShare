@@ -22,6 +22,10 @@ import java.util.List;
 @Component
 public class JwtTokenProvider {
 
+    private static final String TOKEN_TYPE_CLAIM = "type";
+    private static final String ACCESS_TOKEN_TYPE = "access";
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+
     private final SecretKey secretKey;
     private final long accessTokenExpirationInMs;
     private final long refreshTokenExpirationInMs;
@@ -38,7 +42,6 @@ public class JwtTokenProvider {
             keyBytes = jwtSecret.getBytes();
         }
         if (keyBytes.length < 32) {
-            // Pad or use standard key if too short for HS256/HS512
             byte[] paddedKey = new byte[32];
             System.arraycopy(keyBytes, 0, paddedKey, 0, Math.min(keyBytes.length, 32));
             keyBytes = paddedKey;
@@ -59,6 +62,7 @@ public class JwtTokenProvider {
                 .claim("phone", user.getPhone())
                 .claim("email", user.getEmail())
                 .claim("fullName", user.getFullName())
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(secretKey)
@@ -72,19 +76,29 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim("userId", user.getId())
+                .claim(TOKEN_TYPE_CLAIM, REFRESH_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(secretKey)
                 .compact();
     }
 
-    public boolean validateToken(String token) {
+    public boolean validateAccessToken(String token) {
+        return validateToken(token, ACCESS_TOKEN_TYPE);
+    }
+
+    public boolean validateRefreshToken(String token) {
+        return validateToken(token, REFRESH_TOKEN_TYPE);
+    }
+
+    private boolean validateToken(String token, String expectedType) {
         try {
-            Jwts.parser()
+            Claims claims = Jwts.parser()
                     .verifyWith(secretKey)
                     .build()
-                    .parseSignedClaims(token);
-            return true;
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return expectedType.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
         } catch (SecurityException | MalformedJwtException e) {
             log.error("Invalid JWT signature: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
@@ -112,6 +126,10 @@ public class JwtTokenProvider {
             return number.longValue();
         }
         return Long.parseLong(claims.getSubject());
+    }
+
+    public Date getExpirationFromToken(String token) {
+        return getClaims(token).getExpiration();
     }
 
     public Role getRoleFromToken(String token) {

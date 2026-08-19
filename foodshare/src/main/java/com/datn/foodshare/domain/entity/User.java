@@ -37,6 +37,9 @@ public class User extends BaseModel {
     @Column(unique = true, length = 100)
     private String email;
 
+    @Column(name = "google_subject", unique = true, length = 255)
+    private String googleSubject;
+
     @JsonIgnore
     @Column(length = 255)
     private String passwordHash;
@@ -62,6 +65,10 @@ public class User extends BaseModel {
     @Builder.Default
     @Column(nullable = false)
     private boolean active = true;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean profileCompleted = false;
 
     @Column(precision = 10, scale = 7)
     private BigDecimal latitude;

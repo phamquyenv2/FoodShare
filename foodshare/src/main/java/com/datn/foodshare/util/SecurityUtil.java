@@ -18,6 +18,16 @@ public final class SecurityUtil {
         return Optional.ofNullable(extractPrincipal(securityContext.getAuthentication()));
     }
 
+    public static Optional<Long> getCurrentUserId() {
+        return getCurrentUserLogin().flatMap(principal -> {
+            try {
+                return Optional.of(Long.parseLong(principal));
+            } catch (NumberFormatException exception) {
+                return Optional.empty();
+            }
+        });
+    }
+
     public static Optional<Authentication> getAuthentication() {
         return Optional.ofNullable(SecurityContextHolder.getContext().getAuthentication());
     }
