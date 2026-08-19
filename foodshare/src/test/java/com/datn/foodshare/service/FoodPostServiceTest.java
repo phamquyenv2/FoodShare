@@ -13,6 +13,7 @@ import com.datn.foodshare.repository.BusinessProfileRepository;
 import com.datn.foodshare.repository.CategoryRepository;
 import com.datn.foodshare.repository.FoodPostRepository;
 import com.datn.foodshare.repository.UserRepository;
+import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
 import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.PostType;
@@ -55,6 +56,8 @@ class FoodPostServiceTest {
     private UserRepository userRepository;
     @Mock
     private CloudinaryService cloudinaryService;
+    @Mock
+    private DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
 
     private FoodPostService foodPostService;
 
@@ -70,7 +73,8 @@ class FoodPostServiceTest {
                 categoryRepository,
                 businessProfileRepository,
                 userRepository,
-                cloudinaryService
+                cloudinaryService,
+                matchingGraphSynchronizer
         );
     }
 
@@ -96,6 +100,8 @@ class FoodPostServiceTest {
             assertEquals(10, response.getAvailableQuantity());
             assertEquals(PostStatus.DRAFT, response.getPostStatus());
             verify(foodPostRepository).save(any(FoodPost.class));
+            verify(matchingGraphSynchronizer).foodPostChangedAfterCommit(POST_ID);
+            verify(matchingGraphSynchronizer).foodPostChangedAfterCommit(POST_ID);
         }
     }
 
@@ -414,6 +420,8 @@ class FoodPostServiceTest {
             FoodPostResponse response = foodPostService.publish(POST_ID);
 
             assertEquals(PostStatus.AVAILABLE, response.getPostStatus());
+            verify(matchingGraphSynchronizer).foodPostChangedAfterCommit(POST_ID);
+            verify(matchingGraphSynchronizer).foodPostChangedAfterCommit(POST_ID);
         }
     }
 
@@ -442,6 +450,8 @@ class FoodPostServiceTest {
 
         assertEquals(7, post.getAvailableQuantity());
         assertEquals(PostStatus.AVAILABLE, post.getPostStatus());
+        verify(matchingGraphSynchronizer).foodPostChangedAfterCommit(POST_ID);
+        verify(matchingGraphSynchronizer).foodPostChangedAfterCommit(POST_ID);
     }
 
     @Test

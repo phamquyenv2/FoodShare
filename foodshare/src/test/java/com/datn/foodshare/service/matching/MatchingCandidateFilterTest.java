@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -204,5 +205,32 @@ class MatchingCandidateFilterTest {
                 21.028511, 105.804817
         );
         assertTrue(distance > 1100 && distance < 1200);
+    }
+
+    @Test
+    void findEligibleFoodPostIdsChecksOneCandidateAgainstPosts() {
+        User candidate = createCandidate(1L, Role.RECIPIENT, true, true, "10.772622", "106.670172");
+        FoodPost farPost = new FoodPost();
+        farPost.setId(2L);
+        User farSupplier = createCandidate(200L, Role.SUPPLIER, true, true, "21.028511", "105.804817");
+        BusinessProfile farProfile = new BusinessProfile();
+        farProfile.setUser(farSupplier);
+        farPost.setBusinessProfile(farProfile);
+        farPost.setPickupEndAt(now.plus(2, ChronoUnit.HOURS));
+        when(receiverCapacityService.countActiveOrders(List.of(1L))).thenReturn(Map.of(1L, 0L));
+
+        Set<Long> result = filter.findEligibleFoodPostIds(List.of(foodPost, farPost), candidate);
+
+        assertEquals(Set.of(1L), result);
+    }
+
+    @Test
+    void findEligibleFoodPostIdsRejectsCandidateAtCapacity() {
+        User candidate = createCandidate(1L, Role.RECIPIENT, true, true, "10.772622", "106.670172");
+        when(receiverCapacityService.countActiveOrders(List.of(1L))).thenReturn(Map.of(1L, 2L));
+
+        Set<Long> result = filter.findEligibleFoodPostIds(List.of(foodPost), candidate);
+
+        assertTrue(result.isEmpty());
     }
 }

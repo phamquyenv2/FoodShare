@@ -7,6 +7,7 @@ import com.datn.foodshare.domain.request.UpdateUserRequest;
 import com.datn.foodshare.domain.response.CurrentUserResponse;
 import com.datn.foodshare.repository.BusinessProfileRepository;
 import com.datn.foodshare.repository.UserRepository;
+import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
 import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.ProfileType;
 import com.datn.foodshare.util.constant.Role;
@@ -29,6 +30,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final BusinessProfileRepository businessProfileRepository;
+    private final DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
 
     @Transactional(readOnly = true)
     public CurrentUserResponse getCurrentUser() {
@@ -80,6 +82,7 @@ public class UserService {
 
         user.setProfileCompleted(true);
         User savedUser = userRepository.save(user);
+        matchingGraphSynchronizer.userChangedAfterCommit(savedUser.getId());
         return CurrentUserResponse.from(savedUser, businessProfile);
     }
 
