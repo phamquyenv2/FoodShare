@@ -73,9 +73,16 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse handlePaymentSuccess(Long paymentId) {
+    public PaymentResponse handlePaymentSuccess(Long paymentId) throws PermissionException {
+        Long currentUserId = SecurityUtil.getCurrentUserId()
+                .orElseThrow(() -> new PermissionException("Chưa đăng nhập"));
+
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new BusinessException("Giao dịch không tồn tại"));
+
+        if (!payment.getOrder().getReceiver().getId().equals(currentUserId)) {
+            throw new PermissionException("Bạn không có quyền thao tác trên giao dịch này");
+        }
 
         if (payment.getPaymentStatus() == TransactionStatus.SUCCESS) {
             return PaymentResponse.from(payment);
@@ -88,9 +95,16 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse handlePaymentFailure(Long paymentId) {
+    public PaymentResponse handlePaymentFailure(Long paymentId) throws PermissionException {
+        Long currentUserId = SecurityUtil.getCurrentUserId()
+                .orElseThrow(() -> new PermissionException("Chưa đăng nhập"));
+
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new BusinessException("Giao dịch không tồn tại"));
+
+        if (!payment.getOrder().getReceiver().getId().equals(currentUserId)) {
+            throw new PermissionException("Bạn không có quyền thao tác trên giao dịch này");
+        }
 
         if (payment.getPaymentStatus() == TransactionStatus.SUCCESS) {
             throw new BusinessException("Giao dịch đã thành công, không thể chuyển sang thất bại");
