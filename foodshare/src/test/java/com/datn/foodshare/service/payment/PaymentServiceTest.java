@@ -145,34 +145,42 @@ class PaymentServiceTest {
     }
 
     @Test
-    void handlePaymentSuccess_success() {
-        Payment payment = new Payment();
-        payment.setId(PAYMENT_ID);
-        payment.setOrder(mockOrder(new BigDecimal("50000")));
-        payment.setPaymentStatus(TransactionStatus.PROCESSING);
+    void handlePaymentSuccess_success() throws PermissionException {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(USER_ID));
 
-        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+            Payment payment = new Payment();
+            payment.setId(PAYMENT_ID);
+            payment.setOrder(mockOrder(new BigDecimal("50000")));
+            payment.setPaymentStatus(TransactionStatus.PROCESSING);
 
-        PaymentResponse res = paymentService.handlePaymentSuccess(PAYMENT_ID);
+            when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
+            when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertEquals(TransactionStatus.SUCCESS, res.getStatus());
-        assertNotNull(res.getPaidAt());
+            PaymentResponse res = paymentService.handlePaymentSuccess(PAYMENT_ID);
+
+            assertEquals(TransactionStatus.SUCCESS, res.getStatus());
+            assertNotNull(res.getPaidAt());
+        }
     }
 
     @Test
-    void handlePaymentFailure_success() {
-        Payment payment = new Payment();
-        payment.setId(PAYMENT_ID);
-        payment.setOrder(mockOrder(new BigDecimal("50000")));
-        payment.setPaymentStatus(TransactionStatus.PROCESSING);
+    void handlePaymentFailure_success() throws PermissionException {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(USER_ID));
 
-        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
-        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+            Payment payment = new Payment();
+            payment.setId(PAYMENT_ID);
+            payment.setOrder(mockOrder(new BigDecimal("50000")));
+            payment.setPaymentStatus(TransactionStatus.PROCESSING);
 
-        PaymentResponse res = paymentService.handlePaymentFailure(PAYMENT_ID);
+            when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
+            when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertEquals(TransactionStatus.FAILED, res.getStatus());
+            PaymentResponse res = paymentService.handlePaymentFailure(PAYMENT_ID);
+
+            assertEquals(TransactionStatus.FAILED, res.getStatus());
+        }
     }
 
     @Test

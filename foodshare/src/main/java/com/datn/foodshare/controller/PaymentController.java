@@ -34,14 +34,16 @@ public class PaymentController {
     }
 
     @PatchMapping("/{paymentId}/success")
+    @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
     @ApiMessage("Mô phỏng thanh toán thành công")
-    public ResponseEntity<PaymentResponse> handlePaymentSuccess(@PathVariable Long paymentId) {
+    public ResponseEntity<PaymentResponse> handlePaymentSuccess(@PathVariable Long paymentId) throws PermissionException {
         return ResponseEntity.ok(paymentService.handlePaymentSuccess(paymentId));
     }
 
     @PatchMapping("/{paymentId}/failure")
+    @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
     @ApiMessage("Mô phỏng thanh toán thất bại")
-    public ResponseEntity<PaymentResponse> handlePaymentFailure(@PathVariable Long paymentId) {
+    public ResponseEntity<PaymentResponse> handlePaymentFailure(@PathVariable Long paymentId) throws PermissionException {
         return ResponseEntity.ok(paymentService.handlePaymentFailure(paymentId));
     }
 

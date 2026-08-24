@@ -42,6 +42,7 @@ public class OrderDetail extends BaseModel {
     @Column(nullable = false)
     private int quantity;
 
-    @Column(nullable = false, precision = 19, scale = 2)
-    private BigDecimal subtotal;
+    public BigDecimal getSubtotal() {
+        return unitPrice.multiply(BigDecimal.valueOf(quantity));
+    }
 }

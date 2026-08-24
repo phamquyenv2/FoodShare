@@ -15,8 +15,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.List;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -94,6 +97,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<RestResponse<Object>> handleAllExceptions(Exception ex) {
+        log.error("Unhandled exception: {}", ex.getMessage(), ex);
         RestResponse<Object> res = new RestResponse<>();
         res.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
         res.setError("Internal Server Error");
