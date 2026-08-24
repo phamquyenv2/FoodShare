@@ -68,7 +68,7 @@ public class FoodPostPriorityQueue {
                 entryIndex.put(post.getId(), entry);
             }
 
-            log.info("Priority Queue rebuilt: {} FoodPost(s) loaded", queue.size());
+            log.info("Priority Queue được xây dựng: {} FoodPost", queue.size());
         } finally {
             lock.writeLock().unlock();
         }
@@ -163,7 +163,7 @@ public class FoodPostPriorityQueue {
             evictExpired();
             int evicted = before - queue.size();
             if (evicted > 0) {
-                log.info("Priority Queue: evicted {} expired entry(ies), remaining: {}", evicted, queue.size());
+                log.info("Priority Queue: chu kỳ {} FoodPost(s) hết hạn, còn lại: {}", evicted, queue.size());
             }
         } finally {
             lock.writeLock().unlock();

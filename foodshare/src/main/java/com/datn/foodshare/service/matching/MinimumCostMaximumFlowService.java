@@ -36,9 +36,9 @@ public class MinimumCostMaximumFlowService {
             Map<Long, Integer> recipientCapacities,
             Instant evaluatedAt
     ) {
-        Objects.requireNonNull(candidateSets, "Top-K candidate sets must not be null");
-        Objects.requireNonNull(recipientCapacities, "Recipient capacities must not be null");
-        Objects.requireNonNull(evaluatedAt, "Evaluation time must not be null");
+        Objects.requireNonNull(candidateSets, "Top-K candidate set phải khác null");
+        Objects.requireNonNull(recipientCapacities, "Recipient capacities phải khác null");
+        Objects.requireNonNull(evaluatedAt, "Thời gian đánh giá phải khác null");
         validateRecipientCapacities(recipientCapacities);
 
         List<PreparedCandidateSet> preparedSets = prepare(candidateSets, evaluatedAt);
@@ -124,16 +124,16 @@ public class MinimumCostMaximumFlowService {
         List<PreparedCandidateSet> preparedSets = new ArrayList<>();
 
         for (TopKCandidateSet candidateSet : candidateSets) {
-            Objects.requireNonNull(candidateSet, "Top-K candidate set must not be null");
+            Objects.requireNonNull(candidateSet, "Top-K candidate set phải khác null");
             FoodPost foodPost = Objects.requireNonNull(
                     candidateSet.foodPost(),
-                    "FoodPost must not be null"
+                    "FoodPost phải khác null"
             );
             if (foodPost.getId() == null) {
-                throw new IllegalArgumentException("FoodPost ID must not be null");
+                throw new IllegalArgumentException("FoodPost ID phải khác null");
             }
             if (!foodPostIds.add(foodPost.getId())) {
-                throw new IllegalArgumentException("Duplicate FoodPost ID: " + foodPost.getId());
+                throw new IllegalArgumentException("FoodPost ID bị trùng: " + foodPost.getId());
             }
             if (!isEligible(foodPost, evaluatedAt)) {
                 continue;
@@ -141,9 +141,9 @@ public class MinimumCostMaximumFlowService {
 
             Map<Long, PreparedCandidate> bestCandidateById = new LinkedHashMap<>();
             for (MatchingScoreResult result : candidateSet.topCandidates()) {
-                Objects.requireNonNull(result, "Top-K result must not be null");
+                Objects.requireNonNull(result, "Top-K result phải khác null");
                 if (result.candidate() == null || result.candidate().getId() == null) {
-                    throw new IllegalArgumentException("Top-K candidate ID must not be null");
+                    throw new IllegalArgumentException("Top-K candidate ID phải khác null");
                 }
                 validateScore(result.score());
                 PreparedCandidate prepared = new PreparedCandidate(
@@ -176,11 +176,11 @@ public class MinimumCostMaximumFlowService {
     private void validateRecipientCapacities(Map<Long, Integer> recipientCapacities) {
         recipientCapacities.forEach((candidateId, capacity) -> {
             if (candidateId == null) {
-                throw new IllegalArgumentException("Recipient capacity ID must not be null");
+                throw new IllegalArgumentException("Recipient capacity ID phải khác null");
             }
             if (capacity == null || capacity < 0) {
                 throw new IllegalArgumentException(
-                        "Recipient capacity must be non-negative for candidate " + candidateId
+                        "Recipient capacity phải không âm cho candidate " + candidateId
                 );
             }
         });
@@ -195,7 +195,7 @@ public class MinimumCostMaximumFlowService {
 
     private void validateScore(double score) {
         if (!Double.isFinite(score) || score < 0.0 || score > 1.0) {
-            throw new IllegalArgumentException("Matching score must be between 0 and 1");
+            throw new IllegalArgumentException("Matching score phải từ 0 đến 1");
         }
     }
 
@@ -205,10 +205,10 @@ public class MinimumCostMaximumFlowService {
 
     public record TopKCandidateSet(FoodPost foodPost, List<MatchingScoreResult> topCandidates) {
         public TopKCandidateSet {
-            Objects.requireNonNull(foodPost, "FoodPost must not be null");
+            Objects.requireNonNull(foodPost, "FoodPost phải khác null");
             topCandidates = List.copyOf(Objects.requireNonNull(
                     topCandidates,
-                    "Top-K candidates must not be null"
+                    "Top-K candidates phải khác null"
             ));
         }
     }

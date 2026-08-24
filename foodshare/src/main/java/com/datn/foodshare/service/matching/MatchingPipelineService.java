@@ -43,7 +43,7 @@ public class MatchingPipelineService {
             int topK,
             Map<Long, Integer> recipientCapacities
     ) {
-        Objects.requireNonNull(recipientCapacities, "Recipient capacities must not be null");
+        Objects.requireNonNull(recipientCapacities, "Khả năng của người nhận không được null");
         List<PreparedRecommendation> prepared = execute(maximumFoodPosts, topK, Instant.now());
         AllocationResult allocation = minimumCostMaximumFlowService.allocate(
                 prepared.stream()
@@ -59,7 +59,7 @@ public class MatchingPipelineService {
 
     List<PreparedRecommendation> execute(int maximumFoodPosts, int topK, Instant evaluatedAt) {
         validateLimits(maximumFoodPosts, topK);
-        Objects.requireNonNull(evaluatedAt, "Evaluation time must not be null");
+        Objects.requireNonNull(evaluatedAt, "Thời gian đánh giá không được null");
 
         List<FoodPostPriorityEntry> priorityEntries = foodPostPriorityQueue.getOrderedEntries();
         if (priorityEntries.isEmpty()) {
@@ -104,10 +104,10 @@ public class MatchingPipelineService {
 
     private void validateLimits(int maximumFoodPosts, int topK) {
         if (maximumFoodPosts <= 0) {
-            throw new IllegalArgumentException("Maximum FoodPost count must be greater than 0");
+            throw new IllegalArgumentException("Số lượng FoodPost tối đa phải lớn hơn 0");
         }
         if (topK <= 0) {
-            throw new IllegalArgumentException("Top-K must be greater than 0");
+            throw new IllegalArgumentException("Top-K phải lớn hơn 0");
         }
     }
 
@@ -153,7 +153,7 @@ public class MatchingPipelineService {
     ) {
         public AllocationPlan {
             recommendations = List.copyOf(recommendations);
-            Objects.requireNonNull(allocation, "Allocation must not be null");
+            Objects.requireNonNull(allocation, "Allocation không được null");
         }
     }
 
