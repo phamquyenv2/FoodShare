@@ -40,10 +40,10 @@ public class CloudinaryService {
         } catch (StorageException e) {
             throw e;
         } catch (IOException e) {
-            log.error("Cloudinary upload failed", e);
+            log.error("Tải ảnh lên Cloudinary thất bại", e);
             throw new StorageException("Upload ảnh thất bại: " + e.getMessage());
         } catch (Exception e) {
-            log.error("Cloudinary upload unexpected error", e);
+            log.error("Lỗi không xác định khi tải ảnh lên Cloudinary", e);
             throw new StorageException("Upload ảnh thất bại: " + e.getMessage());
         }
     }
@@ -56,7 +56,7 @@ public class CloudinaryService {
                 cloudinary.uploader().destroy(publicId, Map.of());
             }
         } catch (Exception e) {
-            log.warn("Cloudinary delete failed for url={}: {}", imageUrl, e.getMessage());
+            log.warn("Xóa ảnh trên Cloudinary thất bại cho url={}: {}", imageUrl, e.getMessage());
         }
     }
 
@@ -87,7 +87,7 @@ public class CloudinaryService {
             int dotIdx = afterUpload.lastIndexOf('.');
             return dotIdx > 0 ? afterUpload.substring(0, dotIdx) : afterUpload;
         } catch (Exception e) {
-            log.warn("Could not extract publicId from url={}", url);
+            log.warn("Không thể trích xuất publicId từ url={}", url);
             return null;
         }
     }
