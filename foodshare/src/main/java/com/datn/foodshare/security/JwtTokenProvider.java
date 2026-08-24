@@ -100,13 +100,13 @@ public class JwtTokenProvider {
                     .getPayload();
             return expectedType.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
         } catch (SecurityException | MalformedJwtException e) {
-            log.error("Invalid JWT signature: {}", e.getMessage());
+            log.error("Chữ ký JWT không hợp lệ: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
-            log.error("Expired JWT token: {}", e.getMessage());
+            log.error("Token JWT đã hết hạn: {}", e.getMessage());
         } catch (UnsupportedJwtException e) {
-            log.error("Unsupported JWT token: {}", e.getMessage());
+            log.error("Token JWT không được hỗ trợ: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            log.error("JWT claims string is empty: {}", e.getMessage());
+            log.error("Chuỗi JWT claims trống: {}", e.getMessage());
         }
         return false;
     }

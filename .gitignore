@@ -25,3 +25,6 @@ replay_pid*
 
 # Local AI working files
 docs/.ai/
+
+# Firebase credentials
+foodshare/src/main/resources/foodshare-*.json
