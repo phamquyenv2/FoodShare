@@ -201,7 +201,7 @@ public class DynamicMatchingGraph {
             });
             invalidIds.forEach(this::removeFoodPostInternal);
             if (!invalidIds.isEmpty()) {
-                log.info("Dynamic matching graph invalidated {} unavailable FoodPost node(s)", invalidIds.size());
+                log.info("Đồ thị ghép nối động đã vô hiệu hóa {} FoodPost node không khả dụng", invalidIds.size());
             }
         } finally {
             lock.writeLock().unlock();

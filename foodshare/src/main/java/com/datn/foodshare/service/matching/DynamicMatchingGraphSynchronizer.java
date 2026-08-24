@@ -38,7 +38,7 @@ public class DynamicMatchingGraphSynchronizer {
         try {
             rebuildFromDatabase();
         } catch (RuntimeException exception) {
-            log.error("Could not initialize dynamic matching graph; it remains rebuildable from the database", exception);
+            log.error("Không thể khởi tạo dynamic matching graph; nó vẫn có thể được xây dựng lại từ cơ sở dữ liệu", exception);
         }
     }
 
@@ -59,7 +59,7 @@ public class DynamicMatchingGraphSynchronizer {
         try {
             synchronizeFoodPost(event.foodPostId());
         } catch (RuntimeException exception) {
-            log.error("Could not synchronize FoodPost {} to dynamic matching graph", event.foodPostId(), exception);
+            log.error("Không thể đồng bộ FoodPost {} với dynamic matching graph", event.foodPostId(), exception);
         }
     }
 
@@ -68,7 +68,7 @@ public class DynamicMatchingGraphSynchronizer {
         try {
             synchronizeUser(event.userId());
         } catch (RuntimeException exception) {
-            log.error("Could not synchronize user {} to dynamic matching graph", event.userId(), exception);
+            log.error("Không thể đồng bộ user {} với dynamic matching graph", event.userId(), exception);
         }
     }
 
@@ -77,7 +77,7 @@ public class DynamicMatchingGraphSynchronizer {
         try {
             rebuildFromDatabase();
         } catch (RuntimeException exception) {
-            log.error("Could not rebuild dynamic matching graph", exception);
+            log.error("Không thể xây dựng lại dynamic matching graph", exception);
         }
     }
 
@@ -103,7 +103,7 @@ public class DynamicMatchingGraphSynchronizer {
         }
 
         graph.replaceAll(foodPosts, candidateNodes.values(), edges);
-        log.info("Dynamic matching graph rebuilt: {} FoodPost node(s), {} candidate node(s), {} edge(s)",
+        log.info("Dynamic matching graph được xây dựng lại: {} FoodPost node(s), {} candidate node(s), {} edge(s)",
                 graph.foodPostCount(), graph.candidateCount(), graph.edgeCount());
     }
 

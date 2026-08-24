@@ -11,7 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
@@ -171,7 +171,7 @@ class DynamicMatchingGraphSynchronizationTest {
                 .build();
     }
 
-    @Configuration
+    @TestConfiguration
     @EnableTransactionManagement
     static class Config {
 

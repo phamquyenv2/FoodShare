@@ -58,7 +58,7 @@ public class MatchingCandidateFilter {
                 .filter(u -> activeOrderCounts.getOrDefault(u.getId(), 0L) < maxActiveOrders)
                 .toList();
 
-        log.debug("Candidate filter for FoodPost {}: {} receivers -> {} basic -> {} distance -> {} capacity",
+        log.debug("Bộ lọc ứng viên cho FoodPost {}: {} người nhận -> {} cơ bản -> {} khoảng cách -> {} công suất",
                 foodPost.getId(), allReceivers.size(), basicFiltered.size(),
                 relationFiltered.size(), capacityFiltered.size());
 

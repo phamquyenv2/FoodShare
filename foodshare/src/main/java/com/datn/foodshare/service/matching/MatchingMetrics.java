@@ -31,7 +31,7 @@ final class MatchingMetrics {
 
     static double inverseNormalize(double nonNegativeValue) {
         if (nonNegativeValue < 0) {
-            throw new IllegalArgumentException("Value to normalize must not be negative");
+            throw new IllegalArgumentException("Giá trị chuẩn hóa không được âm");
         }
         return 1.0 / (1.0 + nonNegativeValue);
     }
