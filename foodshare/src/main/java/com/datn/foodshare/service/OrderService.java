@@ -80,7 +80,6 @@ public class OrderService {
                 .foodPost(foodPost)
                 .unitPrice(unitPrice)
                 .quantity(request.getQuantity())
-                .subtotal(subtotal)
                 .build();
 
         order.getOrderDetails().add(orderDetail);
@@ -154,7 +153,6 @@ public class OrderService {
                         .foodPost(foodPost)
                         .unitPrice(unitPrice)
                         .quantity(req.getQuantity())
-                        .subtotal(subtotal)
                         .build();
 
                 order.getOrderDetails().add(orderDetail);
