@@ -1,6 +1,7 @@
 package com.datn.foodshare.domain.entity;
 
 import com.datn.foodshare.util.constant.ReportReferenceType;
+import com.datn.foodshare.util.constant.ReportStatus;
 import com.datn.foodshare.util.constant.ReportType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
@@ -12,10 +13,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
+
+import java.time.Instant;
 
 @Entity
 @Table(name = "reports")
@@ -41,6 +45,11 @@ public class Report extends BaseModel {
     @Column(nullable = false, length = 20)
     private ReportType reportType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private ReportStatus reportStatus = ReportStatus.PENDING;
+
     @Column(columnDefinition = "TEXT")
     private String response;
 
@@ -53,4 +62,7 @@ public class Report extends BaseModel {
 
     @Column(nullable = false)
     private Long referenceId;
+
+    @Column
+    private Instant resolvedAt;
 }
