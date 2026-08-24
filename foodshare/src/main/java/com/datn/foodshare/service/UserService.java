@@ -4,14 +4,20 @@ import com.datn.foodshare.domain.entity.BusinessProfile;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.UpdateProfileRequest;
 import com.datn.foodshare.domain.request.UpdateUserRequest;
+import com.datn.foodshare.domain.request.UpdateUserStatusRequest;
+import com.datn.foodshare.domain.response.AdminUserResponse;
 import com.datn.foodshare.domain.response.CurrentUserResponse;
 import com.datn.foodshare.repository.BusinessProfileRepository;
 import com.datn.foodshare.repository.UserRepository;
+import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
 import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.ProfileType;
 import com.datn.foodshare.util.constant.Role;
 import com.datn.foodshare.util.error.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +35,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final BusinessProfileRepository businessProfileRepository;
+    private final DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
 
     @Transactional(readOnly = true)
     public CurrentUserResponse getCurrentUser() {
@@ -80,6 +87,7 @@ public class UserService {
 
         user.setProfileCompleted(true);
         User savedUser = userRepository.save(user);
+        matchingGraphSynchronizer.userChangedAfterCommit(savedUser.getId());
         return CurrentUserResponse.from(savedUser, businessProfile);
     }
 
@@ -212,5 +220,41 @@ public class UserService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    // ── Admin User Management ──────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponse> adminGetAllUsers(Role role, Boolean active, Pageable pageable) {
+        Specification<User> spec = (root, query, cb) -> cb.conjunction();
+
+        if (role != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("role"), role));
+        }
+        if (active != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("active"), active));
+        }
+
+        return userRepository.findAll(spec, pageable).map(AdminUserResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminUserResponse adminGetUserDetail(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("Không tìm thấy người dùng với id: " + userId));
+        return AdminUserResponse.from(user);
+    }
+
+    @Transactional
+    public AdminUserResponse adminUpdateUserStatus(Long userId, UpdateUserStatusRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("Không tìm thấy người dùng với id: " + userId));
+
+        if (user.getRole() == Role.ADMIN) {
+            throw new BusinessException("Không thể thay đổi trạng thái tài khoản ADMIN");
+        }
+
+        user.setActive(request.getActive());
+        return AdminUserResponse.from(userRepository.save(user));
     }
 }

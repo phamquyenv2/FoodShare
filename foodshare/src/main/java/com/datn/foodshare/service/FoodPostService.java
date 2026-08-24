@@ -14,6 +14,7 @@ import com.datn.foodshare.repository.CategoryRepository;
 import com.datn.foodshare.repository.FoodPostRepository;
 import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.repository.specification.FoodPostSpecification;
+import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
 import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.PostType;
@@ -44,6 +45,7 @@ public class FoodPostService {
     private final BusinessProfileRepository businessProfileRepository;
     private final UserRepository userRepository;
     private final CloudinaryService cloudinaryService;
+    private final DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
 
     @Transactional
     public FoodPostResponse create(CreateFoodPostRequest request) throws PermissionException {
@@ -76,7 +78,7 @@ public class FoodPostService {
 
         attachImages(post, request.getImages());
 
-        return FoodPostResponse.from(foodPostRepository.save(post));
+        return FoodPostResponse.from(saveAndSynchronize(post));
     }
 
     @Transactional
@@ -92,7 +94,7 @@ public class FoodPostService {
         validateExpiration(post.getExpiresAt(), post.getPickupEndAt());
 
         post.setPostStatus(PostStatus.AVAILABLE);
-        return FoodPostResponse.from(foodPostRepository.save(post));
+        return FoodPostResponse.from(saveAndSynchronize(post));
     }
 
     @Transactional
@@ -112,7 +114,7 @@ public class FoodPostService {
             post.setPostStatus(PostStatus.OUT_OF_STOCK);
         }
 
-        foodPostRepository.save(post);
+        saveAndSynchronize(post);
     }
 
     @Transactional
@@ -130,7 +132,7 @@ public class FoodPostService {
             post.setPostStatus(PostStatus.AVAILABLE);
         }
 
-        foodPostRepository.save(post);
+        saveAndSynchronize(post);
     }
 
     @Transactional(readOnly = true)
@@ -224,7 +226,7 @@ public class FoodPostService {
             oldUrls.forEach(cloudinaryService::deleteFoodPostImage);
         }
 
-        return FoodPostResponse.from(foodPostRepository.save(post));
+        return FoodPostResponse.from(saveAndSynchronize(post));
     }
 
     @Transactional
@@ -248,7 +250,7 @@ public class FoodPostService {
         }
 
         post.setPostStatus(PostStatus.HIDDEN);
-        return FoodPostResponse.from(foodPostRepository.save(post));
+        return FoodPostResponse.from(saveAndSynchronize(post));
     }
 
     @Transactional
@@ -267,7 +269,7 @@ public class FoodPostService {
 
         PostStatus restored = post.getAvailableQuantity() > 0 ? PostStatus.AVAILABLE : PostStatus.OUT_OF_STOCK;
         post.setPostStatus(restored);
-        return FoodPostResponse.from(foodPostRepository.save(post));
+        return FoodPostResponse.from(saveAndSynchronize(post));
     }
 
     @Transactional
@@ -282,7 +284,7 @@ public class FoodPostService {
         }
 
         post.setPostStatus(PostStatus.DELETED);
-        return FoodPostResponse.from(foodPostRepository.save(post));
+        return FoodPostResponse.from(saveAndSynchronize(post));
     }
 
     @Transactional(readOnly = true)
@@ -305,7 +307,7 @@ public class FoodPostService {
             throw new BusinessException("Bài đăng đã bị hủy");
         }
         post.setPostStatus(PostStatus.HIDDEN);
-        return FoodPostResponse.from(foodPostRepository.save(post));
+        return FoodPostResponse.from(saveAndSynchronize(post));
     }
 
     @Transactional
@@ -319,7 +321,7 @@ public class FoodPostService {
         }
         PostStatus restored = post.getAvailableQuantity() > 0 ? PostStatus.AVAILABLE : PostStatus.OUT_OF_STOCK;
         post.setPostStatus(restored);
-        return FoodPostResponse.from(foodPostRepository.save(post));
+        return FoodPostResponse.from(saveAndSynchronize(post));
     }
 
     private User getAuthenticatedUser() {
@@ -452,6 +454,12 @@ public class FoodPostService {
         return posts.map(FoodPostResponse::from);
     }
 
+    private FoodPost saveAndSynchronize(FoodPost post) {
+        FoodPost saved = foodPostRepository.save(post);
+        matchingGraphSynchronizer.foodPostChangedAfterCommit(saved.getId());
+        return saved;
+    }
+
     private void attachImages(FoodPost post, List<String> imageUrls) {
         if (imageUrls == null || imageUrls.isEmpty()) return;
         List<FoodPostImage> images = new ArrayList<>();
@@ -475,6 +483,7 @@ public class FoodPostService {
     public void markExpiredPosts() {
         int count = foodPostRepository.markExpired(Instant.now());
         if (count > 0) {
+            matchingGraphSynchronizer.rebuildAfterCommit();
             log.info("Đã chuyển {} bài đăng sang trạng thái EXPIRED", count);
         }
     }

@@ -6,6 +6,7 @@ import com.datn.foodshare.domain.request.UpdateProfileRequest;
 import com.datn.foodshare.domain.request.UpdateUserRequest;
 import com.datn.foodshare.repository.BusinessProfileRepository;
 import com.datn.foodshare.repository.UserRepository;
+import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
 import com.datn.foodshare.util.constant.AuthProvider;
 import com.datn.foodshare.util.constant.OrganizationType;
 import com.datn.foodshare.util.constant.ProfileType;
@@ -37,11 +38,14 @@ class UserServiceTest {
     @Mock
     private BusinessProfileRepository businessProfileRepository;
 
+    @Mock
+    private DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, businessProfileRepository);
+        userService = new UserService(userRepository, businessProfileRepository, matchingGraphSynchronizer);
         SecurityContextHolder.getContext().setAuthentication(
                 UsernamePasswordAuthenticationToken.authenticated("1", null, java.util.List.of()));
         lenient().when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -116,6 +120,7 @@ class UserServiceTest {
         assertEquals("Đà Nẵng", response.getSpecificAddress());
         assertNull(response.getProfile());
         verify(businessProfileRepository, never()).save(any());
+        verify(matchingGraphSynchronizer).userChangedAfterCommit(1L);
     }
 
     @Test
@@ -128,6 +133,7 @@ class UserServiceTest {
         assertThrows(BusinessException.class, () -> userService.updateProfile(request));
         assertFalse(user.isProfileCompleted());
         verify(userRepository, never()).save(any());
+        verifyNoInteractions(matchingGraphSynchronizer);
     }
 
     @Test

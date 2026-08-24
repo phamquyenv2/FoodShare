@@ -1,4 +1,4 @@
-package com.datn.foodshare.service;
+package com.datn.foodshare.service.matching;
 
 import com.datn.foodshare.domain.entity.FoodPost;
 import com.datn.foodshare.repository.FoodPostRepository;
@@ -36,26 +36,14 @@ public class FoodPostPriorityQueue {
     private final Map<Long, FoodPostPriorityEntry> entryIndex = new ConcurrentHashMap<>();
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
-    public record FoodPostPriorityEntry(
-            long foodPostId,
-            long remainingSeconds,
-            int availableQuantity,
-            Instant expiresAt,
-            Instant createdAt
-    ) {
+    public record FoodPostPriorityEntry(long foodPostId, long remainingSeconds, int availableQuantity, Instant expiresAt, Instant createdAt) {
         static FoodPostPriorityEntry fromFoodPost(FoodPost post, Instant now) {
             long remaining = Duration.between(now, post.getExpiresAt()).getSeconds();
-            return new FoodPostPriorityEntry(
-                    post.getId(),
-                    Math.max(remaining, 0),
-                    post.getAvailableQuantity(),
-                    post.getExpiresAt(),
-                    post.getCreatedAt()
-            );
+            return new FoodPostPriorityEntry(post.getId(), Math.max(remaining, 0), post.getAvailableQuantity(), post.getExpiresAt(), post.getCreatedAt());
         }
 
         double urgency() {
-            return 1.0 / (1.0 + remainingSeconds / 3600.0);
+            return MatchingMetrics.urgency(remainingSeconds);
         }
     }
 
@@ -80,7 +68,7 @@ public class FoodPostPriorityQueue {
                 entryIndex.put(post.getId(), entry);
             }
 
-            log.info("Priority Queue rebuilt: {} FoodPost(s) loaded", queue.size());
+            log.info("Priority Queue được xây dựng: {} FoodPost", queue.size());
         } finally {
             lock.writeLock().unlock();
         }
@@ -175,7 +163,7 @@ public class FoodPostPriorityQueue {
             evictExpired();
             int evicted = before - queue.size();
             if (evicted > 0) {
-                log.info("Priority Queue: evicted {} expired entry(ies), remaining: {}", evicted, queue.size());
+                log.info("Priority Queue: chu kỳ {} FoodPost(s) hết hạn, còn lại: {}", evicted, queue.size());
             }
         } finally {
             lock.writeLock().unlock();
