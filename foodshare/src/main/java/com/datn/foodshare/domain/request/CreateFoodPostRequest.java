@@ -40,6 +40,9 @@ public class CreateFoodPostRequest {
     @DecimalMin(value = "0", message = "Giá không được âm")
     private BigDecimal unitPrice;
 
+    @DecimalMin(value = "0", message = "Giá gốc không được âm")
+    private BigDecimal originalPrice;
+
     @NotNull(message = "Thời gian hết hạn không được để trống")
     private Instant expiresAt;
 
@@ -54,4 +57,6 @@ public class CreateFoodPostRequest {
     private Instant pickupEndAt;
 
     private List<String> images;
+
+    private Boolean isDraft;
 }

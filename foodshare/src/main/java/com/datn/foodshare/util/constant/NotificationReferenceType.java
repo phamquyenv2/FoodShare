@@ -4,5 +4,6 @@ public enum NotificationReferenceType {
     ORDER,
     FOOD_POST,
     PAYMENT,
-    REPORT
+    REPORT,
+    USER
 }

@@ -56,8 +56,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<RestResponse<Object>> handleAuthException(Exception ex) {
         RestResponse<Object> res = new RestResponse<>();
         res.setStatusCode(HttpStatus.UNAUTHORIZED.value());
-        res.setError("Bad Credentials");
-        res.setMessage(ex.getMessage() != null ? ex.getMessage() : "Thông tin đăng nhập không chính xác");
+        res.setError("Unauthorized");
+        
+        String message = ex.getMessage();
+        if (message != null && message.equals("Bad credentials")) {
+            message = "Tài khoản hoặc mật khẩu không chính xác";
+        } else if (message == null) {
+            message = "Thông tin đăng nhập không chính xác";
+        }
+        
+        res.setMessage(message);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(res);
     }
 

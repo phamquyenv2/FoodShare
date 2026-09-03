@@ -33,6 +33,9 @@ public class UpdateFoodPostRequest {
     @DecimalMin(value = "0", message = "Giá không được âm")
     private BigDecimal unitPrice;
 
+    @DecimalMin(value = "0", message = "Giá gốc không được âm")
+    private BigDecimal originalPrice;
+
     private Instant expiresAt;
 
     @Size(max = 500, message = "Địa điểm nhận tối đa 500 ký tự")
@@ -41,6 +44,8 @@ public class UpdateFoodPostRequest {
     private Instant pickupStartAt;
 
     private Instant pickupEndAt;
+
+    private Boolean isDraft;
 
     private List<String> images;
 }

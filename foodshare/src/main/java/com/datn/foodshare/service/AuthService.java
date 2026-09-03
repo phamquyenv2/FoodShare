@@ -64,12 +64,12 @@ public class AuthService {
 
     @Transactional
     public AuthenticationResult login(LoginRequest request) {
-        String phone = request.getPhone().trim();
+        String identifier = request.getIdentifier().trim();
         authenticationManager.authenticate(
-                UsernamePasswordAuthenticationToken.unauthenticated(phone, request.getPassword()));
+                UsernamePasswordAuthenticationToken.unauthenticated(identifier, request.getPassword()));
 
-        User user = userRepository.findByPhone(phone)
-                .orElseThrow(() -> new BadCredentialsException("Phone hoặc mật khẩu không chính xác"));
+        User user = userRepository.findByPhoneOrEmail(identifier, identifier)
+                .orElseThrow(() -> new BadCredentialsException("Tài khoản hoặc mật khẩu không chính xác"));
         if (!user.isActive()) {
             throw new BadCredentialsException("Tài khoản không hoạt động");
         }

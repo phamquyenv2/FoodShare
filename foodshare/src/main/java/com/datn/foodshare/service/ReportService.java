@@ -52,6 +52,20 @@ public class ReportService {
         Report savedReport = reportRepository.save(report);
 
         log.info("User {} đã tạo report mới: {}", currentUser.getId(), savedReport.getId());
+        
+        // Notify all Admins
+        java.util.List<User> admins = userRepository.findByRole(com.datn.foodshare.util.constant.Role.ADMIN);
+        for (User admin : admins) {
+            eventPublisher.publishEvent(NotificationEvent.builder()
+                    .source(this)
+                    .user(admin)
+                    .title("Báo cáo mới")
+                    .content("Người dùng " + currentUser.getFullName() + " vừa gửi một báo cáo/khiếu nại. Vui lòng kiểm tra.")
+                    .type(NotificationType.REPORT)
+                    .referenceType(NotificationReferenceType.REPORT)
+                    .referenceId(savedReport.getId())
+                    .build());
+        }
 
         return ReportResponse.from(savedReport);
     }

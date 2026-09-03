@@ -35,18 +35,18 @@ public interface StatisticRepository extends Repository<User, Long> {
     @Query("SELECT COUNT(o) FROM Order o WHERE o.orderStatus = :status")
     long countOrdersByStatus(@Param("status") OrderStatus status);
 
-    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.paymentStatus = :status AND p.createdAt BETWEEN :fromTs AND :toTs")
+    @Query("SELECT COALESCE(SUM(p.platformFee), 0) FROM Payout p WHERE p.payoutStatus = :status AND p.createdAt BETWEEN :fromTs AND :toTs")
     BigDecimal sumRevenue(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs, @Param("status") TransactionStatus status);
 
     @Query("SELECT COALESCE(SUM(p.netAmount), 0) FROM Payout p WHERE p.payoutStatus = :status AND p.createdAt BETWEEN :fromTs AND :toTs")
     BigDecimal sumPayout(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs, @Param("status") TransactionStatus status);
 
-    @Query("SELECT CAST(FUNCTION('DATE', u.createdAt) AS string) as dateStr, COUNT(u.id) as val FROM User u WHERE u.createdAt BETWEEN :fromTs AND :toTs GROUP BY FUNCTION('DATE', u.createdAt) ORDER BY dateStr")
+    @Query("SELECT CAST(FUNCTION('DATE', u.createdAt) AS string) as dateStr, COUNT(u.id) as val FROM User u WHERE u.createdAt BETWEEN :fromTs AND :toTs GROUP BY CAST(FUNCTION('DATE', u.createdAt) AS string) ORDER BY dateStr")
     List<DailyMetricProjection> getUserRegistrationsChart(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs);
 
-    @Query("SELECT CAST(FUNCTION('DATE', o.createdAt) AS string) as dateStr, COUNT(o.id) as val FROM Order o WHERE o.createdAt BETWEEN :fromTs AND :toTs GROUP BY FUNCTION('DATE', o.createdAt) ORDER BY dateStr")
+    @Query("SELECT CAST(FUNCTION('DATE', o.createdAt) AS string) as dateStr, COUNT(o.id) as val FROM Order o WHERE o.createdAt BETWEEN :fromTs AND :toTs GROUP BY CAST(FUNCTION('DATE', o.createdAt) AS string) ORDER BY dateStr")
     List<DailyMetricProjection> getOrderCountsChart(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs);
 
-    @Query("SELECT CAST(FUNCTION('DATE', p.createdAt) AS string) as dateStr, SUM(p.amount) as val FROM Payment p WHERE p.paymentStatus = :status AND p.createdAt BETWEEN :fromTs AND :toTs GROUP BY FUNCTION('DATE', p.createdAt) ORDER BY dateStr")
+    @Query("SELECT CAST(FUNCTION('DATE', p.createdAt) AS string) as dateStr, SUM(p.platformFee) as val FROM Payout p WHERE p.payoutStatus = :status AND p.createdAt BETWEEN :fromTs AND :toTs GROUP BY CAST(FUNCTION('DATE', p.createdAt) AS string) ORDER BY dateStr")
     List<DailyMetricProjection> getDailyRevenueChart(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs, @Param("status") TransactionStatus status);
 }

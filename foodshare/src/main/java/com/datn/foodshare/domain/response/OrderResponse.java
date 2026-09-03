@@ -47,6 +47,7 @@ public class OrderResponse {
         private Long id;
         private String name;
         private String pickupAddress;
+        private String imageUrl;
     }
 
     @Getter
@@ -54,6 +55,7 @@ public class OrderResponse {
     public static class ReceiverInfo {
         private Long id;
         private String fullName;
+        private String phone;
     }
 
     @Getter
@@ -61,6 +63,8 @@ public class OrderResponse {
     public static class SupplierInfo {
         private Long businessProfileId;
         private String name;
+        private String avatarUrl;
+        private String phone;
     }
 
     public static OrderResponse from(Order order) {
@@ -84,10 +88,13 @@ public class OrderResponse {
                 .receiver(ReceiverInfo.builder()
                         .id(order.getReceiver().getId())
                         .fullName(order.getReceiver().getFullName())
+                        .phone(order.getReceiver().getPhone())
                         .build())
                 .supplier(SupplierInfo.builder()
                         .businessProfileId(order.getBusinessProfile().getId())
                         .name(order.getBusinessProfile().getName())
+                        .avatarUrl(order.getBusinessProfile().getUser() != null ? order.getBusinessProfile().getUser().getAvatarUrl() : null)
+                        .phone(order.getBusinessProfile().getUser() != null ? order.getBusinessProfile().getUser().getPhone() : null)
                         .build())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
@@ -101,6 +108,8 @@ public class OrderResponse {
                         .id(detail.getFoodPost().getId())
                         .name(detail.getFoodPost().getName())
                         .pickupAddress(detail.getFoodPost().getPickupAddress())
+                        .imageUrl(detail.getFoodPost().getImages() != null && !detail.getFoodPost().getImages().isEmpty() 
+                                ? detail.getFoodPost().getImages().get(0).getImageUrl() : null)
                         .build())
                 .unitPrice(detail.getUnitPrice())
                 .quantity(detail.getQuantity())

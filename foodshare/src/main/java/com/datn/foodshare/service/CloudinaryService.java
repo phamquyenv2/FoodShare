@@ -28,7 +28,8 @@ public class CloudinaryService {
         validateFile(file);
         try {
             String publicId = "food-posts/" + UUID.randomUUID();
-            Map<?, ?> result = cloudinary.uploader().upload(file.getBytes(), Map.of(
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) cloudinary.uploader().upload(file.getBytes(), Map.of(
                     "public_id", publicId,
                     "overwrite", false
             ));
