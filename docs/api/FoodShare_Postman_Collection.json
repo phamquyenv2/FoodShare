@@ -1,0 +1,190 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+    "name": "FoodShare API Collection",
+    "description": "Toàn bộ API cho hệ thống FoodShare, bao gồm Auth, FoodPost, Order, Payment, và Admin. Yêu cầu cấu hình biến môi trường `base_url` và `token`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@foodshare.vn\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyen Van A\",\n  \"email\": \"nguyenvana@gmail.com\",\n  \"password\": \"password123\",\n  \"role\": \"RECIPIENT\",\n  \"phone\": \"0901234567\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. User & Profile",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/users/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Food Post",
+      "item": [
+        {
+          "name": "Get All Food Posts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/food-posts?page=0&size=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "food-posts"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Food Post (Supplier)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cơm tấm\",\n  \"description\": \"Cơm tấm sườn bì chả\",\n  \"category\": \"Cơm\",\n  \"totalQuantity\": 10,\n  \"unitPrice\": 0,\n  \"postType\": \"FREE\",\n  \"pickupAddress\": \"123 Le Loi\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/food-posts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "food-posts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Order",
+      "item": [
+        {
+          "name": "Create Order (Recipient)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodPostId\": 1,\n  \"quantity\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Batch Order (Organization)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"foodPostId\": 1, \"quantity\": 5 },\n    { \"foodPostId\": 2, \"quantity\": 10 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/batch",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "batch"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Admin",
+      "item": [
+        {
+          "name": "Get Statistics Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/statistics/overview?startDate=2026-08-01&endDate=2026-08-30",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "statistics", "overview"],
+              "query": [
+                { "key": "startDate", "value": "2026-08-01" },
+                { "key": "endDate", "value": "2026-08-30" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "YOUR_JWT_TOKEN",
+      "type": "string"
+    }
+  ]
+}

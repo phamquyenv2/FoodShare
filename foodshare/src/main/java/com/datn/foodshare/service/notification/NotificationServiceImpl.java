@@ -23,12 +23,23 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public void markAsRead(Long notificationId, Long userId) {
-        notificationRepository.markAsReadByIdAndUserId(notificationId, userId);
+        notificationRepository.findById(notificationId).ifPresent(notification -> {
+            if (notification.getUser().getId().equals(userId)) {
+                notification.setRead(true);
+                notificationRepository.save(notification);
+            }
+        });
     }
 
     @Override
     @Transactional
     public void markAllAsRead(Long userId) {
         notificationRepository.markAllAsReadByUserId(userId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long getUnreadCount(Long userId) {
+        return notificationRepository.countByUserIdAndIsReadFalse(userId);
     }
 }

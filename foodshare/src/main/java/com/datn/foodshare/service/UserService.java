@@ -8,11 +8,15 @@ import com.datn.foodshare.domain.request.UpdateUserStatusRequest;
 import com.datn.foodshare.domain.response.AdminUserResponse;
 import com.datn.foodshare.domain.response.CurrentUserResponse;
 import com.datn.foodshare.repository.BusinessProfileRepository;
+import com.datn.foodshare.repository.NotificationRepository;
 import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
 import com.datn.foodshare.util.SecurityUtil;
+import com.datn.foodshare.util.constant.NotificationReferenceType;
+import com.datn.foodshare.util.constant.NotificationType;
 import com.datn.foodshare.util.constant.ProfileType;
 import com.datn.foodshare.util.constant.Role;
+import com.datn.foodshare.domain.entity.Notification;
 import com.datn.foodshare.util.error.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -23,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -35,6 +40,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final BusinessProfileRepository businessProfileRepository;
+    private final NotificationRepository notificationRepository;
     private final DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
 
     @Transactional(readOnly = true)
@@ -67,6 +73,11 @@ public class UserService {
     @Transactional
     public CurrentUserResponse updateProfile(UpdateProfileRequest request) {
         User user = getAuthenticatedUser();
+        
+        if (request.getRole() != null && request.getRole() != Role.ADMIN) {
+            user.setRole(request.getRole());
+        }
+
         if (user.getRole() == Role.ADMIN) {
             throw new BusinessException("ADMIN không có hồ sơ nghiệp vụ trong chức năng này");
         }
@@ -85,8 +96,25 @@ public class UserService {
             case ADMIN -> throw new BusinessException("ADMIN không có hồ sơ nghiệp vụ trong chức năng này");
         };
 
+        boolean isFirstTimeCompleted = !user.isProfileCompleted();
         user.setProfileCompleted(true);
         User savedUser = userRepository.save(user);
+
+        if (isFirstTimeCompleted && (user.getRole() == Role.SUPPLIER || user.getRole() == Role.ORGANIZATION)) {
+            // Notify admins about new supplier/org
+            List<User> admins = userRepository.findByRole(Role.ADMIN);
+            for (User admin : admins) {
+                notificationRepository.save(Notification.builder()
+                        .user(admin)
+                        .title("Đăng ký hồ sơ mới")
+                        .content("Người dùng " + user.getFullName() + " vừa hoàn tất hồ sơ đăng ký " + user.getRole() + ". Vui lòng kiểm tra và xét duyệt.")
+                        .notificationType(NotificationType.NEW_SUPPLIER)
+                        .referenceType(NotificationReferenceType.USER)
+                        .referenceId(user.getId())
+                        .build());
+            }
+        }
+
         matchingGraphSynchronizer.userChangedAfterCommit(savedUser.getId());
         return CurrentUserResponse.from(savedUser, businessProfile);
     }
@@ -225,7 +253,7 @@ public class UserService {
     // ── Admin User Management ──────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Page<AdminUserResponse> adminGetAllUsers(Role role, Boolean active, Pageable pageable) {
+    public Page<AdminUserResponse> adminGetAllUsers(Role role, Boolean active, com.datn.foodshare.util.constant.VerificationStatus verificationStatus, Pageable pageable) {
         Specification<User> spec = (root, query, cb) -> cb.conjunction();
 
         if (role != null) {
@@ -233,6 +261,12 @@ public class UserService {
         }
         if (active != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("active"), active));
+        }
+        if (verificationStatus != null) {
+            spec = spec.and((root, query, cb) -> {
+                jakarta.persistence.criteria.Join<User, BusinessProfile> businessProfileJoin = root.join("businessProfile", jakarta.persistence.criteria.JoinType.INNER);
+                return cb.equal(businessProfileJoin.get("verificationStatus"), verificationStatus);
+            });
         }
 
         return userRepository.findAll(spec, pageable).map(AdminUserResponse::from);
@@ -256,5 +290,21 @@ public class UserService {
 
         user.setActive(request.getActive());
         return AdminUserResponse.from(userRepository.save(user));
+    }
+
+    @Transactional
+    public AdminUserResponse adminVerifyBusinessProfile(Long userId, com.datn.foodshare.domain.request.UpdateVerificationStatusRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("Không tìm thấy người dùng với id: " + userId));
+
+        BusinessProfile profile = user.getBusinessProfile();
+        if (profile == null) {
+            throw new BusinessException("Người dùng chưa có hồ sơ kinh doanh");
+        }
+
+        profile.setVerificationStatus(request.getVerificationStatus());
+        businessProfileRepository.save(profile);
+
+        return AdminUserResponse.from(user);
     }
 }

@@ -239,7 +239,7 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OrderResponse> getSupplierOrders(Pageable pageable) throws PermissionException {
+    public Page<OrderResponse> getSupplierOrders(OrderStatus status, String keyword, Pageable pageable) throws PermissionException {
         User currentUser = getAuthenticatedUser();
         requireSupplierRole(currentUser);
 
@@ -248,7 +248,8 @@ public class OrderService {
             throw new BusinessException("Không tìm thấy hồ sơ doanh nghiệp của bạn");
         }
 
-        Page<Order> ordersPage = orderRepository.findByBusinessProfileId(businessProfile.getId(), pageable);
+        Page<Order> ordersPage = orderRepository.searchSupplierOrders(businessProfile.getId(), status, keyword, pageable);
+        
         if (ordersPage.hasContent()) {
             List<Long> orderIds = ordersPage.getContent().stream().map(Order::getId).toList();
             orderRepository.findAllWithDetailsByIdIn(orderIds);

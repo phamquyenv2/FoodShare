@@ -59,6 +59,9 @@ public class FoodPost extends BaseModel {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal unitPrice;
 
+    @Column(precision = 19, scale = 2)
+    private BigDecimal originalPrice;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private PostType postType;

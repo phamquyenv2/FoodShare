@@ -14,6 +14,10 @@ import com.datn.foodshare.repository.CategoryRepository;
 import com.datn.foodshare.repository.FoodPostRepository;
 import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.repository.specification.FoodPostSpecification;
+import com.datn.foodshare.event.NotificationEvent;
+import com.datn.foodshare.util.constant.NotificationType;
+import com.datn.foodshare.util.constant.NotificationReferenceType;
+import org.springframework.context.ApplicationEventPublisher;
 import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
 import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.PostStatus;
@@ -46,6 +50,7 @@ public class FoodPostService {
     private final UserRepository userRepository;
     private final CloudinaryService cloudinaryService;
     private final DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public FoodPostResponse create(CreateFoodPostRequest request) throws PermissionException {
@@ -68,8 +73,9 @@ public class FoodPostService {
                 .totalQuantity(request.getTotalQuantity())
                 .availableQuantity(request.getTotalQuantity())
                 .unitPrice(request.getUnitPrice())
+                .originalPrice(request.getOriginalPrice())
                 .postType(request.getPostType())
-                .postStatus(PostStatus.DRAFT)
+                .postStatus(Boolean.TRUE.equals(request.getIsDraft()) ? PostStatus.DRAFT : PostStatus.AVAILABLE)
                 .expiresAt(request.getExpiresAt())
                 .pickupAddress(request.getPickupAddress().trim())
                 .pickupStartAt(request.getPickupStartAt())
@@ -146,11 +152,11 @@ public class FoodPostService {
     }
 
     @Transactional(readOnly = true)
-    public Page<FoodPostResponse> getMyPosts(Pageable pageable) throws PermissionException {
+    public Page<FoodPostResponse> getMyPosts(PostStatus status, String keyword, Pageable pageable) throws PermissionException {
         User currentUser = getAuthenticatedUser();
         requireRole(currentUser, Role.SUPPLIER);
         BusinessProfile businessProfile = resolveBusinessProfile(currentUser);
-        Page<FoodPost> posts = foodPostRepository.findByBusinessProfileId(businessProfile.getId(), pageable);
+        Page<FoodPost> posts = foodPostRepository.searchSupplierPosts(businessProfile.getId(), status, keyword, pageable);
         return mapPageWithImages(posts);
     }
 
@@ -203,6 +209,10 @@ public class FoodPostService {
         validatePrice(newPostType, newUnitPrice);
         post.setPostType(newPostType);
         post.setUnitPrice(newUnitPrice);
+        
+        if (request.getOriginalPrice() != null) {
+            post.setOriginalPrice(request.getOriginalPrice());
+        }
 
         Instant newPickupStart = request.getPickupStartAt() != null ? request.getPickupStartAt() : post.getPickupStartAt();
         Instant newPickupEnd = request.getPickupEndAt() != null ? request.getPickupEndAt() : post.getPickupEndAt();
@@ -224,6 +234,10 @@ public class FoodPostService {
             post.getImages().clear();
             attachImages(post, request.getImages());
             oldUrls.forEach(cloudinaryService::deleteFoodPostImage);
+        }
+
+        if (Boolean.FALSE.equals(request.getIsDraft()) && post.getPostStatus() == PostStatus.DRAFT) {
+            post.setPostStatus(PostStatus.AVAILABLE);
         }
 
         return FoodPostResponse.from(saveAndSynchronize(post));
@@ -481,9 +495,22 @@ public class FoodPostService {
     @Scheduled(fixedRate = 300_000)
     @Transactional
     public void markExpiredPosts() {
-        int count = foodPostRepository.markExpired(Instant.now());
-        if (count > 0) {
+        Instant now = Instant.now();
+        List<FoodPost> expiredPosts = foodPostRepository.findExpiredPosts(now);
+        if (!expiredPosts.isEmpty()) {
+            int count = foodPostRepository.markExpired(now);
             matchingGraphSynchronizer.rebuildAfterCommit();
+            for (FoodPost post : expiredPosts) {
+                eventPublisher.publishEvent(NotificationEvent.builder()
+                        .source(this)
+                        .user(post.getBusinessProfile().getUser())
+                        .title("Bài đăng đã hết hạn")
+                        .content("Bài đăng \"" + post.getName() + "\" của bạn đã hết thời gian chia sẻ.")
+                        .type(NotificationType.SYSTEM)
+                        .referenceType(NotificationReferenceType.FOOD_POST)
+                        .referenceId(post.getId())
+                        .build());
+            }
             log.info("Đã chuyển {} bài đăng sang trạng thái EXPIRED", count);
         }
     }
