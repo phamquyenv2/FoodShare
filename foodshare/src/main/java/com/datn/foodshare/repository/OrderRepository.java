@@ -26,7 +26,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Object[]> countActiveOrdersByReceiverIds(@Param("receiverIds") Collection<Long> receiverIds, @Param("statuses") Collection<OrderStatus> statuses);
     Page<Order> findByReceiverId(Long receiverId, Pageable pageable);
     
-    Page<Order> findByBusinessProfileId(Long businessProfileId, Pageable pageable);
+    @Query("""
+            SELECT o FROM Order o
+            LEFT JOIN o.receiver r
+            WHERE o.businessProfile.id = :businessProfileId
+              AND (:status IS NULL OR o.orderStatus = :status)
+              AND (:keyword IS NULL OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(r.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            """)
+    Page<Order> searchSupplierOrders(
+            @Param("businessProfileId") Long businessProfileId, 
+            @Param("status") OrderStatus status, 
+            @Param("keyword") String keyword, 
+            Pageable pageable);
 
     @Query("""
             SELECT DISTINCT o FROM Order o
@@ -47,4 +58,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             WHERE o.id = :id
             """)
     Optional<Order> findByIdWithDetails(@Param("id") Long id);
+
+    @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.businessProfile.id = :businessProfileId AND o.orderStatus = :orderStatus")
+    java.math.BigDecimal sumTotalAmountByBusinessProfileIdAndCompletedStatus(@Param("businessProfileId") Long businessProfileId, @Param("orderStatus") com.datn.foodshare.util.constant.OrderStatus orderStatus);
+
+    @Query("SELECT SUM(o.totalAmount) FROM Order o WHERE o.businessProfile.id = :businessProfileId AND EXISTS (SELECT 1 FROM Payment p WHERE p.order = o AND p.paymentStatus = :paymentStatus)")
+    java.math.BigDecimal sumTotalAmountByBusinessProfileIdAndPaymentStatus(@Param("businessProfileId") Long businessProfileId, @Param("paymentStatus") com.datn.foodshare.util.constant.TransactionStatus paymentStatus);
 }

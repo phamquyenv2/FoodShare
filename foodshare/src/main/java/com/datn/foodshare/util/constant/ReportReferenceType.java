@@ -4,5 +4,6 @@ public enum ReportReferenceType {
     ORDER,
     FOOD_POST,
     PAYMENT,
-    USER
+    USER,
+    SYSTEM
 }

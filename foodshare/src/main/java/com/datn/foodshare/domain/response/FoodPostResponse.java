@@ -21,6 +21,7 @@ public class FoodPostResponse {
     private int totalQuantity;
     private int availableQuantity;
     private BigDecimal unitPrice;
+    private BigDecimal originalPrice;
     private PostType postType;
     private PostStatus postStatus;
     private Instant expiresAt;
@@ -63,6 +64,7 @@ public class FoodPostResponse {
                 .totalQuantity(post.getTotalQuantity())
                 .availableQuantity(post.getAvailableQuantity())
                 .unitPrice(post.getUnitPrice())
+                .originalPrice(post.getOriginalPrice())
                 .postType(post.getPostType())
                 .postStatus(post.getPostStatus())
                 .expiresAt(post.getExpiresAt())

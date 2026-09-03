@@ -11,10 +11,13 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import com.datn.foodshare.util.constant.Role;
 
 @Getter
 @Setter
 public class UpdateProfileRequest {
+
+    private Role role;
 
     @Pattern(
             regexp = "^(?:\\+84|0)(3|5|7|8|9)[0-9]{8}$",

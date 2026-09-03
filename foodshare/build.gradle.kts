@@ -29,6 +29,9 @@ dependencies {
 	// OpenAPI / Swagger UI
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
 
+	// Load .env files automatically
+	implementation("me.paulschwarz:spring-dotenv:4.0.0")
+
 	// JWT (JJWT)
 	implementation("io.jsonwebtoken:jjwt-api:0.12.5")
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")

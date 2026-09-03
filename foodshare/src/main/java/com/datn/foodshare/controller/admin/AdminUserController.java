@@ -32,23 +32,32 @@ public class AdminUserController {
     @GetMapping
     @ApiMessage("Lấy danh sách người dùng (Admin) thành công")
     public ResponseEntity<Page<AdminUserResponse>> getAllUsers(
-            @RequestParam(required = false) Role role,
-            @RequestParam(required = false) Boolean active,
+            @RequestParam(name = "role", required = false) Role role,
+            @RequestParam(name = "active", required = false) Boolean active,
+            @RequestParam(name = "verificationStatus", required = false) com.datn.foodshare.util.constant.VerificationStatus verificationStatus,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(userService.adminGetAllUsers(role, active, pageable));
+        return ResponseEntity.ok(userService.adminGetAllUsers(role, active, verificationStatus, pageable));
     }
 
     @GetMapping("/{id}")
     @ApiMessage("Lấy chi tiết người dùng (Admin) thành công")
-    public ResponseEntity<AdminUserResponse> getUserDetail(@PathVariable Long id) {
+    public ResponseEntity<AdminUserResponse> getUserDetail(@PathVariable(name = "id") Long id) {
         return ResponseEntity.ok(userService.adminGetUserDetail(id));
     }
 
     @PatchMapping("/{id}/status")
     @ApiMessage("Cập nhật trạng thái tài khoản thành công")
     public ResponseEntity<AdminUserResponse> updateUserStatus(
-            @PathVariable Long id,
+            @PathVariable(name = "id") Long id,
             @Valid @RequestBody UpdateUserStatusRequest request) {
         return ResponseEntity.ok(userService.adminUpdateUserStatus(id, request));
+    }
+
+    @PatchMapping("/{id}/verify")
+    @ApiMessage("Xác thực hồ sơ nhà cung cấp thành công")
+    public ResponseEntity<AdminUserResponse> updateUserVerificationStatus(
+            @PathVariable(name = "id") Long id,
+            @Valid @RequestBody com.datn.foodshare.domain.request.UpdateVerificationStatusRequest request) {
+        return ResponseEntity.ok(userService.adminVerifyBusinessProfile(id, request));
     }
 }

@@ -20,6 +20,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.datn.foodshare.event.NotificationEvent;
+import com.datn.foodshare.util.constant.NotificationType;
+import com.datn.foodshare.util.constant.NotificationReferenceType;
+import org.springframework.context.ApplicationEventPublisher;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +33,7 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ReviewResponse createReview(CreateReviewRequest request) throws PermissionException {
@@ -61,6 +66,16 @@ public class ReviewService {
         Review savedReview = reviewRepository.save(review);
 
         log.info("Đã tạo đánh giá cho đơn {} bởi user {}", order.getOrderCode(), currentUser.getId());
+
+        eventPublisher.publishEvent(NotificationEvent.builder()
+                .source(this)
+                .user(order.getBusinessProfile().getUser())
+                .title("Bạn có đánh giá " + request.getRating() + " sao mới!")
+                .content("Khách hàng " + currentUser.getFullName() + " vừa đánh giá " + request.getRating() + " sao cho đơn hàng " + order.getOrderCode() + (request.getComment() != null ? " với lời nhắn: " + request.getComment() : "."))
+                .type(NotificationType.REVIEW)
+                .referenceType(NotificationReferenceType.REPORT) // Review is mapped to REPORT/REVIEW in frontend UI, actually the referenceType enum is just for the link. Does NotificationReferenceType have REVIEW? Let's check NotificationReferenceType.
+                .referenceId(order.getId()) // link to order for now
+                .build());
 
         return ReviewResponse.from(savedReview);
     }
