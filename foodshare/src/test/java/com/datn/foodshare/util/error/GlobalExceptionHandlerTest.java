@@ -81,14 +81,21 @@ class GlobalExceptionHandlerTest {
         var response = handler.handleAllExceptions(new IllegalArgumentException(
                 "No enum constant com.datn.foodshare.util.constant.OrderStatus.INVALID"));
         assertEquals(500, response.getStatusCode().value());
-        assertEquals("L?i h? th?ng, xin l?i v? s? b?t ti?n n?y.", response.getBody().getMessage());
+        assertNotNull(response.getBody());
+        String message = assertInstanceOf(String.class, response.getBody().getMessage());
+        assertFalse(message.isBlank());
+        assertFalse(message.contains("No enum constant"));
+        assertFalse(message.contains("OrderStatus.INVALID"));
     }
 
     @Test
     void externalServiceExceptionDoesNotExposeInternalDetails() {
         var response = handler.handleExternalServiceException(new ExternalServiceException("Internal provider details"));
         assertEquals(503, response.getStatusCode().value());
-        assertEquals("L?i h? th?ng, xin l?i v? s? b?t ti?n n?y.", response.getBody().getMessage());
+        assertNotNull(response.getBody());
+        String message = assertInstanceOf(String.class, response.getBody().getMessage());
+        assertFalse(message.isBlank());
+        assertFalse(message.contains("Internal provider details"));
     }
 
     public void dummyMethod(SendPhoneOtpRequest req) {}

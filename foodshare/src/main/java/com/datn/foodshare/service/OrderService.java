@@ -162,7 +162,6 @@ public class OrderService {
                     .receiverNote(supplierRequests.stream()
                             .map(CreateOrderRequest::getReceiverNote)
                             .filter(n -> n != null && !n.isBlank())
-                            .map(String::trim)
                             .reduce((a, b) -> a + "; " + b)
                             .map(this::trimToNull)
                             .orElse(null))

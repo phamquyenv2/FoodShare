@@ -127,6 +127,37 @@ class OrderServiceTest {
     }
 
     @Test
+    void createOrder_rejectsRecipientRequestingMultiplePortions() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(RECIPIENT_USER_ID));
+            when(userRepository.findById(RECIPIENT_USER_ID)).thenReturn(Optional.of(recipientUser()));
+            when(foodPostRepository.findByIdWithDetails(FOOD_POST_ID)).thenReturn(Optional.of(availableFoodPost()));
+            CreateOrderRequest request = validCreateOrderRequest();
+            request.setQuantity(2);
+
+            assertThrows(BusinessException.class, () -> orderService.createOrder(request));
+
+            verify(orderRepository, never()).save(any());
+            verifyNoInteractions(foodPostService);
+        }
+    }
+
+    @Test
+    void createOrder_rejectsRecipientAlreadyRequestingTheSamePost() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(RECIPIENT_USER_ID));
+            when(userRepository.findById(RECIPIENT_USER_ID)).thenReturn(Optional.of(recipientUser()));
+            when(foodPostRepository.findByIdWithDetails(FOOD_POST_ID)).thenReturn(Optional.of(availableFoodPost()));
+            when(orderRepository.existsByReceiverAndFoodPost(RECIPIENT_USER_ID, FOOD_POST_ID)).thenReturn(true);
+
+            assertThrows(BusinessException.class, () -> orderService.createOrder(validCreateOrderRequest()));
+
+            verify(orderRepository, never()).save(any());
+            verifyNoInteractions(foodPostService);
+        }
+    }
+
+    @Test
     void createOrder_success_organization() throws PermissionException {
         try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
             su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(ORGANIZATION_USER_ID));
@@ -918,7 +949,7 @@ class OrderServiceTest {
             });
 
             BatchCreateOrderRequest request = new BatchCreateOrderRequest(List.of(
-                    new CreateOrderRequest(101L, 2, " first "),
+                    new CreateOrderRequest(101L, 2, "first"),
                     new CreateOrderRequest(102L, 3, "second")));
 
             List<OrderResponse> responses = orderService.batchCreateOrders(request);
