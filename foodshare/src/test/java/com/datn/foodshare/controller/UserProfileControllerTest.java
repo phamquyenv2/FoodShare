@@ -8,6 +8,8 @@ import com.datn.foodshare.security.CustomAccessDeniedHandler;
 import com.datn.foodshare.security.CustomAuthenticationEntryPoint;
 import com.datn.foodshare.security.JwtAuthenticationFilter;
 import com.datn.foodshare.security.JwtTokenProvider;
+import com.datn.foodshare.security.RateLimitFilter;
+import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.service.CustomUserDetailsService;
 import com.datn.foodshare.service.UserService;
 import com.datn.foodshare.util.constant.AuthProvider;
@@ -25,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -38,10 +41,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         SecurityConfiguration.class,
         JwtAuthenticationFilter.class,
+        RateLimitFilter.class,
         CustomAuthenticationEntryPoint.class,
         CustomAccessDeniedHandler.class
 })
-class UserProfileIntegrationTest {
+class UserProfileControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -51,6 +55,9 @@ class UserProfileIntegrationTest {
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     @MockitoBean
     private CustomUserDetailsService customUserDetailsService;
@@ -150,6 +157,11 @@ class UserProfileIntegrationTest {
 
     private void stubAccessToken(String token, Role role) {
         when(jwtTokenProvider.validateAccessToken(token)).thenReturn(true);
+        when(jwtTokenProvider.getUserIdFromToken(token)).thenReturn(1L);
+        User activeUser = new User();
+        activeUser.setId(1L);
+        activeUser.setActive(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(activeUser));
         when(jwtTokenProvider.getAuthentication(token)).thenReturn(
                 UsernamePasswordAuthenticationToken.authenticated(
                         "1",

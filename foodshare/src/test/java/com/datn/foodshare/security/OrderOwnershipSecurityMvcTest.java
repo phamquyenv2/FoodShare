@@ -1,5 +1,6 @@
 package com.datn.foodshare.security;
 
+import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.config.SecurityConfiguration;
 import com.datn.foodshare.controller.OrderController;
 import com.datn.foodshare.service.OrderService;
@@ -22,10 +23,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         SecurityConfiguration.class,
         JwtAuthenticationFilter.class,
+        RateLimitFilter.class,
         CustomAuthenticationEntryPoint.class,
         CustomAccessDeniedHandler.class
 })
-class OwnershipSecurityIntegrationTest {
+class OrderOwnershipSecurityMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -35,6 +37,9 @@ class OwnershipSecurityIntegrationTest {
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     @MockitoBean
     private com.datn.foodshare.service.CustomUserDetailsService customUserDetailsService;

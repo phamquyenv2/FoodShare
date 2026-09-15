@@ -1,17 +1,22 @@
 package com.datn.foodshare.service;
 
 import com.datn.foodshare.domain.entity.Report;
+import com.datn.foodshare.domain.entity.Order;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.CreateReportRequest;
 import com.datn.foodshare.domain.request.UpdateReportStatusRequest;
 import com.datn.foodshare.domain.response.ReportResponse;
 import com.datn.foodshare.event.NotificationEvent;
 import com.datn.foodshare.repository.ReportRepository;
+import com.datn.foodshare.repository.OrderRepository;
 import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.NotificationReferenceType;
+import com.datn.foodshare.util.constant.NotificationChannel;
 import com.datn.foodshare.util.constant.NotificationType;
 import com.datn.foodshare.util.constant.ReportStatus;
+import com.datn.foodshare.util.constant.ReportReferenceType;
+import com.datn.foodshare.util.constant.OrderStatus;
 import com.datn.foodshare.util.error.BusinessException;
 import com.datn.foodshare.util.error.PermissionException;
 import lombok.RequiredArgsConstructor;
@@ -24,19 +29,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Set;
+import java.time.Duration;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ReportService {
 
+    private static final Duration INSPECTION_WINDOW = Duration.ofHours(24);
+
     private final ReportRepository reportRepository;
+    private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ReportResponse createReport(CreateReportRequest request) {
         User currentUser = getAuthenticatedUser();
+        if (request.getReferenceType() == ReportReferenceType.ORDER) {
+            validateOrderDispute(request.getReferenceId(), currentUser, Instant.now());
+        }
 
         Report report = Report.builder()
                 .reporter(currentUser)
@@ -68,6 +81,20 @@ public class ReportService {
         }
 
         return ReportResponse.from(savedReport);
+    }
+
+    private void validateOrderDispute(Long orderId, User reporter, Instant now) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException("Đơn tiếp nhận không tồn tại: " + orderId));
+        if (!order.getReceiver().getId().equals(reporter.getId())) {
+            throw new BusinessException("Chỉ người nhận của đơn hàng mới có thể gửi khiếu nại");
+        }
+        if (order.getOrderStatus() != OrderStatus.DELIVERED || order.getDeliveredAt() == null) {
+            throw new BusinessException("Chỉ có thể khiếu nại đơn đang ở trạng thái đã giao (DELIVERED)");
+        }
+        if (now.isAfter(order.getDeliveredAt().plus(INSPECTION_WINDOW))) {
+            throw new BusinessException("Cửa sổ khiếu nại 24 giờ của đơn hàng đã kết thúc");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -142,6 +169,7 @@ public class ReportService {
                 .type(NotificationType.SYSTEM)
                 .referenceType(NotificationReferenceType.REPORT)
                 .referenceId(savedReport.getId())
+                .channels(Set.of(NotificationChannel.IN_APP, NotificationChannel.PUSH))
                 .build());
 
         return ReportResponse.from(savedReport);

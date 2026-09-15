@@ -27,7 +27,7 @@ public class DatabaseInitializer implements CommandLineRunner {
     @Value("${app.default-admin.email:admin@foodshare.com}")
     private String defaultEmail;
 
-    @Value("${app.default-admin.password:Admin@123456}")
+    @Value("${app.default-admin.password:}")
     private String defaultPassword;
 
     @Value("${app.default-admin.full-name:FoodShare Administrator}")
@@ -66,7 +66,13 @@ public class DatabaseInitializer implements CommandLineRunner {
         }
 
         Optional<User> adminOpt = userRepository.findFirstByRole(Role.ADMIN);
-        if (adminOpt.isEmpty()) {
+        if (adminOpt.isEmpty() && (defaultPassword == null || defaultPassword.isBlank()
+                || defaultPassword.contains("CHANGE_ME") || defaultPassword.contains("your_"))) {
+            log.warn("Không tạo tài khoản ADMIN mặc định vì DEFAULT_ADMIN_PASSWORD chưa được cấu hình.");
+        } else if (adminOpt.isEmpty()) {
+            if (defaultPassword.length() < 12) {
+                throw new IllegalStateException("DEFAULT_ADMIN_PASSWORD must contain at least 12 characters");
+            }
             log.info("Chưa có tài khoản ADMIN trong hệ thống. Đang tiến hành tạo tài khoản Admin mặc định...");
 
             User admin = User.builder()

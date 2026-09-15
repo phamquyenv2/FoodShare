@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 import com.datn.foodshare.util.constant.Role;
 
 @Getter
@@ -23,6 +24,8 @@ public class UpdateProfileRequest {
             regexp = "^(?:\\+84|0)(3|5|7|8|9)[0-9]{8}$",
             message = "Số điện thoại không đúng định dạng")
     private String phone;
+
+    private String phoneRegistrationToken;
 
     @NotBlank(message = "Địa chỉ không được để trống")
     @Size(max = 500, message = "Địa chỉ không được vượt quá 500 ký tự")
@@ -47,4 +50,9 @@ public class UpdateProfileRequest {
 
     private SupplierType supplierType;
     private OrganizationType organizationType;
+
+    @Size(max = 50, message = "Số lượng giấy tờ vượt quá giới hạn hệ thống")
+    private List<
+            @NotBlank(message = "URL giấy tờ không được để trống")
+            @Size(max = 1000, message = "URL giấy tờ không được vượt quá 1000 ký tự") String> licenseUrls;
 }

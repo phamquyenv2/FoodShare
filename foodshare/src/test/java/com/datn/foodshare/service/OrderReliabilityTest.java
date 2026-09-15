@@ -44,7 +44,7 @@ import static org.mockito.Mockito.*;
  * - Concurrent order behavior (Optimistic Locking)
  */
 @ExtendWith(MockitoExtension.class)
-class OrderReliabilityIntegrationTest {
+class OrderReliabilityTest {
 
     @Mock
     private OrderRepository orderRepository;
@@ -59,11 +59,15 @@ class OrderReliabilityIntegrationTest {
     @Mock
     private com.datn.foodshare.service.payment.strategy.PaymentStrategyFactory paymentStrategyFactory;
     @Mock
+    private SupplierEarningService supplierEarningService;
+    @Mock
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private PermissionService permissionService;
 
     private OrderService orderService;
 
     private static final Long RECIPIENT_USER_ID = 50L;
+    private static final Long ORGANIZATION_USER_ID = 60L;
     private static final Long SUPPLIER_USER_ID = 10L;
     private static final Long FOOD_POST_ID = 100L;
     private static final Long BUSINESS_PROFILE_ID = 1L;
@@ -71,6 +75,7 @@ class OrderReliabilityIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        permissionService = new PermissionService(userRepository);
         orderService = new OrderService(
                 orderRepository,
                 foodPostRepository,
@@ -78,7 +83,9 @@ class OrderReliabilityIntegrationTest {
                 foodPostService,
                 paymentRepository,
                 paymentStrategyFactory,
-                eventPublisher
+                supplierEarningService,
+                eventPublisher,
+                permissionService
         );
     }
 
@@ -94,8 +101,8 @@ class OrderReliabilityIntegrationTest {
         @DisplayName("Rollback khi quantity vượt quá availableQuantity - order không được lưu")
         void rollback_whenQuantityExceedsAvailable_orderNotSaved() {
             try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
-                su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(RECIPIENT_USER_ID));
-                when(userRepository.findById(RECIPIENT_USER_ID)).thenReturn(Optional.of(recipientUser()));
+                su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(ORGANIZATION_USER_ID));
+                when(userRepository.findById(ORGANIZATION_USER_ID)).thenReturn(Optional.of(organizationUser()));
 
                 FoodPost post = availableFoodPost();
                 post.setAvailableQuantity(5);
@@ -172,7 +179,7 @@ class OrderReliabilityIntegrationTest {
 
                 // Simulate decreaseQuantity throwing exception AFTER order.save()
                 doThrow(new BusinessException("Bài đăng không ở trạng thái khả dụng"))
-                        .when(foodPostService).decreaseQuantity(FOOD_POST_ID, 3);
+                        .when(foodPostService).decreaseQuantity(FOOD_POST_ID, 1);
 
                 CreateOrderRequest request = validCreateOrderRequest();
 
@@ -184,7 +191,7 @@ class OrderReliabilityIntegrationTest {
                 // Verify order.save() was called (but will be rolled back by @Transactional)
                 verify(orderRepository).save(any(Order.class));
                 // Verify decreaseQuantity was called and threw
-                verify(foodPostService).decreaseQuantity(FOOD_POST_ID, 3);
+                verify(foodPostService).decreaseQuantity(FOOD_POST_ID, 1);
             }
         }
 
@@ -239,7 +246,7 @@ class OrderReliabilityIntegrationTest {
                 assertNotNull(savedOrder.getOrderDetails());
                 assertEquals(1, savedOrder.getOrderDetails().size());
                 assertEquals(FOOD_POST_ID, savedOrder.getOrderDetails().get(0).getFoodPost().getId());
-                assertEquals(3, savedOrder.getOrderDetails().get(0).getQuantity());
+                assertEquals(1, savedOrder.getOrderDetails().get(0).getQuantity());
 
                 // Order trạng thái PENDING
                 assertEquals(OrderStatus.PENDING, savedOrder.getOrderStatus());
@@ -266,7 +273,7 @@ class OrderReliabilityIntegrationTest {
                 // InOrder verifies the call sequence: save → decreaseQuantity
                 var inOrder = inOrder(orderRepository, foodPostService);
                 inOrder.verify(orderRepository).save(any(Order.class));
-                inOrder.verify(foodPostService).decreaseQuantity(FOOD_POST_ID, 3);
+                inOrder.verify(foodPostService).decreaseQuantity(FOOD_POST_ID, 1);
             }
         }
 
@@ -289,7 +296,7 @@ class OrderReliabilityIntegrationTest {
                 // Notification event published last
                 var inOrder = inOrder(orderRepository, foodPostService, eventPublisher);
                 inOrder.verify(orderRepository).save(any(Order.class));
-                inOrder.verify(foodPostService).decreaseQuantity(FOOD_POST_ID, 3);
+                inOrder.verify(foodPostService).decreaseQuantity(FOOD_POST_ID, 1);
                 inOrder.verify(eventPublisher).publishEvent(any());
             }
         }
@@ -340,7 +347,7 @@ class OrderReliabilityIntegrationTest {
                 // Simulate OptimisticLockException from decreaseQuantity
                 doThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(
                         FoodPost.class.getName(), FOOD_POST_ID))
-                        .when(foodPostService).decreaseQuantity(FOOD_POST_ID, 3);
+                        .when(foodPostService).decreaseQuantity(FOOD_POST_ID, 1);
 
                 CreateOrderRequest request = validCreateOrderRequest();
 
@@ -365,7 +372,7 @@ class OrderReliabilityIntegrationTest {
 
                 // Simulate another thread already decreased quantity
                 doThrow(new BusinessException("Không đủ số lượng. Còn lại: 0"))
-                        .when(foodPostService).decreaseQuantity(FOOD_POST_ID, 3);
+                        .when(foodPostService).decreaseQuantity(FOOD_POST_ID, 1);
 
                 CreateOrderRequest request = validCreateOrderRequest();
 
@@ -387,6 +394,16 @@ class OrderReliabilityIntegrationTest {
         user.setRole(Role.RECIPIENT);
         user.setProfileCompleted(true);
         user.setFullName("Recipient A");
+        user.setActive(true);
+        return user;
+    }
+
+    private User organizationUser() {
+        User user = new User();
+        user.setId(ORGANIZATION_USER_ID);
+        user.setRole(Role.ORGANIZATION);
+        user.setProfileCompleted(true);
+        user.setFullName("Organization A");
         user.setActive(true);
         return user;
     }
@@ -435,7 +452,7 @@ class OrderReliabilityIntegrationTest {
     private CreateOrderRequest validCreateOrderRequest() {
         CreateOrderRequest request = new CreateOrderRequest();
         request.setFoodPostId(FOOD_POST_ID);
-        request.setQuantity(3);
+        request.setQuantity(1);
         return request;
     }
 }

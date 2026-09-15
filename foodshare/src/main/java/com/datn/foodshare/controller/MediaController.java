@@ -24,4 +24,12 @@ public class MediaController {
         String url = cloudinaryService.uploadFoodPostImage(file);
         return ResponseEntity.ok(Map.of("url", url));
     }
+
+    @PostMapping("/upload/business-document")
+    @ApiMessage("Upload giấy tờ xác minh thành công")
+    public ResponseEntity<Map<String, String>> uploadBusinessDocument(
+            @RequestParam("file") MultipartFile file) throws Exception {
+        String url = cloudinaryService.uploadBusinessDocument(file);
+        return ResponseEntity.ok(Map.of("url", url));
+    }
 }

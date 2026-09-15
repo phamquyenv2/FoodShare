@@ -27,8 +27,8 @@ public class FoodPostPriorityQueue {
     private final FoodPostRepository foodPostRepository;
 
     static final Comparator<FoodPostPriorityEntry> PRIORITY_COMPARATOR = Comparator
-            .comparingLong(FoodPostPriorityEntry::remainingSeconds)
-            .thenComparingInt(FoodPostPriorityEntry::availableQuantity)
+            .comparing(FoodPostPriorityEntry::expiresAt)
+            .thenComparing(Comparator.comparingInt(FoodPostPriorityEntry::availableQuantity).reversed())
             .thenComparing(FoodPostPriorityEntry::createdAt)
             .thenComparingLong(FoodPostPriorityEntry::foodPostId);
 

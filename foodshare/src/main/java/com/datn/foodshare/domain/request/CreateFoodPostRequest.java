@@ -56,7 +56,8 @@ public class CreateFoodPostRequest {
     @NotNull(message = "Thời gian kết thúc nhận không được để trống")
     private Instant pickupEndAt;
 
-    private List<String> images;
+    @Size(max = 10, message = "Mỗi bài đăng chỉ được có tối đa 10 ảnh")
+    private List<@Size(max = 500, message = "URL ảnh tối đa 500 ký tự") String> images;
 
     private Boolean isDraft;
 }

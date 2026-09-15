@@ -63,6 +63,7 @@ class AuthServiceTest {
     @Test
     void registerHashesPasswordAndIssuesTokens() {
         RegisterRequest request = registerRequest();
+        allowVerifiedRegistration(request);
         when(passwordEncoder.encode("Password123")).thenReturn("bcrypt-hash");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User user = invocation.getArgument(0);
@@ -87,6 +88,7 @@ class AuthServiceTest {
     @Test
     void registerRejectsDuplicatePhone() {
         RegisterRequest request = registerRequest();
+        allowVerifiedRegistration(request);
         when(userRepository.existsByPhone("0901234567")).thenReturn(true);
 
         BusinessException exception = assertThrows(BusinessException.class, () -> authService.register(request));
@@ -108,7 +110,7 @@ class AuthServiceTest {
     void loginAuthenticatesByPhoneAndIssuesTokens() {
         LoginRequest request = loginRequest();
         User user = localUser();
-        when(userRepository.findByPhone("0901234567")).thenReturn(Optional.of(user));
+        when(userRepository.findByPhoneOrEmail("0901234567", "0901234567")).thenReturn(Optional.of(user));
         stubIssuedTokens();
 
         AuthService.AuthenticationResult result = authService.login(request);
@@ -125,7 +127,7 @@ class AuthServiceTest {
                 .thenThrow(new BadCredentialsException("Phone hoặc mật khẩu không chính xác"));
 
         assertThrows(BadCredentialsException.class, () -> authService.login(request));
-        verify(userRepository, never()).findByPhone(any());
+        verify(userRepository, never()).findByPhoneOrEmail(any(), any());
     }
 
     @Test
@@ -192,15 +194,20 @@ class AuthServiceTest {
                 .revoked(false)
                 .build();
         when(jwtTokenProvider.validateRefreshToken("refresh-token")).thenReturn(true);
-        when(userTokenRepository.findByRefreshTokenAndRevokedFalse("refresh-token"))
+        when(userTokenRepository.findByRefreshTokenAndRevokedFalse(anyString()))
                 .thenReturn(Optional.of(storedToken));
         when(jwtTokenProvider.getUserIdFromToken("refresh-token")).thenReturn(1L);
         when(jwtTokenProvider.createAccessToken(user)).thenReturn("new-access-token");
 
-        var response = authService.refreshAccessToken("refresh-token");
+        when(jwtTokenProvider.createRefreshToken(user)).thenReturn("rotated-refresh-token");
+        when(jwtTokenProvider.getExpirationFromToken("rotated-refresh-token"))
+                .thenReturn(Date.from(Instant.now().plusSeconds(3600)));
+        var result = authService.refreshAccessToken("refresh-token");
 
-        assertEquals("new-access-token", response.getAccessToken());
+        assertEquals("new-access-token", result.response().getAccessToken());
+        assertEquals("rotated-refresh-token", result.refreshToken());
         assertNotNull(storedToken.getLastActivatedAt());
+        assertTrue(storedToken.isRevoked());
         verify(userTokenRepository).save(storedToken);
     }
 
@@ -212,6 +219,136 @@ class AuthServiceTest {
         verify(userTokenRepository, never()).findByRefreshTokenAndRevokedFalse(any());
     }
 
+    @Test
+    void registerRejectsPhoneThatDoesNotMatchVerificationToken() {
+        RegisterRequest request = registerRequest();
+        when(jwtTokenProvider.validatePhoneRegistrationToken("phone-registration-token")).thenReturn(true);
+        when(jwtTokenProvider.getPhoneFromToken("phone-registration-token")).thenReturn("0987654321");
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> authService.register(request));
+
+        assertEquals("Số điện thoại không khớp với phiên đã xác minh", exception.getMessage());
+        verifyNoInteractions(userRepository, passwordEncoder);
+    }
+
+    @Test
+    void register_duplicateNormalizedEmail_rejectsWithoutEncodingPassword() {
+        RegisterRequest request = registerRequest();
+        allowVerifiedRegistration(request);
+        request.setEmail("  User@Example.com ");
+        when(userRepository.existsByEmail("user@example.com")).thenReturn(true);
+
+        assertThrows(BusinessException.class, () -> authService.register(request));
+
+        verify(passwordEncoder, never()).encode(any());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void register_missingRole_rejectsBeforeRepositoryCalls() {
+        RegisterRequest request = registerRequest();
+        request.setRole(null);
+
+        assertThrows(BusinessException.class, () -> authService.register(request));
+
+        verifyNoInteractions(userRepository, passwordEncoder);
+    }
+
+    @Test
+    void login_inactiveAccount_rejectsWithoutIssuingTokens() {
+        LoginRequest request = loginRequest();
+        User user = localUser();
+        user.setActive(false);
+        when(userRepository.findByPhoneOrEmail("0901234567", "0901234567"))
+                .thenReturn(Optional.of(user));
+
+        assertThrows(BadCredentialsException.class, () -> authService.login(request));
+
+        verifyNoInteractions(jwtTokenProvider);
+    }
+
+    @Test
+    void googleLogin_emailOwnedByLocalAccount_rejectsAccountLinking() {
+        GoogleLoginRequest request = googleRequest();
+        User localOwner = localUser();
+        localOwner.setEmail("user@example.com");
+        when(googleTokenVerifier.verify("google-id-token")).thenReturn(verifiedGoogleUser());
+        when(userRepository.findByGoogleSubject("google-subject")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(localOwner));
+
+        assertThrows(BusinessException.class, () -> authService.loginWithGoogle(request));
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void refresh_expiredStoredToken_revokesItAndRejects() {
+        UserToken storedToken = UserToken.builder()
+                .user(localUser())
+                .refreshToken("refresh-token")
+                .expiresAt(Instant.now().minusSeconds(1))
+                .revoked(false)
+                .build();
+        when(jwtTokenProvider.validateRefreshToken("refresh-token")).thenReturn(true);
+        when(userTokenRepository.findByRefreshTokenAndRevokedFalse(anyString()))
+                .thenReturn(Optional.of(storedToken));
+
+        assertThrows(BadCredentialsException.class,
+                () -> authService.refreshAccessToken("refresh-token"));
+
+        assertTrue(storedToken.isRevoked());
+        verify(userTokenRepository).save(storedToken);
+        verify(jwtTokenProvider, never()).createAccessToken(any());
+    }
+
+    @Test
+    void refresh_tokenUserDoesNotMatchStoredUser_rejectsWithoutUpdatingActivation() {
+        UserToken storedToken = UserToken.builder()
+                .user(localUser())
+                .refreshToken("refresh-token")
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .revoked(false)
+                .build();
+        when(jwtTokenProvider.validateRefreshToken("refresh-token")).thenReturn(true);
+        when(userTokenRepository.findByRefreshTokenAndRevokedFalse(anyString()))
+                .thenReturn(Optional.of(storedToken));
+        when(jwtTokenProvider.getUserIdFromToken("refresh-token")).thenReturn(99L);
+
+        assertThrows(BadCredentialsException.class,
+                () -> authService.refreshAccessToken("refresh-token"));
+
+        assertNull(storedToken.getLastActivatedAt());
+        verify(userTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void logoutRevokesStoredRefreshToken() {
+        UserToken storedToken = UserToken.builder().revoked(false).build();
+        when(userTokenRepository.findByRefreshTokenAndRevokedFalse(anyString()))
+                .thenReturn(Optional.of(storedToken));
+
+        authService.revokeRefreshToken("refresh-token");
+
+        assertTrue(storedToken.isRevoked());
+        verify(userTokenRepository).save(storedToken);
+    }
+
+    private GoogleLoginRequest googleRequest() {
+        GoogleLoginRequest request = new GoogleLoginRequest();
+        request.setIdToken("google-id-token");
+        request.setRole(Role.RECIPIENT);
+        return request;
+    }
+
+    private GoogleUserInfo verifiedGoogleUser() {
+        return GoogleUserInfo.builder()
+                .googleId("google-subject")
+                .email("User@Example.com")
+                .emailVerified(true)
+                .name("Google User")
+                .build();
+    }
+
     private void stubIssuedTokens() {
         when(jwtTokenProvider.createAccessToken(any(User.class))).thenReturn("access-token");
         when(jwtTokenProvider.createRefreshToken(any(User.class))).thenReturn("refresh-token");
@@ -221,6 +358,7 @@ class AuthServiceTest {
 
     private RegisterRequest registerRequest() {
         RegisterRequest request = new RegisterRequest();
+        request.setRegistrationToken("phone-registration-token");
         request.setPhone("0901234567");
         request.setPassword("Password123");
         request.setFullName("Test User");
@@ -228,9 +366,14 @@ class AuthServiceTest {
         return request;
     }
 
+    private void allowVerifiedRegistration(RegisterRequest request) {
+        when(jwtTokenProvider.validatePhoneRegistrationToken(request.getRegistrationToken())).thenReturn(true);
+        when(jwtTokenProvider.getPhoneFromToken(request.getRegistrationToken())).thenReturn("0901234567");
+    }
+
     private LoginRequest loginRequest() {
         LoginRequest request = new LoginRequest();
-        request.setPhone("0901234567");
+        request.setIdentifier("0901234567");
         request.setPassword("Password123");
         return request;
     }

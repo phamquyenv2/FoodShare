@@ -13,8 +13,11 @@ import com.datn.foodshare.security.GoogleTokenVerifier;
 import com.datn.foodshare.security.JwtTokenProvider;
 import com.datn.foodshare.util.constant.AuthProvider;
 import com.datn.foodshare.util.constant.Role;
+import com.datn.foodshare.util.PhoneNumberUtil;
 import com.datn.foodshare.util.error.BusinessException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,10 +26,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -36,11 +44,22 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final GoogleTokenVerifier googleTokenVerifier;
 
+    @Autowired(required = false)
+    private CloudinaryService cloudinaryService;
+
     @Transactional
     public AuthenticationResult register(RegisterRequest request) {
         validateSelfRegistrationRole(request.getRole());
-        String phone = request.getPhone().trim();
+        String phone = PhoneNumberUtil.normalizeVietnamese(request.getPhone());
         String email = normalizeEmail(request.getEmail());
+
+        if (!jwtTokenProvider.validatePhoneRegistrationToken(request.getRegistrationToken())) {
+            throw new BusinessException("Số điện thoại chưa được xác minh hoặc phiên xác minh đã hết hạn");
+        }
+        String verifiedPhone = jwtTokenProvider.getPhoneFromToken(request.getRegistrationToken());
+        if (!phone.equals(verifiedPhone)) {
+            throw new BusinessException("Số điện thoại không khớp với phiên đã xác minh");
+        }
 
         if (userRepository.existsByPhone(phone)) {
             throw new BusinessException("Phone đã được sử dụng");
@@ -100,11 +119,21 @@ public class AuthService {
                         .email(email)
                         .googleSubject(googleUser.getGoogleId())
                         .fullName(resolveGoogleName(googleUser))
-                        .avatarUrl(googleUser.getPicture())
+                        .avatarUrl(uploadGoogleAvatar(googleUser.getPicture()))
                         .role(request.getRole())
                         .authProvider(AuthProvider.GOOGLE)
                         .active(true)
                         .build();
+                user = userRepository.save(user);
+            }
+        }
+
+        if (cloudinaryService != null && (user.getAvatarUrl() == null
+                || user.getAvatarUrl().contains("googleusercontent.com"))) {
+            String migratedAvatar = uploadGoogleAvatar(user.getAvatarUrl() == null
+                    ? googleUser.getPicture() : user.getAvatarUrl());
+            if (migratedAvatar != null) {
+                user.setAvatarUrl(migratedAvatar);
                 user = userRepository.save(user);
             }
         }
@@ -115,13 +144,37 @@ public class AuthService {
         return issueTokens(user);
     }
 
+    private String uploadGoogleAvatar(String pictureUrl) {
+        if (cloudinaryService == null || pictureUrl == null || pictureUrl.isBlank()) return null;
+        try {
+            java.net.URI uri = java.net.URI.create(pictureUrl);
+            String host = uri.getHost();
+            if (host == null || !(host.equals("googleusercontent.com") || host.endsWith(".googleusercontent.com"))) return null;
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) uri.toURL().openConnection();
+            connection.setConnectTimeout(3000);
+            connection.setReadTimeout(5000);
+            connection.setInstanceFollowRedirects(false);
+            if (connection.getResponseCode() != 200) return null;
+            String contentType = connection.getContentType();
+            if (contentType != null && contentType.contains(";")) contentType = contentType.substring(0, contentType.indexOf(';'));
+            byte[] bytes;
+            try (java.io.InputStream input = connection.getInputStream()) {
+                bytes = input.readNBytes(10 * 1024 * 1024 + 1);
+            }
+            return cloudinaryService.uploadUserAvatar(bytes, contentType);
+        } catch (Exception e) {
+            log.warn("Không thể đồng bộ avatar Google về Cloudinary: {}", e.getMessage());
+            return null;
+        }
+    }
+
     @Transactional
-    public AuthResponse refreshAccessToken(String refreshToken) {
+    public AuthenticationResult refreshAccessToken(String refreshToken) {
         if (refreshToken == null || !jwtTokenProvider.validateRefreshToken(refreshToken)) {
             throw new BadCredentialsException("Refresh token không hợp lệ hoặc đã hết hạn");
         }
 
-        UserToken storedToken = userTokenRepository.findByRefreshTokenAndRevokedFalse(refreshToken)
+        UserToken storedToken = userTokenRepository.findByRefreshTokenAndRevokedFalse(hashToken(refreshToken))
                 .orElseThrow(() -> new BadCredentialsException("Refresh token không hợp lệ hoặc đã bị thu hồi"));
 
         if (!storedToken.getExpiresAt().isAfter(Instant.now()) || !storedToken.getUser().isActive()) {
@@ -136,9 +189,18 @@ public class AuthService {
         }
 
         storedToken.setLastActivatedAt(Instant.now());
+        storedToken.setRevoked(true);
         userTokenRepository.save(storedToken);
-        String accessToken = jwtTokenProvider.createAccessToken(storedToken.getUser());
-        return AuthResponse.from(storedToken.getUser(), accessToken);
+        return issueTokens(storedToken.getUser());
+    }
+
+    @Transactional
+    public void revokeRefreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) return;
+        userTokenRepository.findByRefreshTokenAndRevokedFalse(hashToken(refreshToken)).ifPresent(token -> {
+            token.setRevoked(true);
+            userTokenRepository.save(token);
+        });
     }
 
     private AuthenticationResult issueTokens(User user) {
@@ -146,7 +208,7 @@ public class AuthService {
         String refreshToken = jwtTokenProvider.createRefreshToken(user);
         UserToken storedToken = UserToken.builder()
                 .user(user)
-                .refreshToken(refreshToken)
+                .refreshToken(hashToken(refreshToken))
                 .expiresAt(jwtTokenProvider.getExpirationFromToken(refreshToken).toInstant())
                 .build();
         userTokenRepository.save(storedToken);
@@ -170,6 +232,15 @@ public class AuthService {
         return googleUser.getName() == null || googleUser.getName().isBlank()
                 ? googleUser.getEmail()
                 : googleUser.getName().trim();
+    }
+
+    private String hashToken(String token) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 
     public record AuthenticationResult(AuthResponse response, String refreshToken) {

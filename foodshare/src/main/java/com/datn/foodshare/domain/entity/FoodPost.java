@@ -72,6 +72,10 @@ public class FoodPost extends BaseModel {
     private PostStatus postStatus = PostStatus.DRAFT;
 
     @Column(nullable = false)
+    @Builder.Default
+    private boolean hiddenByAdmin = false;
+
+    @Column(nullable = false)
     private Instant expiresAt;
 
     @Version

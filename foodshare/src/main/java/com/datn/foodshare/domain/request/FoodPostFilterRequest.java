@@ -17,6 +17,8 @@ public class FoodPostFilterRequest {
 
     private Long categoryId;
 
+    private Long businessProfileId;
+
     private PostType postType;
 
     private BigDecimal minPrice;

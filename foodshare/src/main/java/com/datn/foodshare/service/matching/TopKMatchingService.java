@@ -2,6 +2,7 @@ package com.datn.foodshare.service.matching;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
 
@@ -33,6 +34,22 @@ public class TopKMatchingService {
                 filteredCandidates
         );
         return selectTopK(scores, k);
+    }
+
+    List<MatchingScoreResult> findTopMatches(
+            FoodPost foodPost,
+            List<User> filteredCandidates,
+            int k,
+            Map<Long, Long> activeOrderCounts
+    ) {
+        Objects.requireNonNull(foodPost, "FoodPost must not be null");
+        Objects.requireNonNull(filteredCandidates, "Filtered candidates must not be null");
+        validateK(k);
+
+        return selectTopK(
+                matchingScoreCalculator.calculateScores(
+                        foodPost, filteredCandidates, activeOrderCounts),
+                k);
     }
 
     List<MatchingScoreResult> selectTopK(List<MatchingScoreResult> scores, int k) {
