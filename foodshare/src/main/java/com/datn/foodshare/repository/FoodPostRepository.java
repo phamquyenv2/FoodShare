@@ -31,8 +31,14 @@ public interface FoodPostRepository extends JpaRepository<FoodPost, Long>, JpaSp
             SELECT fp FROM FoodPost fp
             JOIN FETCH fp.category c
             WHERE fp.businessProfile.id = :businessProfileId
+              AND (:status IS NULL OR fp.postStatus = :status)
+              AND (:keyword IS NULL OR LOWER(fp.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
-    Page<FoodPost> findByBusinessProfileId(@Param("businessProfileId") Long businessProfileId, Pageable pageable);
+    Page<FoodPost> searchSupplierPosts(
+            @Param("businessProfileId") Long businessProfileId, 
+            @Param("status") PostStatus status, 
+            @Param("keyword") String keyword, 
+            Pageable pageable);
 
     @Query("""
             SELECT fp FROM FoodPost fp
@@ -60,6 +66,15 @@ public interface FoodPostRepository extends JpaRepository<FoodPost, Long>, JpaSp
             """)
     int markExpired(@Param("now") Instant now);
 
+    @Query("""
+            SELECT fp FROM FoodPost fp
+            JOIN FETCH fp.businessProfile bp
+            JOIN FETCH bp.user
+            WHERE fp.postStatus IN ('AVAILABLE', 'OUT_OF_STOCK')
+              AND fp.expiresAt <= :now
+            """)
+    List<FoodPost> findExpiredPosts(@Param("now") Instant now);
+
     List<FoodPost> findAllByPostStatusAndExpiresAtAfterAndAvailableQuantityGreaterThan(PostStatus postStatus, Instant now, int minQuantity);
 
     @EntityGraph(attributePaths = {"businessProfile", "businessProfile.user"})
@@ -78,7 +93,7 @@ public interface FoodPostRepository extends JpaRepository<FoodPost, Long>, JpaSp
     @Query("SELECT fp FROM FoodPost fp WHERE fp.id = :id")
     Optional<FoodPost> findByIdForMatching(@Param("id") Long id);
 
-    @EntityGraph(attributePaths = {"businessProfile", "businessProfile.user"})
+    @EntityGraph(attributePaths = {"businessProfile", "businessProfile.user", "category", "images"})
     @Query("SELECT fp FROM FoodPost fp WHERE fp.id IN :ids")
     List<FoodPost> findAllByIdInForMatching(@Param("ids") Collection<Long> ids);
 

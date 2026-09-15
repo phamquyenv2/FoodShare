@@ -32,21 +32,21 @@ public class AdminReportController {
     @GetMapping
     @ApiMessage("Lấy danh sách báo cáo (Admin) thành công")
     public ResponseEntity<Page<ReportResponse>> getAllReports(
-            @RequestParam(required = false) ReportStatus status,
+            @RequestParam(name = "status", required = false) ReportStatus status,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(reportService.adminGetAllReports(status, pageable));
     }
 
     @GetMapping("/{id}")
     @ApiMessage("Lấy chi tiết báo cáo (Admin) thành công")
-    public ResponseEntity<ReportResponse> getReportDetail(@PathVariable Long id) {
+    public ResponseEntity<ReportResponse> getReportDetail(@PathVariable(name = "id") Long id) {
         return ResponseEntity.ok(reportService.adminGetReportDetail(id));
     }
 
     @PatchMapping("/{id}/status")
     @ApiMessage("Cập nhật trạng thái báo cáo thành công")
     public ResponseEntity<ReportResponse> updateReportStatus(
-            @PathVariable Long id,
+            @PathVariable(name = "id") Long id,
             @Valid @RequestBody UpdateReportStatusRequest request) {
         return ResponseEntity.ok(reportService.adminUpdateReportStatus(id, request));
     }

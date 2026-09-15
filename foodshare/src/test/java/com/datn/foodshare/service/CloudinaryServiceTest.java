@@ -52,13 +52,25 @@ class CloudinaryServiceTest {
     }
 
     @Test
+    void uploadBusinessDocumentUsesDedicatedFolder() throws Exception {
+        when(cloudinary.uploader()).thenReturn(uploader);
+        when(uploader.upload(any(byte[].class), any(Map.class)))
+                .thenReturn(Map.of("secure_url", "https://res.cloudinary.com/test/document.jpg"));
+
+        cloudinaryService.uploadBusinessDocument(jpegFile(1024));
+
+        verify(uploader).upload(any(byte[].class), argThat(options ->
+                String.valueOf(options.get("public_id")).startsWith("business-documents/")));
+    }
+
+    @Test
     void upload_acceptsAllAllowedFormats() throws Exception {
         when(cloudinary.uploader()).thenReturn(uploader);
         when(uploader.upload(any(byte[].class), any(Map.class)))
                 .thenReturn(Map.of("secure_url", "https://res.cloudinary.com/test/img.png"));
 
         for (String contentType : new String[]{"image/jpeg", "image/png", "image/webp", "image/gif"}) {
-            MockMultipartFile file = new MockMultipartFile("file", "food.img", contentType, new byte[1024]);
+            MockMultipartFile file = imageFile(contentType, 1024);
             assertDoesNotThrow(() -> cloudinaryService.uploadFoodPostImage(file),
                     "Should accept " + contentType);
         }
@@ -94,6 +106,25 @@ class CloudinaryServiceTest {
 
         assertThrows(StorageException.class, () -> cloudinaryService.uploadFoodPostImage(file));
         verifyNoInteractions(cloudinary);
+    }
+
+    @Test
+    void upload_rejectsSpoofedContentType() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "malware.jpg", "image/jpeg", "not-an-image".getBytes());
+
+        assertThrows(StorageException.class, () -> cloudinaryService.uploadFoodPostImage(file));
+        verifyNoInteractions(cloudinary);
+    }
+
+    @Test
+    void upload_respectsConfiguredMaxFileSize() {
+        CloudinaryService customService = new CloudinaryService(cloudinary, 5);
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "food.jpg", "image/jpeg", new byte[6 * 1024 * 1024]);
+
+        StorageException ex = assertThrows(StorageException.class, () -> customService.uploadFoodPostImage(file));
+        assertTrue(ex.getMessage().contains("5MB"));
     }
 
     @Test
@@ -169,6 +200,19 @@ class CloudinaryServiceTest {
     // ── Helpers ──
 
     private MockMultipartFile jpegFile(int sizeBytes) {
-        return new MockMultipartFile("file", "food.jpg", "image/jpeg", new byte[sizeBytes]);
+        return imageFile("image/jpeg", sizeBytes);
+    }
+
+    private MockMultipartFile imageFile(String contentType, int sizeBytes) {
+        byte[] bytes = new byte[sizeBytes];
+        byte[] signature = switch (contentType) {
+            case "image/jpeg" -> new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+            case "image/png" -> new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+            case "image/gif" -> "GIF89a".getBytes();
+            case "image/webp" -> new byte[]{'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'};
+            default -> new byte[0];
+        };
+        System.arraycopy(signature, 0, bytes, 0, Math.min(signature.length, bytes.length));
+        return new MockMultipartFile("file", "food.img", contentType, bytes);
     }
 }

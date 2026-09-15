@@ -31,6 +31,9 @@ public class FoodPostSpecification {
                 if (filter.getCategoryId() != null) {
                     predicates.add(cb.equal(root.get("category").get("id"), filter.getCategoryId()));
                 }
+                if (filter.getBusinessProfileId() != null) {
+                    predicates.add(cb.equal(root.get("businessProfile").get("id"), filter.getBusinessProfileId()));
+                }
                 if (filter.getPostType() != null) {
                     predicates.add(cb.equal(root.get("postType"), filter.getPostType()));
                 }

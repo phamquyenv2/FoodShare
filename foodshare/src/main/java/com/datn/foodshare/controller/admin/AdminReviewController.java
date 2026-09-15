@@ -33,7 +33,7 @@ public class AdminReviewController {
 
     @DeleteMapping("/{id}")
     @ApiMessage("Xóa đánh giá vi phạm thành công")
-    public ResponseEntity<Void> deleteReview(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteReview(@PathVariable(name = "id") Long id) {
         reviewService.adminDeleteReview(id);
         return ResponseEntity.ok().build();
     }

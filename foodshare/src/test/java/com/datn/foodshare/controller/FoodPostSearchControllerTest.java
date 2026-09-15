@@ -1,6 +1,7 @@
 package com.datn.foodshare.controller;
 
 import com.datn.foodshare.domain.request.FoodPostFilterRequest;
+import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.security.JwtTokenProvider;
 import com.datn.foodshare.service.FoodPostService;
 import com.datn.foodshare.util.constant.PostType;
@@ -36,6 +37,9 @@ class FoodPostSearchControllerTest {
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     @Test
     void bindsCombinedFiltersPaginationAndSorting() throws Exception {

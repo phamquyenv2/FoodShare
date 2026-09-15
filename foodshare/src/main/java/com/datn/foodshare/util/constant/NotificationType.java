@@ -5,5 +5,7 @@ public enum NotificationType {
     ORDER,
     PAYMENT,
     REPORT,
-    SYSTEM
+    REVIEW,
+    SYSTEM,
+    NEW_SUPPLIER
 }

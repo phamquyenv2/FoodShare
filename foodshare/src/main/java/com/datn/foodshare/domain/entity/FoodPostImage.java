@@ -27,6 +27,6 @@ public class FoodPostImage extends BaseModel {
     @JoinColumn(name = "food_post_id", nullable = false)
     private FoodPost foodPost;
 
-    @Column(nullable = false, length = 1000)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String imageUrl;
 }

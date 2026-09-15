@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 
 import java.util.List;
 
@@ -46,8 +49,33 @@ public class PayoutController {
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Tạo yêu cầu rút tiền thành công")
     public ResponseEntity<PayoutResponse> createPayout(
-            @PathVariable Long orderId,
+            @PathVariable("orderId") Long orderId,
             @Valid @RequestBody CreatePayoutRequest request) throws PermissionException {
         return ResponseEntity.status(HttpStatus.CREATED).body(payoutService.createPayout(orderId, request));
+    }
+
+    @PostMapping("/requests")
+    @Secured("ROLE_SUPPLIER")
+    @ApiMessage("Tạo yêu cầu rút tiền thành công")
+    public ResponseEntity<PayoutResponse> createPayoutRequest(
+            @Valid @RequestBody CreatePayoutRequest request) throws PermissionException {
+        return ResponseEntity.status(HttpStatus.CREATED).body(payoutService.createPayoutRequest(request));
+    }
+
+    @GetMapping("/requests")
+    @Secured("ROLE_SUPPLIER")
+    @ApiMessage("Lấy lịch sử yêu cầu rút tiền thành công")
+    public ResponseEntity<Page<PayoutResponse>> getMyPayoutRequests(
+            @PageableDefault(sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC)
+            Pageable pageable) throws PermissionException {
+        return ResponseEntity.ok(payoutService.getMyPayoutRequests(pageable));
+    }
+
+    @GetMapping("/my/wallet")
+    @Secured("ROLE_SUPPLIER")
+    @ApiMessage("Lấy thông vị ví và lịch sử giao dịch thành công")
+    public ResponseEntity<com.datn.foodshare.domain.response.WalletSummaryResponse> getMyWallet(
+            @org.springframework.data.web.PageableDefault(sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC) org.springframework.data.domain.Pageable pageable) throws PermissionException {
+        return ResponseEntity.ok(payoutService.getWalletSummary(pageable));
     }
 }

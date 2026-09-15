@@ -8,6 +8,8 @@ import com.datn.foodshare.util.constant.VerificationStatus;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter
 @Builder
 public class UserProfileResponse {
@@ -20,6 +22,7 @@ public class UserProfileResponse {
     private ProfileType profileType;
     private SupplierType supplierType;
     private OrganizationType organizationType;
+    private List<String> licenseUrls;
 
     public static UserProfileResponse from(BusinessProfile profile) {
         if (profile == null) {
@@ -34,6 +37,9 @@ public class UserProfileResponse {
                 .profileType(profile.getProfileType())
                 .supplierType(profile.getSupplierType())
                 .organizationType(profile.getOrganizationType())
+                .licenseUrls(profile.getLicenses().stream()
+                        .map(license -> license.getFileUrl())
+                        .toList())
                 .build();
     }
 }

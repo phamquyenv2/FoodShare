@@ -42,7 +42,7 @@ public class FoodPostController {
 
     @GetMapping("/{id}")
     @ApiMessage("Lấy chi tiết bài đăng thực phẩm thành công")
-    public ResponseEntity<FoodPostResponse> getDetail(@PathVariable Long id) {
+    public ResponseEntity<FoodPostResponse> getDetail(@PathVariable("id") Long id) {
         return ResponseEntity.ok(foodPostService.getDetail(id));
     }
 
@@ -50,9 +50,11 @@ public class FoodPostController {
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Lấy danh sách bài đăng của tôi thành công")
     public ResponseEntity<Page<FoodPostResponse>> getMyPosts(
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable)
+            @org.springframework.web.bind.annotation.RequestParam(value = "status", required = false) com.datn.foodshare.util.constant.PostStatus status,
+            @org.springframework.web.bind.annotation.RequestParam(value = "keyword", required = false) String keyword,
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable)
             throws PermissionException {
-        return ResponseEntity.ok(foodPostService.getMyPosts(pageable));
+        return ResponseEntity.ok(foodPostService.getMyPosts(status, keyword, pageable));
     }
 
     @PostMapping
@@ -66,7 +68,7 @@ public class FoodPostController {
     @PatchMapping("/{id}/publish")
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Đăng bài thành công")
-    public ResponseEntity<FoodPostResponse> publish(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<FoodPostResponse> publish(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(foodPostService.publish(id));
     }
 
@@ -74,7 +76,7 @@ public class FoodPostController {
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Cập nhật bài đăng thực phẩm thành công")
     public ResponseEntity<FoodPostResponse> update(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @Valid @RequestBody UpdateFoodPostRequest request)
             throws PermissionException {
         return ResponseEntity.ok(foodPostService.update(id, request));
@@ -83,28 +85,28 @@ public class FoodPostController {
     @PatchMapping("/{id}/hide")
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Ẩn bài đăng thành công")
-    public ResponseEntity<FoodPostResponse> hide(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<FoodPostResponse> hide(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(foodPostService.hide(id));
     }
 
     @PatchMapping("/{id}/unhide")
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Hiện lại bài đăng thành công")
-    public ResponseEntity<FoodPostResponse> unhide(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<FoodPostResponse> unhide(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(foodPostService.unhide(id));
     }
 
     @PatchMapping("/{id}/cancel")
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Hủy bài đăng thành công")
-    public ResponseEntity<FoodPostResponse> cancel(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<FoodPostResponse> cancel(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(foodPostService.cancel(id));
     }
 
     @GetMapping("/{id}/owner")
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Lấy chi tiết bài đăng thành công")
-    public ResponseEntity<FoodPostResponse> getDetailForOwner(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<FoodPostResponse> getDetailForOwner(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(foodPostService.getDetailForOwner(id));
     }
 }

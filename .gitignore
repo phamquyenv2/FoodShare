@@ -31,3 +31,7 @@ foodshare/src/main/resources/foodshare-*.json
 
 # Environment variables (ch?a secret)
 foodshare/.env
+
+
+.agent
+design-system/

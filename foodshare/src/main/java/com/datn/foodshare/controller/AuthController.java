@@ -16,8 +16,13 @@ import org.springframework.web.bind.annotation.RestController;
 import com.datn.foodshare.domain.request.GoogleLoginRequest;
 import com.datn.foodshare.domain.request.LoginRequest;
 import com.datn.foodshare.domain.request.RegisterRequest;
+import com.datn.foodshare.domain.request.SendPhoneOtpRequest;
+import com.datn.foodshare.domain.request.VerifyPhoneOtpRequest;
 import com.datn.foodshare.domain.response.AuthResponse;
+import com.datn.foodshare.domain.response.PhoneOtpChallengeResponse;
+import com.datn.foodshare.domain.response.PhoneVerificationResponse;
 import com.datn.foodshare.service.AuthService;
+import com.datn.foodshare.service.PhoneOtpService;
 import com.datn.foodshare.util.annotation.ApiMessage;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -32,6 +37,7 @@ public class AuthController {
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
 
     private final AuthService authService;
+    private final PhoneOtpService phoneOtpService;
 
     @Value("${app.jwt.refresh-token-expiration-in-seconds:2592000}")
     private long refreshTokenExpirationInSeconds;
@@ -75,8 +81,37 @@ public class AuthController {
     @PostMapping("/refresh")
     @ApiMessage("Làm mới Access Token thành công")
     public ResponseEntity<AuthResponse> refresh(
-            @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
-        return ResponseEntity.ok().body(authService.refreshAccessToken(refreshToken));
+            @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+            HttpServletResponse response) {
+        AuthService.AuthenticationResult result = authService.refreshAccessToken(refreshToken);
+        addRefreshTokenCookie(response, result.refreshToken());
+        return ResponseEntity.ok().body(result.response());
+    }
+
+    @PostMapping("/phone-otp/send")
+    @ApiMessage("Đã gửi OTP xác minh số điện thoại")
+    public ResponseEntity<PhoneOtpChallengeResponse> sendPhoneOtp(
+            @Valid @RequestBody SendPhoneOtpRequest request) {
+        return ResponseEntity.ok(phoneOtpService.sendOtp(request));
+    }
+
+    @PostMapping("/phone-otp/verify")
+    @ApiMessage("Xác minh số điện thoại thành công")
+    public ResponseEntity<PhoneVerificationResponse> verifyPhoneOtp(
+            @Valid @RequestBody VerifyPhoneOtpRequest request) {
+        return ResponseEntity.ok(phoneOtpService.verifyOtp(request));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+            HttpServletResponse response) {
+        authService.revokeRefreshToken(refreshToken);
+        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, "")
+                .httpOnly(true).secure(secureCookie).sameSite(sameSite)
+                .path("/api/auth").maxAge(Duration.ZERO).build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        return ResponseEntity.noContent().build();
     }
 
     private void addRefreshTokenCookie(HttpServletResponse response, String refreshToken) {

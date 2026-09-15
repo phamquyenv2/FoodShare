@@ -3,6 +3,7 @@ package com.datn.foodshare.domain.entity;
 import com.datn.foodshare.util.constant.NotificationReferenceType;
 import com.datn.foodshare.util.constant.NotificationType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -38,6 +39,7 @@ public class Notification extends BaseModel {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @JsonProperty("isRead")
     @Builder.Default
     @Column(nullable = false)
     private boolean isRead = false;

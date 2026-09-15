@@ -1,20 +1,31 @@
 package com.datn.foodshare.service;
 
 import com.datn.foodshare.domain.entity.BusinessProfile;
+import com.datn.foodshare.domain.entity.License;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.UpdateProfileRequest;
 import com.datn.foodshare.domain.request.UpdateUserRequest;
 import com.datn.foodshare.domain.request.UpdateUserStatusRequest;
 import com.datn.foodshare.domain.response.AdminUserResponse;
 import com.datn.foodshare.domain.response.CurrentUserResponse;
+import com.datn.foodshare.event.NotificationEvent;
 import com.datn.foodshare.repository.BusinessProfileRepository;
+import com.datn.foodshare.repository.NotificationRepository;
 import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
+import com.datn.foodshare.security.JwtTokenProvider;
 import com.datn.foodshare.util.SecurityUtil;
+import com.datn.foodshare.util.PhoneNumberUtil;
+import com.datn.foodshare.util.constant.NotificationReferenceType;
+import com.datn.foodshare.util.constant.NotificationChannel;
+import com.datn.foodshare.util.constant.NotificationType;
 import com.datn.foodshare.util.constant.ProfileType;
 import com.datn.foodshare.util.constant.Role;
+import com.datn.foodshare.domain.entity.Notification;
 import com.datn.foodshare.util.error.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -23,7 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Service
@@ -35,7 +48,13 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final BusinessProfileRepository businessProfileRepository;
+    private final NotificationRepository notificationRepository;
     private final DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final ApplicationEventPublisher eventPublisher;
+
+    @Value("${app.upload.max-documents:5}")
+    private int maxDocuments = 5;
 
     @Transactional(readOnly = true)
     public CurrentUserResponse getCurrentUser() {
@@ -46,6 +65,7 @@ public class UserService {
     @Transactional
     public CurrentUserResponse updateCurrentUser(UpdateUserRequest request) {
         User user = getAuthenticatedUser();
+        boolean locationChanged = false;
 
         if (request.getFullName() != null) {
             user.setFullName(request.getFullName().trim());
@@ -61,17 +81,39 @@ public class UserService {
             user.setAvatarUrl(trimToNull(request.getAvatarUrl()));
         }
 
-        return toResponse(userRepository.save(user));
+        if (request.getSpecificAddress() != null
+                || request.getLatitude() != null
+                || request.getLongitude() != null) {
+            validateLocationPair(request.getLatitude(), request.getLongitude());
+            if (!hasText(request.getSpecificAddress())) {
+                throw new BusinessException("Địa chỉ là bắt buộc khi cập nhật vị trí");
+            }
+            user.setSpecificAddress(request.getSpecificAddress().trim());
+            user.setLatitude(request.getLatitude());
+            user.setLongitude(request.getLongitude());
+            locationChanged = true;
+        }
+
+        User savedUser = userRepository.save(user);
+        if (locationChanged) {
+            matchingGraphSynchronizer.userChangedAfterCommit(savedUser.getId());
+        }
+        return toResponse(savedUser);
     }
 
     @Transactional
     public CurrentUserResponse updateProfile(UpdateProfileRequest request) {
         User user = getAuthenticatedUser();
+        
+        if (request.getRole() != null && request.getRole() != user.getRole()) {
+            throw new BusinessException("Không được phép thay đổi vai trò");
+        }
+
         if (user.getRole() == Role.ADMIN) {
             throw new BusinessException("ADMIN không có hồ sơ nghiệp vụ trong chức năng này");
         }
 
-        updatePhoneWhenRequired(user, request.getPhone());
+        updatePhoneWhenRequired(user, request.getPhone(), request.getPhoneRegistrationToken());
         validateRequiredUserFields(user);
         validateLocationPair(request.getLatitude(), request.getLongitude());
         user.setSpecificAddress(request.getSpecificAddress().trim());
@@ -85,8 +127,25 @@ public class UserService {
             case ADMIN -> throw new BusinessException("ADMIN không có hồ sơ nghiệp vụ trong chức năng này");
         };
 
+        boolean isFirstTimeCompleted = !user.isProfileCompleted();
         user.setProfileCompleted(true);
         User savedUser = userRepository.save(user);
+
+        if (isFirstTimeCompleted && (user.getRole() == Role.SUPPLIER || user.getRole() == Role.ORGANIZATION)) {
+            // Notify admins about new supplier/org
+            List<User> admins = userRepository.findByRole(Role.ADMIN);
+            for (User admin : admins) {
+                notificationRepository.save(Notification.builder()
+                        .user(admin)
+                        .title("Đăng ký hồ sơ mới")
+                        .content("Người dùng " + user.getFullName() + " vừa hoàn tất hồ sơ đăng ký " + user.getRole() + ". Vui lòng kiểm tra và xét duyệt.")
+                        .notificationType(NotificationType.NEW_SUPPLIER)
+                        .referenceType(NotificationReferenceType.USER)
+                        .referenceId(user.getId())
+                        .build());
+            }
+        }
+
         matchingGraphSynchronizer.userChangedAfterCommit(savedUser.getId());
         return CurrentUserResponse.from(savedUser, businessProfile);
     }
@@ -96,7 +155,8 @@ public class UserService {
                 || hasText(request.getDescription())
                 || hasText(request.getTaxCode())
                 || request.getSupplierType() != null
-                || request.getOrganizationType() != null) {
+                || request.getOrganizationType() != null
+                || (request.getLicenseUrls() != null && !request.getLicenseUrls().isEmpty())) {
             throw new BusinessException("RECIPIENT không sử dụng thông tin BusinessProfile");
         }
         return null;
@@ -113,6 +173,7 @@ public class UserService {
 
         BusinessProfile profile = getOrCreateBusinessProfile(user, ProfileType.SUPPLIER);
         applyBusinessProfileFields(profile, request);
+        applyRequiredLicenses(profile, request.getLicenseUrls());
         profile.setProfileType(ProfileType.SUPPLIER);
         profile.setSupplierType(request.getSupplierType());
         profile.setOrganizationType(null);
@@ -130,6 +191,7 @@ public class UserService {
 
         BusinessProfile profile = getOrCreateBusinessProfile(user, ProfileType.ORGANIZATION);
         applyBusinessProfileFields(profile, request);
+        applyRequiredLicenses(profile, request.getLicenseUrls());
         profile.setProfileType(ProfileType.ORGANIZATION);
         profile.setOrganizationType(request.getOrganizationType());
         profile.setSupplierType(null);
@@ -159,11 +221,57 @@ public class UserService {
         profile.setTaxCode(taxCode);
     }
 
-    private void updatePhoneWhenRequired(User user, String requestedPhone) {
+    private void applyRequiredLicenses(BusinessProfile profile, List<String> licenseUrls) {
+        if (licenseUrls == null || licenseUrls.isEmpty()) {
+            throw new BusinessException("Supplier/Organization phải cung cấp ít nhất 1 giấy tờ xác minh");
+        }
+
+        List<String> normalizedUrls = licenseUrls.stream()
+                .map(this::trimToNull)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (normalizedUrls.isEmpty()) {
+            throw new BusinessException("Supplier/Organization phải cung cấp ít nhất 1 giấy tờ xác minh");
+        }
+        if (normalizedUrls.size() > maxDocuments) {
+            throw new BusinessException("Chỉ được cung cấp tối đa " + maxDocuments + " giấy tờ xác minh");
+        }
+        if (normalizedUrls.stream().anyMatch(url -> !isTrustedDocumentUrl(url))) {
+            throw new BusinessException("URL giấy tờ không hợp lệ");
+        }
+
+        profile.getLicenses().clear();
+        normalizedUrls.forEach(url -> profile.getLicenses().add(License.builder()
+                .businessProfile(profile)
+                .fileUrl(url)
+                .build()));
+        profile.setVerificationStatus(com.datn.foodshare.util.constant.VerificationStatus.UNVERIFIED);
+    }
+
+    private boolean isTrustedDocumentUrl(String url) {
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            return "https".equalsIgnoreCase(uri.getScheme())
+                    && "res.cloudinary.com".equalsIgnoreCase(uri.getHost())
+                    && uri.getPath() != null
+                    && uri.getPath().contains("/image/upload/");
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private void updatePhoneWhenRequired(User user, String requestedPhone, String registrationToken) {
         String phone = trimToNull(requestedPhone);
+        if (phone != null) phone = PhoneNumberUtil.normalizeVietnamese(phone);
         if (!hasText(user.getPhone())) {
             if (phone == null) {
                 throw new BusinessException("Tài khoản Google phải bổ sung số điện thoại");
+            }
+            if (!hasText(registrationToken)
+                    || !jwtTokenProvider.validatePhoneRegistrationToken(registrationToken)
+                    || !phone.equals(jwtTokenProvider.getPhoneFromToken(registrationToken))) {
+                throw new BusinessException("Số điện thoại phải được xác minh OTP trước khi hoàn thiện hồ sơ");
             }
             if (userRepository.existsByPhoneAndIdNot(phone, user.getId())) {
                 throw new BusinessException("Số điện thoại đã được sử dụng");
@@ -225,7 +333,7 @@ public class UserService {
     // ── Admin User Management ──────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Page<AdminUserResponse> adminGetAllUsers(Role role, Boolean active, Pageable pageable) {
+    public Page<AdminUserResponse> adminGetAllUsers(Role role, Boolean active, com.datn.foodshare.util.constant.VerificationStatus verificationStatus, Pageable pageable) {
         Specification<User> spec = (root, query, cb) -> cb.conjunction();
 
         if (role != null) {
@@ -233,6 +341,12 @@ public class UserService {
         }
         if (active != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("active"), active));
+        }
+        if (verificationStatus != null) {
+            spec = spec.and((root, query, cb) -> {
+                jakarta.persistence.criteria.Join<User, BusinessProfile> businessProfileJoin = root.join("businessProfile", jakarta.persistence.criteria.JoinType.INNER);
+                return cb.equal(businessProfileJoin.get("verificationStatus"), verificationStatus);
+            });
         }
 
         return userRepository.findAll(spec, pageable).map(AdminUserResponse::from);
@@ -254,7 +368,60 @@ public class UserService {
             throw new BusinessException("Không thể thay đổi trạng thái tài khoản ADMIN");
         }
 
+        boolean statusChanged = user.isActive() != request.getActive();
         user.setActive(request.getActive());
-        return AdminUserResponse.from(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+        if (statusChanged) {
+            publishAccountNotification(
+                    savedUser,
+                    savedUser.isActive() ? "Tài khoản đã được kích hoạt" : "Tài khoản đã bị khóa",
+                    savedUser.isActive()
+                            ? "Tài khoản FoodShare của bạn đã được kích hoạt."
+                            : "Tài khoản FoodShare của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ nếu cần.");
+        }
+        return AdminUserResponse.from(savedUser);
+    }
+
+    @Transactional
+    public AdminUserResponse adminVerifyBusinessProfile(Long userId, com.datn.foodshare.domain.request.UpdateVerificationStatusRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("Không tìm thấy người dùng với id: " + userId));
+
+        BusinessProfile profile = user.getBusinessProfile();
+        if (profile == null) {
+            throw new BusinessException("Người dùng chưa có hồ sơ kinh doanh");
+        }
+
+        if (request.getVerificationStatus() == com.datn.foodshare.util.constant.VerificationStatus.VERIFIED
+                && (profile.getLicenses() == null || profile.getLicenses().isEmpty())) {
+            throw new BusinessException("Không thể xác minh hồ sơ kinh doanh chưa có giấy phép");
+        }
+
+        boolean statusChanged = profile.getVerificationStatus() != request.getVerificationStatus();
+        profile.setVerificationStatus(request.getVerificationStatus());
+        businessProfileRepository.save(profile);
+
+        if (statusChanged) {
+            publishAccountNotification(
+                    user,
+                    "Hồ sơ doanh nghiệp đã được cập nhật",
+                    "Hồ sơ doanh nghiệp của bạn đã chuyển sang trạng thái "
+                            + request.getVerificationStatus() + ".");
+        }
+
+        return AdminUserResponse.from(user);
+    }
+
+    private void publishAccountNotification(User user, String title, String content) {
+        eventPublisher.publishEvent(NotificationEvent.builder()
+                .source(this)
+                .user(user)
+                .title(title)
+                .content(content)
+                .type(NotificationType.SYSTEM)
+                .referenceType(NotificationReferenceType.USER)
+                .referenceId(user.getId())
+                .channels(Set.of(NotificationChannel.IN_APP, NotificationChannel.PUSH, NotificationChannel.EMAIL))
+                .build());
     }
 }

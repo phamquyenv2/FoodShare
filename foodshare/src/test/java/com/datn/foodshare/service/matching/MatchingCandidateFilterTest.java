@@ -22,6 +22,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -232,5 +233,23 @@ class MatchingCandidateFilterTest {
         Set<Long> result = filter.findEligibleFoodPostIds(List.of(foodPost), candidate);
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void batchFilterLoadsCandidatesAndCapacityOnlyOnce() {
+        User candidate = createCandidate(1L, Role.RECIPIENT, true, true, "10.772622", "106.670172");
+        FoodPost secondPost = new FoodPost();
+        secondPost.setId(2L);
+        secondPost.setBusinessProfile(foodPost.getBusinessProfile());
+        secondPost.setPickupEndAt(foodPost.getPickupEndAt());
+        when(userRepository.findEligibleMatchingCandidates(any())).thenReturn(List.of(candidate));
+        when(receiverCapacityService.countActiveOrders(List.of(1L))).thenReturn(Map.of(1L, 0L));
+
+        Map<Long, List<User>> result = filter.filterCandidates(List.of(foodPost, secondPost));
+
+        assertEquals(List.of(candidate), result.get(1L));
+        assertEquals(List.of(candidate), result.get(2L));
+        verify(userRepository).findEligibleMatchingCandidates(any());
+        verify(receiverCapacityService).countActiveOrders(List.of(1L));
     }
 }

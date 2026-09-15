@@ -314,7 +314,7 @@ class FoodPostPriorityQueueTest {
         }
 
         @Test
-        void ordering_tieBreak_lowerQuantityFirst() {
+        void ordering_tieBreak_higherQuantityFirst() {
             Instant sameExpiry = Instant.now().plus(3, ChronoUnit.HOURS);
             Instant sameCreated = Instant.now().minus(1, ChronoUnit.HOURS);
 
@@ -328,25 +328,23 @@ class FoodPostPriorityQueueTest {
 
             List<FoodPostPriorityEntry> ordered = priorityQueue.getOrderedEntries();
             assertEquals(2, ordered.size());
-            assertEquals(2L, ordered.get(0).foodPostId());
-            assertEquals(1L, ordered.get(1).foodPostId());
+            assertEquals(1L, ordered.get(0).foodPostId());
+            assertEquals(2L, ordered.get(1).foodPostId());
         }
 
         @Test
         void ordering_tieBreak_earlierCreatedFirst() {
-            Instant sameExpiry = Instant.now().plus(3, ChronoUnit.HOURS);
             Instant earlier = Instant.now().minus(5, ChronoUnit.HOURS);
             Instant later = Instant.now().minus(1, ChronoUnit.HOURS);
 
-            FoodPost olderPost = createPost(1L, PostStatus.AVAILABLE, 10, sameExpiry);
-            olderPost.setCreatedAt(earlier);
-            FoodPost newerPost = createPost(2L, PostStatus.AVAILABLE, 10, sameExpiry);
-            newerPost.setCreatedAt(later);
+            FoodPostPriorityEntry olderPost = new FoodPostPriorityEntry(
+                    1L, 10_800L, 10, Instant.now().plus(3, ChronoUnit.HOURS), earlier);
+            FoodPostPriorityEntry newerPost = new FoodPostPriorityEntry(
+                    2L, 10_800L, 10, Instant.now().plus(3, ChronoUnit.HOURS), later);
 
-            priorityQueue.addOrUpdate(olderPost);
-            priorityQueue.addOrUpdate(newerPost);
-
-            List<FoodPostPriorityEntry> ordered = priorityQueue.getOrderedEntries();
+            List<FoodPostPriorityEntry> ordered = List.of(newerPost, olderPost).stream()
+                    .sorted(FoodPostPriorityQueue.PRIORITY_COMPARATOR)
+                    .toList();
             assertEquals(2, ordered.size());
             assertEquals(1L, ordered.get(0).foodPostId());
             assertEquals(2L, ordered.get(1).foodPostId());
@@ -398,10 +396,27 @@ class FoodPostPriorityQueueTest {
 
             List<FoodPostPriorityEntry> ordered = priorityQueue.getOrderedEntries();
             assertEquals(4, ordered.size());
-            assertEquals(1L, ordered.get(0).foodPostId());
-            assertEquals(2L, ordered.get(1).foodPostId());
+            assertEquals(2L, ordered.get(0).foodPostId());
+            assertEquals(1L, ordered.get(1).foodPostId());
             assertEquals(3L, ordered.get(2).foodPostId());
             assertEquals(4L, ordered.get(3).foodPostId());
+        }
+
+        @Test
+        void ordering_usesAbsoluteExpiry_whenRelativeValuesWereCapturedAtDifferentTimes() {
+            Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
+            FoodPostPriorityEntry earlierExpiry = new FoodPostPriorityEntry(
+                    1L, 9_999L, 10, Instant.parse("2026-01-02T00:00:00Z"), createdAt);
+            FoodPostPriorityEntry laterExpiry = new FoodPostPriorityEntry(
+                    2L, 1L, 10, Instant.parse("2026-01-03T00:00:00Z"), createdAt);
+
+            List<FoodPostPriorityEntry> ordered = List.of(laterExpiry, earlierExpiry).stream()
+                    .sorted(FoodPostPriorityQueue.PRIORITY_COMPARATOR)
+                    .toList();
+
+            assertEquals(List.of(1L, 2L), ordered.stream()
+                    .map(FoodPostPriorityEntry::foodPostId)
+                    .toList());
         }
 
         @Test

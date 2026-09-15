@@ -20,6 +20,7 @@ public class PaymentResponse {
     private String externalTransactionId;
     private String provider;
     private Instant paidAt;
+    private String paymentUrl;
 
     public static PaymentResponse from(Payment payment) {
         return PaymentResponse.builder()
@@ -31,6 +32,7 @@ public class PaymentResponse {
                 .externalTransactionId(payment.getExternalTransactionId())
                 .provider(payment.getProvider())
                 .paidAt(payment.getPaidAt())
+                .paymentUrl(payment.getPaymentUrl())
                 .build();
     }
 }

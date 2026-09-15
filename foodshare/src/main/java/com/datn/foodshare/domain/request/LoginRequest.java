@@ -9,9 +9,8 @@ import lombok.Setter;
 @Setter
 public class LoginRequest {
 
-    @NotBlank(message = "Phone không được để trống")
-    @Size(max = 10, message = "Phone không được vượt quá 10 ký tự")
-    private String phone;
+    @NotBlank(message = "Tài khoản không được để trống")
+    private String identifier;
 
     @NotBlank(message = "Password không được để trống")
     private String password;

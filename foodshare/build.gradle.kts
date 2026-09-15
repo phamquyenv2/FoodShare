@@ -1,5 +1,6 @@
 plugins {
 	java
+	jacoco
 	id("org.springframework.boot") version "4.1.0"
 	id("io.spring.dependency-management") version "1.1.7"
 }
@@ -28,6 +29,9 @@ dependencies {
 	
 	// OpenAPI / Swagger UI
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
+
+	// Load .env files automatically
+	implementation("me.paulschwarz:spring-dotenv:4.0.0")
 
 	// JWT (JJWT)
 	implementation("io.jsonwebtoken:jjwt-api:0.12.5")
@@ -62,4 +66,58 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+fun Test.useFoodShareTestRuntime() {
+	testClassesDirs = sourceSets["test"].output.classesDirs
+	classpath = sourceSets["test"].runtimeClasspath
+	useJUnitPlatform()
+}
+
+tasks.register<Test>("unitTest") {
+	description = "Runs isolated JUnit/Mockito tests without Spring MVC or a database."
+	group = "verification"
+	useFoodShareTestRuntime()
+	include("**/service/**/*Test.class")
+	include("**/event/**/*Test.class")
+	include("**/security/JwtTokenProviderTest.class")
+	include("**/security/GoogleTokenVerifierTest.class")
+	exclude("**/*IntegrationTest.class")
+}
+
+tasks.register<Test>("componentTest") {
+	description = "Runs Spring MVC slice and security component tests."
+	group = "verification"
+	useFoodShareTestRuntime()
+	include("**/controller/**/*Test.class")
+	include("**/security/*MvcTest.class")
+}
+
+tasks.register<Test>("integrationTest") {
+	description = "Runs database, transaction, and application-context integration tests."
+	group = "verification"
+	useFoodShareTestRuntime()
+	include("**/integration/**/*IntegrationTest.class")
+}
+
+tasks.jacocoTestReport {
+	dependsOn(tasks.test)
+	reports {
+		xml.required = true
+		html.required = true
+	}
+}
+
+tasks.register<JacocoReport>("jacocoUnitTestReport") {
+	description = "Generates JaCoCo coverage from isolated unit tests only."
+	group = "verification"
+	dependsOn(tasks.named("unitTest"))
+	executionData(layout.buildDirectory.file("jacoco/unitTest.exec"))
+	sourceSets(sourceSets.main.get())
+	reports {
+		xml.required = true
+		html.required = true
+		xml.outputLocation = layout.buildDirectory.file("reports/jacoco/unitTest/jacocoUnitTestReport.xml")
+		html.outputLocation = layout.buildDirectory.dir("reports/jacoco/unitTest/html")
+	}
 }

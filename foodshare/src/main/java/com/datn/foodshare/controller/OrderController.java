@@ -43,7 +43,7 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(orderService.batchCreateOrders(request));
     }
 
-    @GetMapping
+    @GetMapping("/my")
     @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
     @ApiMessage("Lấy danh sách đơn tiếp nhận thành công")
     public ResponseEntity<Page<OrderResponse>> getMyOrders(
@@ -55,14 +55,14 @@ public class OrderController {
     @GetMapping("/{id}")
     @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
     @ApiMessage("Lấy chi tiết đơn tiếp nhận thành công")
-    public ResponseEntity<OrderResponse> getOrderDetail(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<OrderResponse> getOrderDetail(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(orderService.getOrderDetail(id));
     }
 
     @PatchMapping("/{id}/cancel")
     @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
     @ApiMessage("Hủy đơn tiếp nhận thành công")
-    public ResponseEntity<OrderResponse> cancelOrder(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<OrderResponse> cancelOrder(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(orderService.cancelOrder(id));
     }
 
@@ -70,15 +70,25 @@ public class OrderController {
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Lấy danh sách đơn tiếp nhận của nhà cung cấp thành công")
     public ResponseEntity<Page<OrderResponse>> getSupplierOrders(
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable)
+            @org.springframework.web.bind.annotation.RequestParam(value = "status", required = false) String status,
+            @org.springframework.web.bind.annotation.RequestParam(value = "keyword", required = false) String keyword,
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable)
             throws PermissionException {
-        return ResponseEntity.ok(orderService.getSupplierOrders(pageable));
+        com.datn.foodshare.util.constant.OrderStatus orderStatus = null;
+        if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status.trim())) {
+            try {
+                orderStatus = com.datn.foodshare.util.constant.OrderStatus.valueOf(status.trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                orderStatus = null;
+            }
+        }
+        return ResponseEntity.ok(orderService.getSupplierOrders(orderStatus, keyword, pageable));
     }
 
     @PatchMapping("/{id}/accept")
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Chấp nhận đơn tiếp nhận thành công")
-    public ResponseEntity<OrderResponse> acceptOrder(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<OrderResponse> acceptOrder(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(orderService.acceptOrder(id));
     }
 
@@ -86,29 +96,29 @@ public class OrderController {
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Từ chối đơn tiếp nhận thành công")
     public ResponseEntity<OrderResponse> rejectOrder(
-            @PathVariable Long id,
-            @Valid @RequestBody com.datn.foodshare.domain.request.RejectOrderRequest request) throws PermissionException {
+            @PathVariable("id") Long id,
+            @Valid @RequestBody(required = false) com.datn.foodshare.domain.request.RejectOrderRequest request) throws PermissionException {
         return ResponseEntity.ok(orderService.rejectOrder(id, request));
     }
 
     @PatchMapping("/{id}/ready")
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Xác nhận chuẩn bị món xong thành công")
-    public ResponseEntity<OrderResponse> readyForPickupOrder(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<OrderResponse> readyForPickupOrder(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(orderService.readyForPickupOrder(id));
     }
 
     @PatchMapping("/{id}/deliver")
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Xác nhận đã giao món thành công")
-    public ResponseEntity<OrderResponse> deliverOrder(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<OrderResponse> deliverOrder(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(orderService.deliverOrder(id));
     }
 
     @PatchMapping("/{id}/complete")
     @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
     @ApiMessage("Xác nhận đã nhận món thành công")
-    public ResponseEntity<OrderResponse> completeOrder(@PathVariable Long id) throws PermissionException {
+    public ResponseEntity<OrderResponse> completeOrder(@PathVariable("id") Long id) throws PermissionException {
         return ResponseEntity.ok(orderService.completeOrder(id));
     }
 }

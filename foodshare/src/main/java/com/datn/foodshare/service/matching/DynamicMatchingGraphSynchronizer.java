@@ -85,18 +85,16 @@ public class DynamicMatchingGraphSynchronizer {
         Instant now = Instant.now();
         List<FoodPost> foodPosts = foodPostRepository
                 .findAllForMatchingGraph(PostStatus.AVAILABLE, now, 0);
-        List<User> globallyEligibleCandidates = userRepository
-                .findByRoleIn(MatchingCandidateFilter.RECEIVER_ROLES)
-                .stream()
-                .filter(candidateFilter::isGloballyEligibleCandidate)
-                .toList();
+        List<User> globallyEligibleCandidates = candidateFilter.findGloballyEligibleCandidates();
+        Map<Long, List<User>> candidatesByPostId = candidateFilter
+                .filterCandidates(foodPosts, globallyEligibleCandidates);
 
         Map<Long, User> candidateNodes = new LinkedHashMap<>();
         globallyEligibleCandidates.forEach(candidate -> candidateNodes.put(candidate.getId(), candidate));
         List<CandidateEdge> edges = new ArrayList<>();
 
         for (FoodPost foodPost : foodPosts) {
-            for (User candidate : candidateFilter.filterCandidates(foodPost)) {
+            for (User candidate : candidatesByPostId.getOrDefault(foodPost.getId(), List.of())) {
                 candidateNodes.put(candidate.getId(), candidate);
                 edges.add(new CandidateEdge(foodPost.getId(), candidate.getId()));
             }

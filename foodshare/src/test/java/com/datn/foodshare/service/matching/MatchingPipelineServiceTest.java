@@ -2,7 +2,11 @@ package com.datn.foodshare.service.matching;
 
 import com.datn.foodshare.domain.entity.FoodPost;
 import com.datn.foodshare.domain.entity.User;
+import com.datn.foodshare.domain.entity.BusinessProfile;
+import com.datn.foodshare.domain.entity.Category;
+import com.datn.foodshare.domain.response.FoodPostResponse;
 import com.datn.foodshare.repository.FoodPostRepository;
+import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.service.matching.FoodPostPriorityQueue.FoodPostPriorityEntry;
 import com.datn.foodshare.service.matching.MatchingPipelineService.AllocationPlan;
 import com.datn.foodshare.service.matching.MatchingPipelineService.FoodPostRecommendation;
@@ -10,6 +14,8 @@ import com.datn.foodshare.service.matching.MatchingScoreCalculator.MatchingScore
 import com.datn.foodshare.service.matching.MinimumCostMaximumFlowService.AllocationResult;
 import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.Role;
+import com.datn.foodshare.util.SecurityUtil;
+import org.mockito.MockedStatic;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,12 +27,15 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -51,6 +60,9 @@ class MatchingPipelineServiceTest {
     @Mock
     private MinimumCostMaximumFlowService minimumCostMaximumFlowService;
 
+    @Mock
+    private UserRepository userRepository;
+
     @InjectMocks
     private MatchingPipelineService service;
 
@@ -69,9 +81,14 @@ class MatchingPipelineServiceTest {
         when(foodPostPriorityQueue.getOrderedEntries()).thenReturn(entries);
         when(foodPostRepository.findAllByIdInForMatching(List.of(1L, 2L, 3L)))
                 .thenReturn(List.of(secondAvailable, expired, firstAvailable));
-        when(matchingCandidateFilter.filterCandidates(any(FoodPost.class)))
-                .thenReturn(List.of(candidate));
-        when(topKMatchingService.findTopMatches(any(FoodPost.class), eq(List.of(candidate)), eq(2)))
+        when(matchingCandidateFilter.prepareCandidates(List.of(firstAvailable, secondAvailable)))
+                .thenReturn(new MatchingCandidateFilter.CandidateBatch(
+                        Map.of(
+                                firstAvailable.getId(), List.of(candidate),
+                                secondAvailable.getId(), List.of(candidate)),
+                        Map.of(candidate.getId(), 1L)));
+        when(topKMatchingService.findTopMatches(
+                any(FoodPost.class), eq(List.of(candidate)), eq(2), anyMap()))
                 .thenReturn(List.of(score(candidate, 0.90)));
 
         List<FoodPostRecommendation> result = service.recommend(2, 2);
@@ -95,8 +112,11 @@ class MatchingPipelineServiceTest {
         when(foodPostPriorityQueue.getOrderedEntries()).thenReturn(List.of(entry(foodPost, 20)));
         when(foodPostRepository.findAllByIdInForMatching(List.of(10L)))
                 .thenReturn(List.of(foodPost));
-        when(matchingCandidateFilter.filterCandidates(foodPost)).thenReturn(List.of(candidate));
-        when(topKMatchingService.findTopMatches(foodPost, List.of(candidate), 3))
+        when(matchingCandidateFilter.prepareCandidates(List.of(foodPost)))
+                .thenReturn(new MatchingCandidateFilter.CandidateBatch(
+                        Map.of(foodPost.getId(), List.of(candidate)),
+                        Map.of(candidate.getId(), 1L)));
+        when(topKMatchingService.findTopMatches(foodPost, List.of(candidate), 3, Map.of(101L, 1L)))
                 .thenReturn(List.of(score));
         when(minimumCostMaximumFlowService.allocate(any(), eq(Map.of(101L, 4))))
                 .thenReturn(expectedAllocation);
@@ -118,6 +138,40 @@ class MatchingPipelineServiceTest {
     }
 
     @Test
+    void recommendForCurrentUser_returnsOnlyEligiblePostsWithScore() throws Exception {
+        User currentUser = candidate(101L);
+        FoodPost foodPost = post(10L, 6, Instant.parse("2030-01-01T00:00:00Z"));
+        Category category = new Category();
+        category.setId(1L);
+        category.setName("Food");
+        BusinessProfile supplier = new BusinessProfile();
+        supplier.setId(20L);
+        supplier.setName("Supplier");
+        supplier.setUser(candidate(202L));
+        foodPost.setCategory(category);
+        foodPost.setBusinessProfile(supplier);
+
+        when(userRepository.findById(101L)).thenReturn(Optional.of(currentUser));
+        when(foodPostPriorityQueue.getOrderedEntries()).thenReturn(List.of(entry(foodPost, 20)));
+        when(foodPostRepository.findAllByIdInForMatching(List.of(10L))).thenReturn(List.of(foodPost));
+        when(matchingCandidateFilter.findEligibleFoodPostIds(List.of(foodPost), currentUser))
+                .thenReturn(Set.of(10L));
+        when(topKMatchingService.findTopMatches(foodPost, List.of(currentUser), 1))
+                .thenReturn(List.of(score(currentUser, 0.87)));
+
+        try (MockedStatic<SecurityUtil> security = org.mockito.Mockito.mockStatic(SecurityUtil.class)) {
+            security.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(101L));
+
+            List<FoodPostResponse> result = service.recommendForCurrentUser(6);
+
+            assertEquals(1, result.size());
+            assertEquals(10L, result.getFirst().getId());
+            assertEquals(87.0, result.getFirst().getMatchScore(), 1.0e-9);
+            assertEquals(1.5, result.getFirst().getDistanceKm(), 1.0e-9);
+        }
+    }
+
+    @Test
     void recommend_completesExperimentalDatasetWithinBudget() {
         int postCount = 1_000;
         Instant expiresAt = Instant.parse("2030-01-01T00:00:00Z");
@@ -132,9 +186,12 @@ class MatchingPipelineServiceTest {
 
         when(foodPostPriorityQueue.getOrderedEntries()).thenReturn(entries);
         when(foodPostRepository.findAllByIdInForMatching(any())).thenReturn(posts);
-        when(matchingCandidateFilter.filterCandidates(any(FoodPost.class)))
-                .thenReturn(List.of(candidate));
-        when(topKMatchingService.findTopMatches(any(FoodPost.class), any(), anyInt()))
+        Map<Long, List<User>> candidatesByPostId = new java.util.HashMap<>();
+        posts.forEach(post -> candidatesByPostId.put(post.getId(), List.of(candidate)));
+        when(matchingCandidateFilter.prepareCandidates(posts))
+                .thenReturn(new MatchingCandidateFilter.CandidateBatch(
+                        candidatesByPostId, Map.of(candidate.getId(), 1L)));
+        when(topKMatchingService.findTopMatches(any(FoodPost.class), any(), anyInt(), anyMap()))
                 .thenReturn(List.of(score(candidate, 0.80)));
 
         List<FoodPostRecommendation> result = assertTimeout(

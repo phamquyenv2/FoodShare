@@ -1,18 +1,21 @@
 package com.datn.foodshare.service;
 
 import com.datn.foodshare.domain.entity.Report;
+import com.datn.foodshare.domain.entity.Order;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.CreateReportRequest;
 import com.datn.foodshare.domain.request.UpdateReportStatusRequest;
 import com.datn.foodshare.domain.response.ReportResponse;
 import com.datn.foodshare.event.NotificationEvent;
 import com.datn.foodshare.repository.ReportRepository;
+import com.datn.foodshare.repository.OrderRepository;
 import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.NotificationReferenceType;
 import com.datn.foodshare.util.constant.ReportReferenceType;
 import com.datn.foodshare.util.constant.ReportStatus;
 import com.datn.foodshare.util.constant.ReportType;
+import com.datn.foodshare.util.constant.OrderStatus;
 import com.datn.foodshare.util.error.BusinessException;
 import com.datn.foodshare.util.error.PermissionException;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +45,8 @@ class ReportServiceTest {
     @Mock
     private ReportRepository reportRepository;
     @Mock
+    private OrderRepository orderRepository;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -53,7 +58,7 @@ class ReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        reportService = new ReportService(reportRepository, userRepository, eventPublisher);
+        reportService = new ReportService(reportRepository, orderRepository, userRepository, eventPublisher);
     }
 
     @Test
@@ -72,7 +77,7 @@ class ReportServiceTest {
             request.setTitle("Lừa đảo");
             request.setContent("Bán hàng không đúng mô tả");
             request.setReportType(ReportType.COMPLAINT);
-            request.setReferenceType(ReportReferenceType.ORDER);
+            request.setReferenceType(ReportReferenceType.FOOD_POST);
             request.setReferenceId(50L);
 
             ReportResponse response = reportService.createReport(request);
@@ -82,6 +87,59 @@ class ReportServiceTest {
             assertEquals(ReportStatus.PENDING, response.getReportStatus());
             verify(reportRepository).save(any(Report.class));
         }
+    }
+
+    @Test
+    void createOrderDispute_within24HoursLocksOrderAndSucceeds() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            User user = testUser();
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(USER_ID));
+            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+            Order order = new Order();
+            order.setId(50L);
+            order.setReceiver(user);
+            order.setOrderStatus(OrderStatus.DELIVERED);
+            order.setDeliveredAt(Instant.now().minusSeconds(60));
+            when(orderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(order));
+            when(reportRepository.save(any(Report.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            CreateReportRequest request = orderReportRequest();
+
+            ReportResponse response = reportService.createReport(request);
+
+            assertEquals(ReportStatus.PENDING, response.getReportStatus());
+            verify(orderRepository).findByIdForUpdate(50L);
+            verify(reportRepository).save(any(Report.class));
+        }
+    }
+
+    @Test
+    void createOrderDispute_after24HoursRejects() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            User user = testUser();
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(USER_ID));
+            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+            Order order = new Order();
+            order.setId(50L);
+            order.setReceiver(user);
+            order.setOrderStatus(OrderStatus.DELIVERED);
+            order.setDeliveredAt(Instant.now().minus(25, java.time.temporal.ChronoUnit.HOURS));
+            when(orderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(order));
+
+            assertThrows(BusinessException.class, () -> reportService.createReport(orderReportRequest()));
+
+            verify(reportRepository, never()).save(any());
+        }
+    }
+
+    private CreateReportRequest orderReportRequest() {
+        CreateReportRequest request = new CreateReportRequest();
+        request.setTitle("Giao sai món");
+        request.setContent("Nội dung khiếu nại");
+        request.setReportType(ReportType.COMPLAINT);
+        request.setReferenceType(ReportReferenceType.ORDER);
+        request.setReferenceId(50L);
+        return request;
     }
 
     @Test

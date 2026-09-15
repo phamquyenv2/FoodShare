@@ -2,6 +2,8 @@ package com.datn.foodshare.domain.response;
 
 import com.datn.foodshare.domain.entity.Order;
 import com.datn.foodshare.domain.entity.OrderDetail;
+import com.datn.foodshare.domain.entity.Payment;
+import com.datn.foodshare.util.constant.TransactionStatus;
 import com.datn.foodshare.util.constant.OrderStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -9,6 +11,7 @@ import lombok.Getter;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Comparator;
 
 @Getter
 @Builder
@@ -17,6 +20,7 @@ public class OrderResponse {
     private Long id;
     private String orderCode;
     private OrderStatus orderStatus;
+    private TransactionStatus paymentStatus;
     private BigDecimal totalAmount;
     private String receiverNote;
     private Instant readyAt;
@@ -25,6 +29,7 @@ public class OrderResponse {
     private Instant completedAt;
     private Instant cancelledAt;
     private Instant rejectedAt;
+    private String rejectionReason;
     private List<OrderDetailInfo> orderDetails;
     private ReceiverInfo receiver;
     private SupplierInfo supplier;
@@ -47,6 +52,7 @@ public class OrderResponse {
         private Long id;
         private String name;
         private String pickupAddress;
+        private String imageUrl;
     }
 
     @Getter
@@ -54,6 +60,7 @@ public class OrderResponse {
     public static class ReceiverInfo {
         private Long id;
         private String fullName;
+        private String phone;
     }
 
     @Getter
@@ -61,6 +68,8 @@ public class OrderResponse {
     public static class SupplierInfo {
         private Long businessProfileId;
         private String name;
+        private String avatarUrl;
+        private String phone;
     }
 
     public static OrderResponse from(Order order) {
@@ -72,6 +81,7 @@ public class OrderResponse {
                 .id(order.getId())
                 .orderCode(order.getOrderCode())
                 .orderStatus(order.getOrderStatus())
+                .paymentStatus(mapPaymentStatus(order))
                 .totalAmount(order.getTotalAmount())
                 .receiverNote(order.getReceiverNote())
                 .readyAt(order.getReadyAt())
@@ -80,18 +90,33 @@ public class OrderResponse {
                 .completedAt(order.getCompletedAt())
                 .cancelledAt(order.getCancelledAt())
                 .rejectedAt(order.getRejectedAt())
+                .rejectionReason(order.getRejectionReason())
                 .orderDetails(details)
                 .receiver(ReceiverInfo.builder()
                         .id(order.getReceiver().getId())
                         .fullName(order.getReceiver().getFullName())
+                        .phone(order.getReceiver().getPhone())
                         .build())
                 .supplier(SupplierInfo.builder()
                         .businessProfileId(order.getBusinessProfile().getId())
                         .name(order.getBusinessProfile().getName())
+                        .avatarUrl(order.getBusinessProfile().getUser() != null ? order.getBusinessProfile().getUser().getAvatarUrl() : null)
+                        .phone(order.getBusinessProfile().getUser() != null ? order.getBusinessProfile().getUser().getPhone() : null)
                         .build())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .build();
+    }
+
+    private static TransactionStatus mapPaymentStatus(Order order) {
+        // A successful payment still settles the order even if another attempt failed.
+        // Otherwise expose the newest persisted attempt; collection order is unspecified.
+        return order.getPayments().stream()
+                .max(Comparator.comparing((Payment payment) ->
+                                payment.getPaymentStatus() == TransactionStatus.SUCCESS)
+                        .thenComparing(Payment::getId, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .map(Payment::getPaymentStatus)
+                .orElse(null);
     }
 
     private static OrderDetailInfo mapDetail(OrderDetail detail) {
@@ -101,6 +126,8 @@ public class OrderResponse {
                         .id(detail.getFoodPost().getId())
                         .name(detail.getFoodPost().getName())
                         .pickupAddress(detail.getFoodPost().getPickupAddress())
+                        .imageUrl(detail.getFoodPost().getImages() != null && !detail.getFoodPost().getImages().isEmpty() 
+                                ? detail.getFoodPost().getImages().get(0).getImageUrl() : null)
                         .build())
                 .unitPrice(detail.getUnitPrice())
                 .quantity(detail.getQuantity())

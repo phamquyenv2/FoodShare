@@ -14,11 +14,15 @@ import com.datn.foodshare.repository.CategoryRepository;
 import com.datn.foodshare.repository.FoodPostRepository;
 import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.repository.specification.FoodPostSpecification;
+import com.datn.foodshare.event.NotificationEvent;
+import com.datn.foodshare.util.constant.NotificationType;
+import com.datn.foodshare.util.constant.NotificationReferenceType;
+import org.springframework.context.ApplicationEventPublisher;
 import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
-import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.PostType;
 import com.datn.foodshare.util.constant.Role;
+import com.datn.foodshare.util.constant.VerificationStatus;
 import com.datn.foodshare.util.error.BusinessException;
 import com.datn.foodshare.util.error.PermissionException;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +30,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +49,8 @@ public class FoodPostService {
     private final UserRepository userRepository;
     private final CloudinaryService cloudinaryService;
     private final DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
+    private final ApplicationEventPublisher eventPublisher;
+    private final PermissionService permissionService;
 
     @Transactional
     public FoodPostResponse create(CreateFoodPostRequest request) throws PermissionException {
@@ -54,6 +59,7 @@ public class FoodPostService {
         requireProfileCompleted(currentUser);
 
         BusinessProfile businessProfile = resolveBusinessProfile(currentUser);
+        requireVerifiedBusinessProfile(businessProfile);
         Category category = resolveCategory(request.getCategoryId());
 
         validatePrice(request.getPostType(), request.getUnitPrice());
@@ -68,8 +74,9 @@ public class FoodPostService {
                 .totalQuantity(request.getTotalQuantity())
                 .availableQuantity(request.getTotalQuantity())
                 .unitPrice(request.getUnitPrice())
+                .originalPrice(request.getOriginalPrice())
                 .postType(request.getPostType())
-                .postStatus(PostStatus.DRAFT)
+                .postStatus(Boolean.TRUE.equals(request.getIsDraft()) ? PostStatus.DRAFT : PostStatus.AVAILABLE)
                 .expiresAt(request.getExpiresAt())
                 .pickupAddress(request.getPickupAddress().trim())
                 .pickupStartAt(request.getPickupStartAt())
@@ -87,6 +94,7 @@ public class FoodPostService {
         requireRole(currentUser, Role.SUPPLIER);
         FoodPost post = findPostOrThrow(id);
         requireOwnership(currentUser, post);
+        requireVerifiedBusinessProfile(post.getBusinessProfile());
 
         if (post.getPostStatus() != PostStatus.DRAFT) {
             throw new BusinessException("Chỉ có thể đăng bài ở trạng thái nháp");
@@ -129,7 +137,9 @@ public class FoodPostService {
         post.setAvailableQuantity(newAvailable);
 
         if (post.getPostStatus() == PostStatus.OUT_OF_STOCK && newAvailable > 0) {
-            post.setPostStatus(PostStatus.AVAILABLE);
+            post.setPostStatus(post.getExpiresAt().isAfter(Instant.now())
+                    ? PostStatus.AVAILABLE
+                    : PostStatus.EXPIRED);
         }
 
         saveAndSynchronize(post);
@@ -146,11 +156,11 @@ public class FoodPostService {
     }
 
     @Transactional(readOnly = true)
-    public Page<FoodPostResponse> getMyPosts(Pageable pageable) throws PermissionException {
+    public Page<FoodPostResponse> getMyPosts(PostStatus status, String keyword, Pageable pageable) throws PermissionException {
         User currentUser = getAuthenticatedUser();
         requireRole(currentUser, Role.SUPPLIER);
         BusinessProfile businessProfile = resolveBusinessProfile(currentUser);
-        Page<FoodPost> posts = foodPostRepository.findByBusinessProfileId(businessProfile.getId(), pageable);
+        Page<FoodPost> posts = foodPostRepository.searchSupplierPosts(businessProfile.getId(), status, keyword, pageable);
         return mapPageWithImages(posts);
     }
 
@@ -203,6 +213,10 @@ public class FoodPostService {
         validatePrice(newPostType, newUnitPrice);
         post.setPostType(newPostType);
         post.setUnitPrice(newUnitPrice);
+        
+        if (request.getOriginalPrice() != null) {
+            post.setOriginalPrice(request.getOriginalPrice());
+        }
 
         Instant newPickupStart = request.getPickupStartAt() != null ? request.getPickupStartAt() : post.getPickupStartAt();
         Instant newPickupEnd = request.getPickupEndAt() != null ? request.getPickupEndAt() : post.getPickupEndAt();
@@ -218,12 +232,13 @@ public class FoodPostService {
         }
 
         if (request.getImages() != null) {
-            List<String> oldUrls = post.getImages().stream()
-                    .map(img -> img.getImageUrl())
-                    .toList();
             post.getImages().clear();
             attachImages(post, request.getImages());
-            oldUrls.forEach(cloudinaryService::deleteFoodPostImage);
+        }
+
+        if (Boolean.FALSE.equals(request.getIsDraft()) && post.getPostStatus() == PostStatus.DRAFT) {
+            requireVerifiedBusinessProfile(post.getBusinessProfile());
+            post.setPostStatus(PostStatus.AVAILABLE);
         }
 
         return FoodPostResponse.from(saveAndSynchronize(post));
@@ -249,6 +264,7 @@ public class FoodPostService {
             throw new BusinessException("Bài đăng đã hết hạn, không thể ẩn");
         }
 
+        post.setHiddenByAdmin(false);
         post.setPostStatus(PostStatus.HIDDEN);
         return FoodPostResponse.from(saveAndSynchronize(post));
     }
@@ -262,6 +278,9 @@ public class FoodPostService {
 
         if (post.getPostStatus() != PostStatus.HIDDEN) {
             throw new BusinessException("Bài đăng không ở trạng thái ẩn");
+        }
+        if (post.isHiddenByAdmin()) {
+            throw new PermissionException("Bài đăng đã bị Admin ẩn và chỉ Admin mới có thể khôi phục");
         }
         if (post.getExpiresAt().isBefore(Instant.now())) {
             throw new BusinessException("Bài đăng đã hết hạn, không thể khôi phục");
@@ -306,6 +325,7 @@ public class FoodPostService {
         if (post.getPostStatus() == PostStatus.DELETED) {
             throw new BusinessException("Bài đăng đã bị hủy");
         }
+        post.setHiddenByAdmin(true);
         post.setPostStatus(PostStatus.HIDDEN);
         return FoodPostResponse.from(saveAndSynchronize(post));
     }
@@ -320,21 +340,17 @@ public class FoodPostService {
             throw new BusinessException("Bài đăng đã hết hạn, không thể khôi phục");
         }
         PostStatus restored = post.getAvailableQuantity() > 0 ? PostStatus.AVAILABLE : PostStatus.OUT_OF_STOCK;
+        post.setHiddenByAdmin(false);
         post.setPostStatus(restored);
         return FoodPostResponse.from(saveAndSynchronize(post));
     }
 
     private User getAuthenticatedUser() {
-        Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new BadCredentialsException("Không xác định được người dùng hiện tại"));
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new BadCredentialsException("Tài khoản không tồn tại"));
+        return permissionService.currentUser();
     }
 
     private void requireRole(User user, Role expected) throws PermissionException {
-        if (user.getRole() != expected) {
-            throw new PermissionException("Chỉ " + expected.name() + " mới có quyền thực hiện hành động này");
-        }
+        permissionService.requireRole(user, expected);
     }
 
     private void requireProfileCompleted(User user) {
@@ -346,6 +362,12 @@ public class FoodPostService {
     private BusinessProfile resolveBusinessProfile(User user) {
         return businessProfileRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new BusinessException("Không tìm thấy hồ sơ kinh doanh của Nhà cung cấp"));
+    }
+
+    private void requireVerifiedBusinessProfile(BusinessProfile businessProfile) {
+        if (businessProfile.getVerificationStatus() != VerificationStatus.VERIFIED) {
+            throw new BusinessException("Hồ sơ kinh doanh phải được xác minh trước khi đăng bài");
+        }
     }
 
     private Category resolveCategory(Long categoryId) {
@@ -369,9 +391,7 @@ public class FoodPostService {
     }
 
     private void requireOwnership(User user, FoodPost post) throws PermissionException {
-        if (!isOwner(user, post)) {
-            throw new PermissionException("Bạn không có quyền thao tác với bài đăng này");
-        }
+        permissionService.requireFoodPostOwnership(user, post);
     }
 
     private void requireUpdatableStatus(FoodPost post) {
@@ -481,9 +501,22 @@ public class FoodPostService {
     @Scheduled(fixedRate = 300_000)
     @Transactional
     public void markExpiredPosts() {
-        int count = foodPostRepository.markExpired(Instant.now());
-        if (count > 0) {
+        Instant now = Instant.now();
+        List<FoodPost> expiredPosts = foodPostRepository.findExpiredPosts(now);
+        if (!expiredPosts.isEmpty()) {
+            int count = foodPostRepository.markExpired(now);
             matchingGraphSynchronizer.rebuildAfterCommit();
+            for (FoodPost post : expiredPosts) {
+                eventPublisher.publishEvent(NotificationEvent.builder()
+                        .source(this)
+                        .user(post.getBusinessProfile().getUser())
+                        .title("Bài đăng đã hết hạn")
+                        .content("Bài đăng \"" + post.getName() + "\" của bạn đã hết thời gian chia sẻ.")
+                        .type(NotificationType.SYSTEM)
+                        .referenceType(NotificationReferenceType.FOOD_POST)
+                        .referenceId(post.getId())
+                        .build());
+            }
             log.info("Đã chuyển {} bài đăng sang trạng thái EXPIRED", count);
         }
     }

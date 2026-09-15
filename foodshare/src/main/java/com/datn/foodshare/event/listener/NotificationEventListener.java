@@ -7,6 +7,7 @@ import com.datn.foodshare.repository.NotificationRepository;
 import com.datn.foodshare.repository.UserDeviceRepository;
 import com.datn.foodshare.service.notification.EmailService;
 import com.datn.foodshare.service.notification.FCMService;
+import com.datn.foodshare.util.constant.NotificationChannel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -45,8 +46,8 @@ public class NotificationEventListener {
                     .build();
             notificationRepository.save(notification);
 
-            List<UserDevice> activeDevices = userDeviceRepository.findByUserIdAndIsActiveTrue(event.getUser().getId());
-            if (!activeDevices.isEmpty()) {
+            if (event.supports(NotificationChannel.PUSH)) {
+                List<UserDevice> activeDevices = userDeviceRepository.findByUserIdAndIsActiveTrue(event.getUser().getId());
                 Map<String, String> data = new HashMap<>();
                 if (event.getReferenceType() != null) data.put("referenceType", event.getReferenceType().name());
                 if (event.getReferenceId() != null) data.put("referenceId", event.getReferenceId().toString());
@@ -58,7 +59,7 @@ public class NotificationEventListener {
                 }
             }
 
-            if (event.getType() == com.datn.foodshare.util.constant.NotificationType.PAYMENT 
+            if (event.supports(NotificationChannel.EMAIL)
                 && event.getUser().getEmail() != null && !event.getUser().getEmail().isBlank()) {
                 emailService.sendEmail(event.getUser().getEmail(), event.getTitle(), event.getContent());
             }

@@ -26,8 +26,8 @@ public class StatisticController {
     @GetMapping("/dashboard")
     @ApiMessage("Lấy dữ liệu thống kê dashboard thành công")
     public ResponseEntity<AdminDashboardResponse> getDashboardStatistics(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date toDate) {
+            @RequestParam(name = "fromDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date fromDate,
+            @RequestParam(name = "toDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date toDate) {
         
         Instant from = fromDate != null ? fromDate.toInstant() : null;
         Instant to = toDate != null ? toDate.toInstant() : null;

@@ -10,9 +10,11 @@ import com.datn.foodshare.domain.response.OrderResponse;
 import com.datn.foodshare.repository.FoodPostRepository;
 import com.datn.foodshare.repository.OrderRepository;
 import com.datn.foodshare.repository.UserRepository;
-import com.datn.foodshare.util.SecurityUtil;
+import com.datn.foodshare.util.constant.NotificationChannel;
 import com.datn.foodshare.util.constant.OrderStatus;
 import com.datn.foodshare.util.constant.PostStatus;
+import com.datn.foodshare.util.constant.ReportReferenceType;
+import com.datn.foodshare.util.constant.ReportStatus;
 import com.datn.foodshare.util.constant.Role;
 import com.datn.foodshare.util.error.BusinessException;
 import com.datn.foodshare.util.error.PermissionException;
@@ -24,16 +26,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.UUID;
 
 @Service
@@ -41,24 +46,36 @@ import java.util.UUID;
 @Slf4j
 public class OrderService {
 
+    private static final Duration INSPECTION_WINDOW = Duration.ofHours(24);
+    private static final List<ReportStatus> ACTIVE_REPORT_STATUSES =
+            List.of(ReportStatus.PENDING, ReportStatus.REVIEWING);
+    private static final List<OrderStatus> EXPIRABLE_ORDER_STATUSES = List.of(
+            OrderStatus.PENDING,
+            OrderStatus.ACCEPTED,
+            OrderStatus.READY_FOR_PICKUP);
+
     private final OrderRepository orderRepository;
     private final FoodPostRepository foodPostRepository;
     private final UserRepository userRepository;
     private final FoodPostService foodPostService;
     private final com.datn.foodshare.repository.PaymentRepository paymentRepository;
     private final com.datn.foodshare.service.payment.strategy.PaymentStrategyFactory paymentStrategyFactory;
+    private final SupplierEarningService supplierEarningService;
     private final ApplicationEventPublisher eventPublisher;
+    private final PermissionService permissionService;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) throws PermissionException {
         User currentUser = getAuthenticatedUser();
         requireReceiverRole(currentUser);
         requireProfileCompleted(currentUser);
+        Instant now = Instant.now();
 
         FoodPost foodPost = foodPostRepository.findByIdWithDetails(request.getFoodPostId())
                 .orElseThrow(() -> new BusinessException("Bài đăng không tồn tại: " + request.getFoodPostId()));
 
-        validateFoodPostAvailability(foodPost);
+        validateRecipientLimits(currentUser, request.getFoodPostId(), request.getQuantity());
+        validateFoodPostAvailability(foodPost, now);
         validateQuantity(request.getQuantity(), foodPost.getAvailableQuantity());
 
         BigDecimal unitPrice = foodPost.getUnitPrice();
@@ -99,6 +116,7 @@ public class OrderService {
                 .type(NotificationType.ORDER)
                 .referenceType(NotificationReferenceType.ORDER)
                 .referenceId(savedOrder.getId())
+                .channels(pushChannels(false))
                 .build());
 
         return OrderResponse.from(savedOrder);
@@ -109,14 +127,20 @@ public class OrderService {
         User currentUser = getAuthenticatedUser();
         requireReceiverRole(currentUser);
         requireProfileCompleted(currentUser);
+        Instant now = Instant.now();
 
         Map<BusinessProfile, List<CreateOrderRequest>> ordersBySupplier = new HashMap<>();
+        Set<Long> requestedPostIds = new HashSet<>();
         
         for (CreateOrderRequest request : batchRequest.getOrders()) {
+            if (!requestedPostIds.add(request.getFoodPostId())) {
+                throw new BusinessException("Không được lặp lại cùng một bài đăng trong một đơn");
+            }
             FoodPost foodPost = foodPostRepository.findByIdWithDetails(request.getFoodPostId())
                     .orElseThrow(() -> new BusinessException("Bài đăng không tồn tại: " + request.getFoodPostId()));
 
-            validateFoodPostAvailability(foodPost);
+            validateRecipientLimits(currentUser, request.getFoodPostId(), request.getQuantity());
+            validateFoodPostAvailability(foodPost, now);
             validateQuantity(request.getQuantity(), foodPost.getAvailableQuantity());
             
             BusinessProfile businessProfile = foodPost.getBusinessProfile();
@@ -176,6 +200,7 @@ public class OrderService {
                     .type(NotificationType.ORDER)
                     .referenceType(NotificationReferenceType.ORDER)
                     .referenceId(savedOrder.getId())
+                    .channels(pushChannels(false))
                     .build());
         }
 
@@ -189,8 +214,7 @@ public class OrderService {
 
         Page<Order> ordersPage = orderRepository.findByReceiverId(currentUser.getId(), pageable);
         if (ordersPage.hasContent()) {
-            List<Long> orderIds = ordersPage.getContent().stream().map(Order::getId).toList();
-            orderRepository.findAllWithDetailsByIdIn(orderIds);
+            hydrateOrderPage(ordersPage.getContent());
         }
         return ordersPage.map(OrderResponse::from);
     }
@@ -215,31 +239,48 @@ public class OrderService {
         User currentUser = getAuthenticatedUser();
         requireReceiverRole(currentUser);
 
-        Order order = orderRepository.findByIdWithDetails(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException("Đơn tiếp nhận không tồn tại: " + orderId));
 
         if (!order.getReceiver().getId().equals(currentUser.getId())) {
             throw new PermissionException("Bạn không có quyền thao tác với đơn tiếp nhận này");
         }
 
-        if (order.getOrderStatus() != OrderStatus.PENDING) {
-            throw new BusinessException("Chỉ có thể hủy đơn tiếp nhận ở trạng thái chờ xác nhận");
+        if (!transitionOrder(
+                order,
+                OrderStatus.PENDING,
+                OrderStatus.CANCELLED,
+                "Chỉ có thể hủy đơn tiếp nhận ở trạng thái chờ xác nhận")) {
+            return OrderResponse.from(order);
         }
-
-        order.setOrderStatus(OrderStatus.CANCELLED);
         order.setCancelledAt(Instant.now());
 
         for (OrderDetail detail : order.getOrderDetails()) {
             foodPostService.restoreQuantity(detail.getFoodPost().getId(), detail.getQuantity());
         }
 
-        processRefundIfPaid(orderId);
+        boolean refunded = reconcilePaymentsForTerminatedOrder(orderId);
+        Order savedOrder = orderRepository.save(order);
 
-        return OrderResponse.from(orderRepository.save(order));
+        eventPublisher.publishEvent(NotificationEvent.builder()
+                .source(this)
+                .user(savedOrder.getBusinessProfile().getUser())
+                .title("Đơn yêu cầu đã bị hủy")
+                .content("Người nhận đã hủy đơn " + savedOrder.getOrderCode() + ".")
+                .type(NotificationType.ORDER)
+                .referenceType(NotificationReferenceType.ORDER)
+                .referenceId(savedOrder.getId())
+                .channels(pushChannels(false))
+                .build());
+        if (refunded) {
+            publishRefundNotification(savedOrder);
+        }
+
+        return OrderResponse.from(savedOrder);
     }
 
     @Transactional(readOnly = true)
-    public Page<OrderResponse> getSupplierOrders(Pageable pageable) throws PermissionException {
+    public Page<OrderResponse> getSupplierOrders(OrderStatus status, String keyword, Pageable pageable) throws PermissionException {
         User currentUser = getAuthenticatedUser();
         requireSupplierRole(currentUser);
 
@@ -248,10 +289,10 @@ public class OrderService {
             throw new BusinessException("Không tìm thấy hồ sơ doanh nghiệp của bạn");
         }
 
-        Page<Order> ordersPage = orderRepository.findByBusinessProfileId(businessProfile.getId(), pageable);
+        Page<Order> ordersPage = orderRepository.searchSupplierOrders(businessProfile.getId(), status, keyword, pageable);
+        
         if (ordersPage.hasContent()) {
-            List<Long> orderIds = ordersPage.getContent().stream().map(Order::getId).toList();
-            orderRepository.findAllWithDetailsByIdIn(orderIds);
+            hydrateOrderPage(ordersPage.getContent());
         }
         return ordersPage.map(OrderResponse::from);
     }
@@ -259,10 +300,18 @@ public class OrderService {
     @Transactional
     public OrderResponse acceptOrder(Long orderId) throws PermissionException {
         Order order = getSupplierOrder(orderId);
-        if (order.getOrderStatus() != OrderStatus.PENDING) {
-            throw new BusinessException("Chỉ có thể chấp nhận đơn ở trạng thái chờ");
+        if (order.getOrderStatus() == OrderStatus.PENDING) {
+            Instant now = Instant.now();
+            validateOrderAcceptWindow(order, now);
+            order.setPickupDeadline(calculatePickupDeadline(order));
         }
-        order.setOrderStatus(OrderStatus.ACCEPTED);
+        if (!transitionOrder(
+                order,
+                OrderStatus.PENDING,
+                OrderStatus.ACCEPTED,
+                "Chỉ có thể chấp nhận đơn ở trạng thái chờ")) {
+            return OrderResponse.from(order);
+        }
         Order savedOrder = orderRepository.save(order);
 
         eventPublisher.publishEvent(NotificationEvent.builder()
@@ -273,6 +322,7 @@ public class OrderService {
                 .type(NotificationType.ORDER)
                 .referenceType(NotificationReferenceType.ORDER)
                 .referenceId(savedOrder.getId())
+                .channels(pushChannels(false))
                 .build());
 
         return OrderResponse.from(savedOrder);
@@ -281,18 +331,21 @@ public class OrderService {
     @Transactional
     public OrderResponse rejectOrder(Long orderId, com.datn.foodshare.domain.request.RejectOrderRequest request) throws PermissionException {
         Order order = getSupplierOrder(orderId);
-        if (order.getOrderStatus() != OrderStatus.PENDING) {
-            throw new BusinessException("Chỉ có thể từ chối đơn ở trạng thái chờ");
+        if (!transitionOrder(
+                order,
+                OrderStatus.PENDING,
+                OrderStatus.REJECTED,
+                "Chỉ có thể từ chối đơn ở trạng thái chờ")) {
+            return OrderResponse.from(order);
         }
-        order.setOrderStatus(OrderStatus.REJECTED);
-        order.setRejectionReason(trimToNull(request.getRejectionReason()));
+        order.setRejectionReason(request == null ? null : trimToNull(request.getRejectionReason()));
         order.setRejectedAt(Instant.now());
 
         for (OrderDetail detail : order.getOrderDetails()) {
             foodPostService.restoreQuantity(detail.getFoodPost().getId(), detail.getQuantity());
         }
 
-        processRefundIfPaid(orderId);
+        boolean refunded = reconcilePaymentsForTerminatedOrder(orderId);
 
         Order savedOrder = orderRepository.save(order);
 
@@ -300,22 +353,30 @@ public class OrderService {
                 .source(this)
                 .user(savedOrder.getReceiver())
                 .title("Đơn yêu cầu bị từ chối")
-                .content("Đơn yêu cầu " + savedOrder.getOrderCode() + " đã bị từ chối với lý do: " + savedOrder.getRejectionReason())
+                .content("Đơn yêu cầu " + savedOrder.getOrderCode() + " đã bị từ chối với lý do: "
+                        + savedOrder.getRejectionReason()
+                        + (refunded ? ". Khoản thanh toán đã được hoàn lại." : ""))
                 .type(NotificationType.ORDER)
                 .referenceType(NotificationReferenceType.ORDER)
                 .referenceId(savedOrder.getId())
+                .channels(pushChannels(refunded))
                 .build());
 
-        return OrderResponse.from(savedOrder);
+        Order responseOrder = orderRepository.findByIdWithDetails(savedOrder.getId()).orElse(savedOrder);
+        orderRepository.findAllWithPaymentsByIdIn(List.of(savedOrder.getId()));
+        return OrderResponse.from(responseOrder);
     }
 
     @Transactional
     public OrderResponse readyForPickupOrder(Long orderId) throws PermissionException {
         Order order = getSupplierOrder(orderId);
-        if (order.getOrderStatus() != OrderStatus.ACCEPTED) {
-            throw new BusinessException("Chỉ có thể chuẩn bị xong đơn đã được chấp nhận");
+        if (!transitionOrder(
+                order,
+                OrderStatus.ACCEPTED,
+                OrderStatus.READY_FOR_PICKUP,
+                "Chỉ có thể chuẩn bị xong đơn đã được chấp nhận")) {
+            return OrderResponse.from(order);
         }
-        order.setOrderStatus(OrderStatus.READY_FOR_PICKUP);
         order.setReadyAt(Instant.now());
         
         Order savedOrder = orderRepository.save(order);
@@ -328,6 +389,7 @@ public class OrderService {
                 .type(NotificationType.ORDER)
                 .referenceType(NotificationReferenceType.ORDER)
                 .referenceId(savedOrder.getId())
+                .channels(pushChannels(false))
                 .build());
 
         return OrderResponse.from(savedOrder);
@@ -336,10 +398,13 @@ public class OrderService {
     @Transactional
     public OrderResponse deliverOrder(Long orderId) throws PermissionException {
         Order order = getSupplierOrder(orderId);
-        if (order.getOrderStatus() != OrderStatus.READY_FOR_PICKUP) {
-            throw new BusinessException("Chỉ có thể xác nhận giao đơn ở trạng thái đã chuẩn bị xong (READY_FOR_PICKUP)");
+        if (!transitionOrder(
+                order,
+                OrderStatus.READY_FOR_PICKUP,
+                OrderStatus.DELIVERED,
+                "Chỉ có thể xác nhận giao đơn ở trạng thái đã chuẩn bị xong (READY_FOR_PICKUP)")) {
+            return OrderResponse.from(order);
         }
-        order.setOrderStatus(OrderStatus.DELIVERED);
         order.setDeliveredAt(Instant.now());
                 
         Order savedOrder = orderRepository.save(order);
@@ -352,6 +417,7 @@ public class OrderService {
                 .type(NotificationType.ORDER)
                 .referenceType(NotificationReferenceType.ORDER)
                 .referenceId(savedOrder.getId())
+                .channels(pushChannels(false))
                 .build());
 
         return OrderResponse.from(savedOrder);
@@ -362,32 +428,27 @@ public class OrderService {
         User currentUser = getAuthenticatedUser();
         requireReceiverRole(currentUser);
 
-        Order order = orderRepository.findByIdWithDetails(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException("Đơn tiếp nhận không tồn tại: " + orderId));
 
         if (!order.getReceiver().getId().equals(currentUser.getId())) {
             throw new PermissionException("Bạn không có quyền thao tác với đơn tiếp nhận này");
         }
 
+        if (order.getOrderStatus() == OrderStatus.COMPLETED) {
+            return OrderResponse.from(order);
+        }
         if (order.getOrderStatus() != OrderStatus.DELIVERED) {
             throw new BusinessException("Chỉ có thể hoàn thành đơn ở trạng thái đã giao (DELIVERED)");
         }
+        if (hasActiveDispute(orderId)) {
+            throw new BusinessException("Đơn hàng đang có khiếu nại cần được đối soát");
+        }
+        if (!hasSuccessfulPaymentWhenRequired(order)) {
+            throw new BusinessException("Đơn hàng có phí chỉ có thể hoàn thành sau khi thanh toán thành công");
+        }
 
-        order.setOrderStatus(OrderStatus.COMPLETED);
-        order.setCompletedAt(Instant.now());
-        
-        Order savedOrder = orderRepository.save(order);
-
-        eventPublisher.publishEvent(NotificationEvent.builder()
-                .source(this)
-                .user(savedOrder.getBusinessProfile().getUser())
-                .title("Đơn yêu cầu đã hoàn thành")
-                .content("Đơn yêu cầu " + savedOrder.getOrderCode() + " đã được người nhận xác nhận hoàn thành.")
-                .type(NotificationType.ORDER)
-                .referenceType(NotificationReferenceType.ORDER)
-                .referenceId(savedOrder.getId())
-                .build());
-
+        Order savedOrder = completeDeliveredOrder(order, Instant.now(), false);
         return OrderResponse.from(savedOrder);
     }
 
@@ -400,7 +461,7 @@ public class OrderService {
             throw new BusinessException("Không tìm thấy hồ sơ doanh nghiệp của bạn");
         }
 
-        Order order = orderRepository.findByIdWithDetails(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException("Đơn tiếp nhận không tồn tại: " + orderId));
 
         if (!order.getBusinessProfile().getId().equals(businessProfile.getId())) {
@@ -411,22 +472,15 @@ public class OrderService {
     }
 
     private void requireSupplierRole(User user) throws PermissionException {
-        if (user.getRole() != Role.SUPPLIER) {
-            throw new PermissionException("Chỉ SUPPLIER mới có quyền thực hiện thao tác này");
-        }
+        permissionService.requireRole(user, Role.SUPPLIER);
     }
 
     private User getAuthenticatedUser() {
-        Long userId = SecurityUtil.getCurrentUserId()
-                .orElseThrow(() -> new BadCredentialsException("Không xác định được người dùng hiện tại"));
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new BadCredentialsException("Tài khoản không tồn tại"));
+        return permissionService.currentUser();
     }
 
     private void requireReceiverRole(User user) throws PermissionException {
-        if (user.getRole() != Role.RECIPIENT && user.getRole() != Role.ORGANIZATION) {
-            throw new PermissionException("Chỉ RECIPIENT hoặc ORGANIZATION mới có quyền tạo đơn tiếp nhận");
-        }
+        permissionService.requireReceiver(user);
     }
 
     private void requireProfileCompleted(User user) {
@@ -435,12 +489,15 @@ public class OrderService {
         }
     }
 
-    private void validateFoodPostAvailability(FoodPost foodPost) {
+    private void validateFoodPostAvailability(FoodPost foodPost, Instant now) {
         if (foodPost.getPostStatus() != PostStatus.AVAILABLE) {
             throw new BusinessException("Bài đăng không ở trạng thái khả dụng");
         }
-        if (foodPost.getExpiresAt().isBefore(Instant.now())) {
+        if (!foodPost.getExpiresAt().isAfter(now)) {
             throw new BusinessException("Bài đăng đã hết hạn");
+        }
+        if (foodPost.getPickupEndAt().isBefore(now)) {
+            throw new BusinessException("Đã quá thời gian kết thúc nhận hàng");
         }
     }
 
@@ -453,22 +510,228 @@ public class OrderService {
         }
     }
 
+    private void validateRecipientLimits(User user, Long foodPostId, int quantity) {
+        if (user.getRole() != Role.RECIPIENT) return;
+        if (quantity != 1) {
+            throw new BusinessException("Người nhận cá nhân chỉ được nhận 1 phần cho mỗi bài đăng");
+        }
+        if (orderRepository.existsByReceiverAndFoodPost(user.getId(), foodPostId)) {
+            throw new BusinessException("Bạn đã gửi yêu cầu cho bài đăng này rồi");
+        }
+    }
+
+    private boolean transitionOrder(
+            Order order,
+            OrderStatus expectedCurrentStatus,
+            OrderStatus targetStatus,
+            String invalidTransitionMessage) {
+        if (order.getOrderStatus() == targetStatus) {
+            return false;
+        }
+        if (order.getOrderStatus() != expectedCurrentStatus) {
+            throw new BusinessException(invalidTransitionMessage);
+        }
+        order.setOrderStatus(targetStatus);
+        return true;
+    }
+
+    private void validateOrderAcceptWindow(Order order, Instant now) {
+        for (OrderDetail detail : order.getOrderDetails()) {
+            FoodPost foodPost = detail.getFoodPost();
+            if (!foodPost.getExpiresAt().isAfter(now)) {
+                throw new BusinessException("Không thể chấp nhận đơn vì bài đăng đã hết hạn");
+            }
+            if (foodPost.getPickupEndAt().isBefore(now)) {
+                throw new BusinessException("Không thể chấp nhận đơn sau thời gian kết thúc nhận hàng");
+            }
+        }
+    }
+
+    private Instant calculatePickupDeadline(Order order) {
+        return order.getOrderDetails().stream()
+                .map(OrderDetail::getFoodPost)
+                .map(FoodPost::getPickupEndAt)
+                .min(Instant::compareTo)
+                .orElseThrow(() -> new BusinessException("Đơn hàng không có thông tin thời gian nhận hàng"));
+    }
+
+    @Scheduled(fixedRate = 60_000)
+    @Transactional
+    public void cancelTimedOutOrders() {
+        Instant now = Instant.now();
+        List<Long> orderIds = orderRepository.findIdsPastFulfillmentWindow(EXPIRABLE_ORDER_STATUSES, now);
+
+        for (Long orderId : orderIds) {
+            Order order = orderRepository.findByIdForUpdate(orderId).orElse(null);
+            if (order == null
+                    || !EXPIRABLE_ORDER_STATUSES.contains(order.getOrderStatus())
+                    || !isPastFulfillmentWindow(order, now)) {
+                continue;
+            }
+
+            boolean hasExpiredFood = order.getOrderDetails().stream()
+                    .map(OrderDetail::getFoodPost)
+                    .anyMatch(post -> !post.getExpiresAt().isAfter(now));
+            order.setOrderStatus(OrderStatus.CANCELLED);
+            order.setCancelledAt(now);
+            order.setCancellationReason(hasExpiredFood
+                    ? "Tự động hủy do món ăn đã hết hạn"
+                    : "Tự động hủy do quá thời hạn nhận hàng");
+            for (OrderDetail detail : order.getOrderDetails()) {
+                foodPostService.restoreQuantity(detail.getFoodPost().getId(), detail.getQuantity());
+            }
+            boolean refunded = reconcilePaymentsForTerminatedOrder(orderId);
+            Order savedOrder = orderRepository.save(order);
+
+            eventPublisher.publishEvent(NotificationEvent.builder()
+                    .source(this)
+                    .user(savedOrder.getReceiver())
+                    .title("Đơn yêu cầu đã tự động hủy")
+                    .content("Đơn " + savedOrder.getOrderCode() + " đã tự động hủy vì "
+                            + (hasExpiredFood ? "món ăn hết hạn" : "quá thời gian nhận hàng")
+                            + (refunded ? ". Khoản thanh toán đã được hoàn lại." : "."))
+                    .type(NotificationType.ORDER)
+                    .referenceType(NotificationReferenceType.ORDER)
+                    .referenceId(savedOrder.getId())
+                    .channels(pushChannels(refunded))
+                    .build());
+        }
+    }
+
+    private boolean isPastFulfillmentWindow(Order order, Instant now) {
+        if (order.getPickupDeadline() != null && order.getPickupDeadline().isBefore(now)) {
+            return true;
+        }
+        return order.getOrderDetails().stream()
+                .map(OrderDetail::getFoodPost)
+                .anyMatch(post -> post.getPickupEndAt().isBefore(now)
+                        || !post.getExpiresAt().isAfter(now));
+    }
+
+    @Scheduled(fixedDelayString = "${foodshare.orders.auto-complete-interval-ms:60000}")
+    @Transactional
+    public void autoCompleteDeliveredOrders() {
+        Instant now = Instant.now();
+        Instant deliveredBefore = now.minus(INSPECTION_WINDOW);
+        List<Long> orderIds = orderRepository.findIdsEligibleForAutoCompletion(
+                OrderStatus.DELIVERED,
+                deliveredBefore,
+                ReportReferenceType.ORDER,
+                ACTIVE_REPORT_STATUSES);
+
+        for (Long orderId : orderIds) {
+            Order order = orderRepository.findByIdForUpdate(orderId).orElse(null);
+            if (order == null
+                    || order.getOrderStatus() != OrderStatus.DELIVERED
+                    || order.getDeliveredAt() == null
+                    || order.getDeliveredAt().isAfter(deliveredBefore)
+                    || hasActiveDispute(orderId)
+                    || !hasSuccessfulPaymentWhenRequired(order)) {
+                continue;
+            }
+
+            completeDeliveredOrder(order, now, true);
+        }
+    }
+
+    private Order completeDeliveredOrder(Order order, Instant completedAt, boolean automatic) {
+        transitionOrder(
+                order,
+                OrderStatus.DELIVERED,
+                OrderStatus.COMPLETED,
+                "Chỉ có thể hoàn thành đơn ở trạng thái đã giao (DELIVERED)");
+        order.setCompletedAt(completedAt);
+
+        Order savedOrder = orderRepository.save(order);
+        supplierEarningService.recordForCompletedOrder(savedOrder);
+
+        eventPublisher.publishEvent(NotificationEvent.builder()
+                .source(this)
+                .user(savedOrder.getBusinessProfile().getUser())
+                .title("Đơn yêu cầu đã hoàn thành")
+                .content(automatic
+                        ? "Đơn yêu cầu " + savedOrder.getOrderCode()
+                                + " đã tự động hoàn thành sau 24 giờ không có khiếu nại."
+                        : "Đơn yêu cầu " + savedOrder.getOrderCode()
+                                + " đã được người nhận xác nhận hoàn thành.")
+                .type(NotificationType.ORDER)
+                .referenceType(NotificationReferenceType.ORDER)
+                .referenceId(savedOrder.getId())
+                .build());
+        return savedOrder;
+    }
+
+    private boolean hasSuccessfulPaymentWhenRequired(Order order) {
+        return order.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0
+                || paymentRepository.existsByOrderIdAndPaymentStatus(
+                        order.getId(),
+                        com.datn.foodshare.util.constant.TransactionStatus.SUCCESS);
+    }
+
+    private boolean hasActiveDispute(Long orderId) {
+        return orderRepository.hasActiveReport(
+                orderId,
+                ReportReferenceType.ORDER,
+                ACTIVE_REPORT_STATUSES);
+    }
+
     private String generateOrderCode() {
         return "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    private void hydrateOrderPage(List<Order> orders) {
+        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+        List<Order> hydratedOrders = orderRepository.findAllWithDetailsByIdIn(orderIds);
+        List<Long> foodPostIds = hydratedOrders.stream()
+                .flatMap(order -> order.getOrderDetails().stream())
+                .map(OrderDetail::getFoodPost)
+                .map(FoodPost::getId)
+                .distinct()
+                .toList();
+        if (!foodPostIds.isEmpty()) {
+            foodPostRepository.findAllWithImagesByIdIn(foodPostIds);
+        }
+        orderRepository.findAllWithPaymentsByIdIn(orderIds);
     }
 
     private String trimToNull(String value) {
         return (value != null && !value.isBlank()) ? value.trim() : null;
     }
 
-    private void processRefundIfPaid(Long orderId) {
+    private boolean reconcilePaymentsForTerminatedOrder(Long orderId) {
+        boolean refunded = false;
         java.util.List<com.datn.foodshare.domain.entity.Payment> payments = paymentRepository.findByOrderId(orderId);
         for (com.datn.foodshare.domain.entity.Payment payment : payments) {
             if (payment.getPaymentStatus() == com.datn.foodshare.util.constant.TransactionStatus.SUCCESS) {
                 com.datn.foodshare.service.payment.strategy.PaymentStrategy strategy = paymentStrategyFactory.getStrategy(payment.getMethod());
                 com.datn.foodshare.domain.entity.Payment refundedPayment = strategy.processRefund(payment);
                 paymentRepository.save(refundedPayment);
+                refunded = true;
+            } else if (payment.getPaymentStatus() == com.datn.foodshare.util.constant.TransactionStatus.PENDING
+                    || payment.getPaymentStatus() == com.datn.foodshare.util.constant.TransactionStatus.PROCESSING) {
+                payment.setPaymentStatus(com.datn.foodshare.util.constant.TransactionStatus.CANCELLED);
+                paymentRepository.save(payment);
             }
         }
+        return refunded;
+    }
+
+    private Set<NotificationChannel> pushChannels(boolean email) {
+        return email
+                ? Set.of(NotificationChannel.IN_APP, NotificationChannel.PUSH, NotificationChannel.EMAIL)
+                : Set.of(NotificationChannel.IN_APP, NotificationChannel.PUSH);
+    }
+
+    private void publishRefundNotification(Order order) {
+        eventPublisher.publishEvent(NotificationEvent.builder()
+                .source(this)
+                .user(order.getReceiver())
+                .title("Khoản thanh toán đã được hoàn lại")
+                .content("Khoản thanh toán của đơn " + order.getOrderCode() + " đã được hoàn lại.")
+                .type(NotificationType.PAYMENT)
+                .referenceType(NotificationReferenceType.ORDER)
+                .referenceId(order.getId())
+                .channels(pushChannels(true))
+                .build());
     }
 }

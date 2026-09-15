@@ -13,7 +13,10 @@ import lombok.Setter;
 @Setter
 public class RegisterRequest {
 
-    @NotBlank(message = "Phone không được để trống")
+    @NotBlank(message = "Phiên xác minh số điện thoại không được để trống")
+    private String registrationToken;
+
+    @NotBlank(message = "Số điện thoại không được để trống")
     @Size(max = 12, message = "Phone không được vượt quá 12 ký tự")
     @Pattern(
             regexp = "^(?:\\+84|0)(3|5|7|8|9)[0-9]{8}$",

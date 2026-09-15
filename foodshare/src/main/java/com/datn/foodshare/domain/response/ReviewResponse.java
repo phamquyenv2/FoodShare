@@ -29,6 +29,7 @@ public class ReviewResponse {
     public static class ReviewerInfo {
         private Long id;
         private String fullName;
+        private String avatarUrl;
     }
 
     public static ReviewResponse from(Review review) {
@@ -43,6 +44,7 @@ public class ReviewResponse {
                 .reviewer(ReviewerInfo.builder()
                         .id(review.getReviewer().getId())
                         .fullName(review.getReviewer().getFullName())
+                        .avatarUrl(review.getReviewer().getAvatarUrl())
                         .build())
                 .createdAt(review.getCreatedAt())
                 .build();

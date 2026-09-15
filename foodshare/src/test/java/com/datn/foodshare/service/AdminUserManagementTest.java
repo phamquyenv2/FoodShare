@@ -3,10 +3,14 @@ package com.datn.foodshare.service;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.UpdateUserStatusRequest;
 import com.datn.foodshare.domain.response.AdminUserResponse;
+import com.datn.foodshare.event.NotificationEvent;
 import com.datn.foodshare.repository.BusinessProfileRepository;
+import com.datn.foodshare.repository.NotificationRepository;
 import com.datn.foodshare.repository.UserRepository;
 import com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer;
+import com.datn.foodshare.security.JwtTokenProvider;
 import com.datn.foodshare.util.constant.AuthProvider;
+import com.datn.foodshare.util.constant.NotificationChannel;
 import com.datn.foodshare.util.constant.Role;
 import com.datn.foodshare.util.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,12 +18,14 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,7 +44,13 @@ class AdminUserManagementTest {
     @Mock
     private BusinessProfileRepository businessProfileRepository;
     @Mock
+    private NotificationRepository notificationRepository;
+    @Mock
     private DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private UserService userService;
 
@@ -47,7 +59,14 @@ class AdminUserManagementTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, businessProfileRepository, matchingGraphSynchronizer);
+        userService = new UserService(
+                userRepository,
+                businessProfileRepository,
+                notificationRepository,
+                matchingGraphSynchronizer,
+                jwtTokenProvider,
+                eventPublisher
+        );
     }
 
     // ── adminGetAllUsers ───────────────────────────────────────────────
@@ -61,7 +80,7 @@ class AdminUserManagementTest {
             Page<User> page = new PageImpl<>(List.of(testUser(Role.SUPPLIER), testUser(Role.RECIPIENT)), pageable, 2);
             when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
-            Page<AdminUserResponse> result = userService.adminGetAllUsers(null, null, pageable);
+            Page<AdminUserResponse> result = userService.adminGetAllUsers(null, null, null, pageable);
 
             assertEquals(2, result.getTotalElements());
             verify(userRepository).findAll(any(Specification.class), eq(pageable));
@@ -73,7 +92,7 @@ class AdminUserManagementTest {
             Page<User> page = new PageImpl<>(List.of(testUser(Role.SUPPLIER)), pageable, 1);
             when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
-            Page<AdminUserResponse> result = userService.adminGetAllUsers(Role.SUPPLIER, null, pageable);
+            Page<AdminUserResponse> result = userService.adminGetAllUsers(Role.SUPPLIER, null, null, pageable);
 
             assertEquals(1, result.getTotalElements());
             assertEquals(Role.SUPPLIER, result.getContent().get(0).getRole());
@@ -85,7 +104,7 @@ class AdminUserManagementTest {
             Page<User> page = new PageImpl<>(List.of(testUser(Role.RECIPIENT)), pageable, 1);
             when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
-            Page<AdminUserResponse> result = userService.adminGetAllUsers(null, true, pageable);
+            Page<AdminUserResponse> result = userService.adminGetAllUsers(null, true, null, pageable);
 
             assertEquals(1, result.getTotalElements());
         }
@@ -98,7 +117,7 @@ class AdminUserManagementTest {
             Page<User> page = new PageImpl<>(List.of(user), pageable, 1);
             when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
-            Page<AdminUserResponse> result = userService.adminGetAllUsers(null, null, pageable);
+            Page<AdminUserResponse> result = userService.adminGetAllUsers(null, null, null, pageable);
 
             AdminUserResponse response = result.getContent().get(0);
             // AdminUserResponse has no passwordHash field — compilation guarantees this
@@ -152,6 +171,10 @@ class AdminUserManagementTest {
 
             assertFalse(response.isActive());
             verify(userRepository).save(user);
+            ArgumentCaptor<NotificationEvent> captor = ArgumentCaptor.forClass(NotificationEvent.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+            assertTrue(captor.getValue().supports(NotificationChannel.PUSH));
+            assertTrue(captor.getValue().supports(NotificationChannel.EMAIL));
         }
 
         @Test
