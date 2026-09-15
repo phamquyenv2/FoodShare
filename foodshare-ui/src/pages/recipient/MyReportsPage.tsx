@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Flag, ArrowLeft, X } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { timeAgo } from '../../utils/format';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -33,6 +34,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default function MyReportsPage() {
+  const { showError } = useToast();
   const { user } = useAuth();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,11 +54,11 @@ export default function MyReportsPage() {
       
       setReports(data);
     } catch (err) {
-      console.error('Failed to fetch reports:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải báo cáo');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showError, user?.role]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
 

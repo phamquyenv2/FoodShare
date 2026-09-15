@@ -1,22 +1,25 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Camera, Phone, Mail, MapPin, Save, Loader2, LogOut, Flag, ChevronRight } from 'lucide-react';
+import { User, Camera, Phone, Mail, Save, Loader2, LogOut, Flag, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiFetch } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
+import LocationField from '../../components/shared/LocationField';
+import { useToast } from '../../contexts/ToastContext';
 
 export default function SupplierProfilePage() {
-  const { user, checkAuth } = useAuth();
+  const { user, checkAuth, logout } = useAuth();
+  const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
   const [form, setForm] = useState({
     fullName: '',
     phone: '',
     email: '',
     specificAddress: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
   });
 
   useEffect(() => {
@@ -26,27 +29,29 @@ export default function SupplierProfilePage() {
         phone: (user as any).phone || '',
         email: (user as any).email || '',
         specificAddress: (user as any).specificAddress || '',
+        latitude: (user as any).latitude ?? null,
+        longitude: (user as any).longitude ?? null,
       });
     }
   }, [user]);
 
   const handleSave = async () => {
-    setError('');
-    setSuccess('');
     setIsLoading(true);
     try {
       await apiFetch('/users/me', {
         method: 'PATCH',
         body: JSON.stringify({
           fullName: form.fullName,
-          phone: form.phone,
+          specificAddress: form.specificAddress,
+          latitude: form.latitude,
+          longitude: form.longitude,
         }),
       });
       await checkAuth();
-      setSuccess('Cập nhật thành công!');
+      showSuccess('Cập nhật thành công!');
       setIsEditing(false);
     } catch (err: any) {
-      setError(err.message || 'Cập nhật thất bại');
+      showError(err.message || 'Cập nhật thất bại');
     } finally {
       setIsLoading(false);
     }
@@ -99,16 +104,13 @@ export default function SupplierProfilePage() {
             </button>
           ) : (
             <button
-              onClick={() => { setIsEditing(false); setError(''); setSuccess(''); }}
+              onClick={() => setIsEditing(false)}
               className="text-sm text-gray-500 font-medium cursor-pointer hover:underline"
             >
               Hủy
             </button>
           )}
         </div>
-
-        {error && <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100 mb-4">{error}</div>}
-        {success && <div className="p-3 bg-green-50 text-green-600 rounded-xl text-sm border border-green-100 mb-4">{success}</div>}
 
         <div className="flex flex-col gap-4">
           <div>
@@ -146,18 +148,22 @@ export default function SupplierProfilePage() {
               className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-500 bg-gray-50"
             />
           </div>
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-1.5">
-              <MapPin size={14} /> Địa chỉ
-            </label>
-            <input
-              type="text"
-              value={form.specificAddress}
-              onChange={e => setForm({ ...form, specificAddress: e.target.value })}
-              disabled={!isEditing}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2db84c]/30 focus:border-[#2db84c] transition-all disabled:bg-gray-50 disabled:text-gray-500"
-            />
-          </div>
+          <LocationField
+            label="Địa chỉ"
+            value={{
+              address: form.specificAddress,
+              latitude: form.latitude,
+              longitude: form.longitude,
+            }}
+            onChange={location => setForm(current => ({
+              ...current,
+              specificAddress: location.address,
+              latitude: location.latitude,
+              longitude: location.longitude,
+            }))}
+            disabled={!isEditing}
+            required
+          />
         </div>
 
         {isEditing && (
@@ -192,8 +198,8 @@ export default function SupplierProfilePage() {
       >
         <button
           onClick={() => {
-            localStorage.removeItem('foodshare_token');
-            window.location.href = '/auth/login';
+            logout();
+            navigate('/auth/login', { replace: true });
           }}
           className="w-full bg-white border border-red-100 text-red-500 hover:bg-red-50 rounded-2xl py-3.5 px-4 flex items-center justify-center gap-2 font-medium transition-colors cursor-pointer"
         >

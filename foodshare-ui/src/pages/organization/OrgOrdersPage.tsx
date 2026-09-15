@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Package, Loader2, ChevronRight, CreditCard, CheckCircle, XCircle, Clock, Truck, ShoppingBag } from 'lucide-react';
+import { Package, Loader2, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { formatVND, timeAgo } from '../../utils/format';
 
 interface OrderItem {
@@ -28,6 +29,7 @@ const TABS = [
 ];
 
 export default function OrgOrdersPage() {
+  const { showError } = useToast();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,8 +44,8 @@ export default function OrgOrdersPage() {
       const res = await apiFetch<any>(`/orders/my?page=${page}&size=20`);
       setOrders(res.content || []);
       setTotalPages(res.totalPages || 0);
-    } catch (err) { console.error(err); } finally { setIsLoading(false); }
-  }, [page]);
+    } catch (err) { showError(err instanceof Error ? err.message : 'Không thể tải đơn hàng'); } finally { setIsLoading(false); }
+  }, [page, showError]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -52,7 +54,7 @@ export default function OrgOrdersPage() {
     try {
       await apiFetch(`/orders/${orderId}/${action}`, { method: 'PATCH' });
       fetchOrders();
-    } catch (err: any) { alert(err.message || 'Thao tác thất bại'); }
+    } catch (err: any) { showError(err.message || 'Thao tác thất bại'); }
     finally { setActionLoading(null); }
   };
 
@@ -116,7 +118,7 @@ export default function OrgOrdersPage() {
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <div className="text-right">
-                            <p className="text-sm font-bold text-gray-900">{order.totalAmount > 0 ? formatVND(order.totalAmount) : '🎁'}</p>
+                            <p className="text-sm font-bold text-gray-900">{order.totalAmount > 0 ? formatVND(order.totalAmount) : 'Miễn phí'}</p>
                             <p className="text-xs text-gray-400">{timeAgo(order.createdAt)}</p>
                           </div>
                           <ChevronRight size={16} className="text-gray-300" />

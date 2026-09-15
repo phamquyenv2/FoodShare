@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Search, Filter, MapPin, Sparkles, ChevronDown,
-  Loader2, UtensilsCrossed, X,
-} from 'lucide-react';
+  Search, Filter, MapPin, Sparkles, Loader2, UtensilsCrossed, X, ChevronRight, Star } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { formatVND } from '../../utils/format';
 import HorizontalFoodCard from '../../components/recipient/HorizontalFoodCard';
 
@@ -23,18 +22,17 @@ interface FoodPostItem {
   postStatus: string;
   pickupAddress: string;
   expiresAt: string;
-  supplier: { name: string };
+  supplier?: {
+    name: string;
+    businessProfileId?: number;
+    description?: string;
+  };
   supplierAvatar?: string;
   distanceKm?: number;
   matchScore?: number;
 }
 
-const CATEGORIES = [
-  { id: 0, name: 'Tất cả' },
-  { id: 1, name: 'Cơm' }, { id: 2, name: 'Phở / Bún' }, { id: 3, name: 'Bánh mì' },
-  { id: 4, name: 'Đồ uống' }, { id: 5, name: 'Trái cây' }, { id: 6, name: 'Rau củ' },
-  { id: 7, name: 'Đồ khô' }, { id: 8, name: 'Khác' },
-];
+import { getCategories, DEFAULT_CATEGORIES, type Category } from '../../services/categoryApi';
 
 const TYPE_FILTERS = [
   { key: 'all', label: 'Tất cả' },
@@ -45,12 +43,23 @@ const TYPE_FILTERS = [
 
 
 export default function ExplorePage() {
+  const { showError } = useToast();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<FoodPostItem[]>([]);
   const [recommendations, setRecommendations] = useState<FoodPostItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState(0);
+  const [categories, setCategories] = useState<Category[]>([{ id: 0, name: 'Tất cả' }, ...DEFAULT_CATEGORIES]);
+  const [ratingsMap, setRatingsMap] = useState<Record<number, { averageRating: number | null; totalReviews: number }>>({});
+
+  useEffect(() => {
+    getCategories().then(list => {
+      if (list && list.length > 0) {
+        setCategories([{ id: 0, name: 'Tất cả' }, ...list]);
+      }
+    });
+  }, []);
   const [typeFilter, setTypeFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
@@ -76,11 +85,11 @@ export default function ExplorePage() {
       setPosts(res.content || []);
       setTotalPages(res.totalPages || 0);
     } catch (err) {
-      console.error('Failed to fetch posts:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải bài đăng');
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, categoryId, typeFilter]);
+  }, [page, search, categoryId, typeFilter, showError]);
 
   const fetchRecommendations = useCallback(async () => {
     try {
@@ -95,6 +104,20 @@ export default function ExplorePage() {
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
   useEffect(() => { fetchRecommendations(); }, [fetchRecommendations]);
 
+  // Fetch real review ratings for stores on page
+  useEffect(() => {
+    if (posts.length === 0) return;
+    const bpIds = Array.from(new Set(
+      posts.map(p => p.supplier?.businessProfileId).filter((id): id is number => typeof id === 'number' && id > 0)
+    ));
+    if (bpIds.length === 0) return;
+    apiFetch<Record<number, { averageRating: number | null; totalReviews: number }>>(`/reviews/business/summaries?ids=${bpIds.join(',')}`)
+      .then(res => {
+        if (res) setRatingsMap(prev => ({ ...prev, ...res }));
+      })
+      .catch(() => {});
+  }, [posts]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(0);
@@ -105,13 +128,31 @@ export default function ExplorePage() {
   const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.25 } } };
 
   const groupedPosts = useMemo(() => {
-    const groups: Record<string, { supplier: { name: string; avatar?: string }; posts: FoodPostItem[] }> = {};
+    const groups: Record<string, {
+      supplier: {
+        name: string;
+        avatar?: string;
+        businessProfileId?: number;
+        address?: string;
+      };
+      posts: FoodPostItem[];
+    }> = {};
     for (const post of posts) {
       const supplierName = post.supplier?.name || 'Quán ăn chưa rõ';
-      if (!groups[supplierName]) {
-        groups[supplierName] = { supplier: { name: supplierName, avatar: post.supplierAvatar }, posts: [] };
+      const bpId = post.supplier?.businessProfileId;
+      const key = bpId ? `bp_${bpId}` : supplierName;
+      if (!groups[key]) {
+        groups[key] = {
+          supplier: {
+            name: supplierName,
+            avatar: post.supplierAvatar,
+            businessProfileId: bpId,
+            address: post.pickupAddress,
+          },
+          posts: [],
+        };
       }
-      groups[supplierName].posts.push(post);
+      groups[key].posts.push(post);
     }
     return Object.values(groups);
   }, [posts]);
@@ -172,10 +213,10 @@ export default function ExplorePage() {
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide flex items-center justify-between">
                   Danh mục
-                  <span className="text-gray-400 font-normal normal-case">{CATEGORIES.find(c => c.id === categoryId)?.name}</span>
+                  <span className="text-gray-400 font-normal normal-case">{categories.find(c => c.id === categoryId)?.name}</span>
                 </p>
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
-                  {CATEGORIES.map(c => (
+                  {categories.map(c => (
                     <button
                       key={c.id}
                       onClick={() => { setCategoryId(c.id); setPage(0); }}
@@ -336,7 +377,7 @@ export default function ExplorePage() {
                   <p className="text-xs text-gray-400 mt-0.5 truncate">{post.supplier?.name}</p>
                   <div className="flex items-center justify-between mt-2">
                     <span className={`text-xs font-bold ${post.postType === 'FREE' ? 'text-[#2db84c]' : 'text-gray-900'}`}>
-                      {post.postType === 'FREE' ? '🎁 Miễn phí' : (
+                      {post.postType === 'FREE' ? 'Miễn phí' : (
                         <div className="flex flex-col">
                           {post.originalPrice && post.originalPrice > post.unitPrice && (
                             <span className="text-[10px] line-through text-gray-400 font-normal">{formatVND(post.originalPrice)}</span>
@@ -367,38 +408,98 @@ export default function ExplorePage() {
         </div>
       ) : (
         <motion.div className="grid grid-cols-1 lg:grid-cols-2 gap-6" variants={stagger} initial="hidden" animate="show">
-          {groupedPosts.map((group, idx) => (
-            <motion.div key={idx} variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-              {/* Supplier Header */}
-              <div className="p-4 flex items-center gap-4 bg-gray-50/50 border-b border-gray-100">
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-xl font-bold flex-shrink-0 shadow-inner">
-                  {group.supplier.avatar ? (
-                    <img src={group.supplier.avatar} className="w-full h-full rounded-xl object-cover" alt="" />
+          {groupedPosts.map((group, idx) => {
+            const storeId = group.supplier.businessProfileId || group.posts[0]?.id;
+            const goToStore = () => {
+              navigate(`/recipient/stores/${storeId}`, {
+                state: {
+                  supplier: group.supplier,
+                  posts: group.posts,
+                },
+              });
+            };
+
+            return (
+              <motion.div
+                key={idx}
+                variants={fadeUp}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col"
+              >
+                {/* Supplier Header */}
+                <div className="p-4 flex items-center justify-between gap-3 bg-gray-50/60 border-b border-gray-100">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div
+                      onClick={goToStore}
+                      className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-base font-bold shrink-0 shadow-xs overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                    >
+                      {group.supplier.avatar ? (
+                        <img src={group.supplier.avatar} className="w-full h-full object-cover" alt="" />
+                      ) : (
+                        group.supplier.name.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h2
+                        onClick={goToStore}
+                        className="text-base font-bold text-gray-900 truncate hover:text-[#2db84c] transition-colors cursor-pointer"
+                      >
+                        {group.supplier.name}
+                      </h2>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                        {(() => {
+                          const bpId = group.supplier.businessProfileId;
+                          const stat = bpId ? ratingsMap[bpId] : null;
+                          if (stat && stat.totalReviews > 0) {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200/50 shrink-0">
+                                <Star size={11} className="fill-amber-400 text-amber-400" />
+                                {stat.averageRating !== null ? stat.averageRating.toFixed(1) : '5.0'} ({stat.totalReviews})
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 bg-amber-50/70 px-1.5 py-0.5 rounded-md border border-amber-200/40 shrink-0">
+                              <Star size={11} className="fill-amber-400 text-amber-400" /> Mới
+                            </span>
+                          );
+                        })()}
+                        <span className="text-xs text-gray-500 flex items-center gap-1 min-w-0 max-w-full">
+                          <MapPin size={12} className="text-gray-400 shrink-0" />
+                          <span className="truncate max-w-[280px] sm:max-w-[340px]">{group.posts[0]?.pickupAddress}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={goToStore}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#2db84c]/10 text-[#2db84c] hover:bg-[#2db84c] hover:text-white transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <span>Tới quán</span>
+                    <ChevronRight size={13} />
+                  </button>
+                </div>
+
+                {/* Posts Content */}
+                <div className="p-3.5">
+                  {group.posts.length === 1 ? (
+                    <HorizontalFoodCard post={group.posts[0]} fullWidth />
+                  ) : group.posts.length === 2 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {group.posts.map(post => (
+                        <HorizontalFoodCard key={post.id} post={post} fullWidth />
+                      ))}
+                    </div>
                   ) : (
-                    group.supplier.name.charAt(0).toUpperCase()
+                    <div className="flex gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x">
+                      {group.posts.map(post => (
+                        <HorizontalFoodCard key={post.id} post={post} />
+                      ))}
+                    </div>
                   )}
                 </div>
-                <div className="flex-1">
-                  <h2 className="text-lg font-bold text-gray-900 line-clamp-1">{group.supplier.name}</h2>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="flex items-center text-xs font-semibold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md">⭐ 5.0 (99+)</span>
-                    <span className="text-gray-300">•</span>
-                    <span className="text-xs text-gray-500 flex items-center gap-1 line-clamp-1"><MapPin size={12}/> {group.posts[0].pickupAddress}</span>
-                  </div>
-                </div>
-                <button className="text-[#2db84c] font-medium text-xs px-3 py-1.5 rounded-lg bg-[#2db84c]/10 hover:bg-[#2db84c]/20 transition-colors whitespace-nowrap">
-                  Tới quán
-                </button>
-              </div>
-
-              {/* Posts Content */}
-              <div className="p-4 grid grid-rows-2 grid-flow-col gap-3 overflow-x-auto pb-4 snap-x">
-                {group.posts.map(post => (
-                  <HorizontalFoodCard key={post.id} post={post} />
-                ))}
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </motion.div>
       )}
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Bell, BellOff, ShieldAlert, Flag, Check, Loader2, UserPlus } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { timeAgo } from '../../utils/format';
 
 interface NotificationItem {
@@ -31,10 +32,11 @@ const TABS = [
 ];
 
 export default function AdminNotificationsPage() {
+  const { showError } = useToast();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeTab, setActiveTab] = useState('ALL');
   const [isLoading, setIsLoading] = useState(true);
-  const [page, setPage] = useState(0);
+  const [, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -60,13 +62,13 @@ export default function AdminNotificationsPage() {
       
       setHasMore(!res.last && newItems.length > 0);
     } catch (err) {
-      console.error('Failed to fetch notifications:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải thông báo');
       if (isInitial) setNotifications([]);
     } finally {
       setIsLoading(false);
       setIsFetchingNextPage(false);
     }
-  }, []);
+  }, [showError]);
 
   useEffect(() => { 
     setPage(0);
@@ -95,17 +97,25 @@ export default function AdminNotificationsPage() {
   }, [hasMore, isLoading, isFetchingNextPage, fetchNotifications]);
 
   const markAsRead = async (id: number) => {
+    const previousNotifications = notifications;
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     try {
       await apiFetch(`/notifications/${id}/read`, { method: 'PATCH' });
-    } catch (err) {}
+    } catch (err) {
+      setNotifications(previousNotifications);
+      showError(err instanceof Error ? err.message : 'Không thể đánh dấu thông báo đã đọc');
+    }
   };
 
   const markAllRead = async () => {
+    const previousNotifications = notifications;
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     try {
       await apiFetch('/notifications/read-all', { method: 'PATCH' });
-    } catch (err) {}
+    } catch (err) {
+      setNotifications(previousNotifications);
+      showError(err instanceof Error ? err.message : 'Không thể đánh dấu tất cả thông báo đã đọc');
+    }
   };
 
   const handleNotificationClick = (notif: NotificationItem) => {
@@ -130,34 +140,37 @@ export default function AdminNotificationsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Thông báo quản trị viên</h1>
+      {/* Sticky Header & Filter Bar */}
+      <div className="sticky top-0 z-20 bg-[#f5f7f5]/95 backdrop-blur-md -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 md:pt-6 pb-3 flex flex-col gap-4 border-b border-gray-200/60 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Thông báo quản trị viên</h1>
+            {unreadCount > 0 && (
+              <p className="text-sm text-gray-500 mt-0.5">{unreadCount} chưa đọc</p>
+            )}
+          </div>
           {unreadCount > 0 && (
-            <p className="text-sm text-gray-500 mt-0.5">{unreadCount} chưa đọc</p>
+            <button onClick={markAllRead} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer">
+              <Check size={16} /> Đánh dấu đã đọc
+            </button>
           )}
         </div>
-        {unreadCount > 0 && (
-          <button onClick={markAllRead} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
-            <Check size={16} /> Đánh dấu đã đọc
-          </button>
-        )}
-      </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors border
-              ${activeTab === t.key 
-                ? 'bg-[#2db84c] text-white border-[#2db84c]' 
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-              }`}
-          >
-            {t.label}
-          </button>
-        ))}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {TABS.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors border cursor-pointer
+                ${activeTab === t.key
+                  ? 'bg-[#2db84c] text-white border-[#2db84c]'
+                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">

@@ -6,12 +6,10 @@ import {
   UtensilsCrossed, X, ShoppingCart, Plus, Check,
 } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { formatVND } from '../../utils/format';
 
 interface FoodPostItem {
-  id: number;
-  name: string;
-  description: string;
   id: number;
   name: string;
   description: string;
@@ -25,7 +23,11 @@ interface FoodPostItem {
   postStatus: string;
   pickupAddress: string;
   expiresAt: string;
-  supplier: { name: string };
+  supplier?: {
+    name: string;
+    businessProfileId?: number;
+    description?: string;
+  };
   supplierAvatar?: string;
   distanceKm?: number;
   matchScore?: number;
@@ -36,12 +38,7 @@ export interface CartItem {
   quantity: number;
 }
 
-const CATEGORIES = [
-  { id: 0, name: 'Tất cả' },
-  { id: 1, name: 'Cơm' }, { id: 2, name: 'Phở / Bún' }, { id: 3, name: 'Bánh mì' },
-  { id: 4, name: 'Đồ uống' }, { id: 5, name: 'Trái cây' }, { id: 6, name: 'Rau củ' },
-  { id: 7, name: 'Đồ khô' }, { id: 8, name: 'Khác' },
-];
+import { getCategories, DEFAULT_CATEGORIES, type Category } from '../../services/categoryApi';
 
 function getTimeLeft(expiresAt: string): string {
   const diff = new Date(expiresAt).getTime() - Date.now();
@@ -62,17 +59,28 @@ function saveCart(items: CartItem[]) {
 }
 
 export default function OrgExplorePage() {
+  const { showError } = useToast();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<FoodPostItem[]>([]);
   const [recommendations, setRecommendations] = useState<FoodPostItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState(0);
+  const [categories, setCategories] = useState<Category[]>([{ id: 0, name: 'Tất cả' }, ...DEFAULT_CATEGORIES]);
+
+  useEffect(() => {
+    getCategories().then(list => {
+      if (list && list.length > 0) {
+        setCategories([{ id: 0, name: 'Tất cả' }, ...list]);
+      }
+    });
+  }, []);
   const [typeFilter, setTypeFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [cart, setCart] = useState<CartItem[]>(loadCart);
+  const [ratingsMap, setRatingsMap] = useState<Record<number, { averageRating: number | null; totalReviews: number }>>({});
 
   const fetchPosts = useCallback(async () => {
     setIsLoading(true);
@@ -84,8 +92,8 @@ export default function OrgExplorePage() {
       const res = await apiFetch<any>(url);
       setPosts(res.content || []);
       setTotalPages(res.totalPages || 0);
-    } catch (err) { console.error(err); } finally { setIsLoading(false); }
-  }, [page, search, categoryId, typeFilter]);
+    } catch (err) { showError(err instanceof Error ? err.message : 'Không thể tải bài đăng'); } finally { setIsLoading(false); }
+  }, [page, search, categoryId, typeFilter, showError]);
 
   const fetchRecommendations = useCallback(async () => {
     try {
@@ -96,6 +104,20 @@ export default function OrgExplorePage() {
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
   useEffect(() => { fetchRecommendations(); }, [fetchRecommendations]);
+
+  // Fetch real review ratings for stores on page
+  useEffect(() => {
+    if (posts.length === 0) return;
+    const bpIds = Array.from(new Set(
+      posts.map(p => p.supplier?.businessProfileId).filter((id): id is number => typeof id === 'number' && id > 0)
+    ));
+    if (bpIds.length === 0) return;
+    apiFetch<Record<number, { averageRating: number | null; totalReviews: number }>>(`/reviews/business/summaries?ids=${bpIds.join(',')}`)
+      .then(res => {
+        if (res) setRatingsMap(prev => ({ ...prev, ...res }));
+      })
+      .catch(() => {});
+  }, [posts]);
 
   const addToCart = (post: FoodPostItem) => {
     setCart(prev => {
@@ -117,13 +139,31 @@ export default function OrgExplorePage() {
   const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.25 } } };
 
   const groupedPosts = useMemo(() => {
-    const groups: Record<string, { supplier: { name: string; avatar?: string }; posts: FoodPostItem[] }> = {};
+    const groups: Record<string, {
+      supplier: {
+        name: string;
+        avatar?: string;
+        businessProfileId?: number;
+        address?: string;
+      };
+      posts: FoodPostItem[];
+    }> = {};
     for (const post of posts) {
       const supplierName = post.supplier?.name || 'Quán ăn chưa rõ';
-      if (!groups[supplierName]) {
-        groups[supplierName] = { supplier: { name: supplierName, avatar: post.supplierAvatar }, posts: [] };
+      const bpId = post.supplier?.businessProfileId;
+      const key = bpId ? `bp_${bpId}` : supplierName;
+      if (!groups[key]) {
+        groups[key] = {
+          supplier: {
+            name: supplierName,
+            avatar: post.supplierAvatar,
+            businessProfileId: bpId,
+            address: post.pickupAddress,
+          },
+          posts: [],
+        };
       }
-      groups[supplierName].posts.push(post);
+      groups[key].posts.push(post);
     }
     return Object.values(groups);
   }, [posts]);
@@ -158,7 +198,7 @@ export default function OrgExplorePage() {
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Danh mục</p>
             <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map(c => (
+              {categories.map(c => (
                 <button key={c.id} onClick={() => { setCategoryId(c.id); setPage(0); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${categoryId === c.id ? 'bg-[#2db84c] text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>{c.name}</button>
               ))}
@@ -167,7 +207,7 @@ export default function OrgExplorePage() {
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Loại</p>
             <div className="flex gap-2">
-              {[{ key: 'all', label: 'Tất cả' }, { key: 'FREE', label: '🎁 Miễn phí' }, { key: 'PAID', label: '💰 Có phí' }].map(t => (
+              {[{ key: 'all', label: 'Tất cả' }, { key: 'FREE', label: 'Miễn phí' }, { key: 'PAID', label: 'Có phí' }].map(t => (
                 <button key={t.key} onClick={() => { setTypeFilter(t.key); setPage(0); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all ${typeFilter === t.key ? 'bg-[#2db84c] text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>{t.label}</button>
               ))}
@@ -194,7 +234,7 @@ export default function OrgExplorePage() {
                   <p className="text-xs text-gray-400 mt-0.5 truncate">{post.supplier?.name}</p>
                   <div className="flex items-center justify-between mt-2">
                     <span className={`text-xs font-bold ${post.postType === 'FREE' ? 'text-[#2db84c]' : 'text-gray-900'}`}>
-                      {post.postType === 'FREE' ? '🎁 Miễn phí' : (
+                      {post.postType === 'FREE' ? 'Miễn phí' : (
                         <div className="flex flex-col">
                           {post.originalPrice && post.originalPrice > post.unitPrice && (
                             <span className="text-[10px] line-through text-gray-400 font-normal">{formatVND(post.originalPrice)}</span>
@@ -224,23 +264,73 @@ export default function OrgExplorePage() {
           {groupedPosts.map((group, idx) => (
             <motion.div key={idx} variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
               {/* Supplier Header */}
-              <div className="p-4 flex items-center gap-4 bg-gray-50/50 border-b border-gray-100">
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-xl font-bold flex-shrink-0 shadow-inner">
+              <div 
+                onClick={() => {
+                  const targetId = group.supplier.businessProfileId || group.posts[0]?.supplier?.businessProfileId || 0;
+                  navigate(`/organization/stores/${targetId}`, {
+                    state: {
+                      supplier: {
+                        id: targetId,
+                        businessProfileId: group.supplier.businessProfileId,
+                        name: group.supplier.name,
+                        avatar: group.supplier.avatar,
+                        address: group.supplier.address || group.posts[0]?.pickupAddress,
+                        rating: 5.0,
+                      }
+                    }
+                  });
+                }}
+                className="p-4 flex items-center gap-4 bg-gray-50/50 border-b border-gray-100 cursor-pointer hover:bg-gray-100/60 transition-colors"
+              >
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-xl font-bold flex-shrink-0 shadow-inner overflow-hidden">
                   {group.supplier.avatar ? (
                     <img src={group.supplier.avatar} className="w-full h-full rounded-xl object-cover" alt="" />
                   ) : (
                     group.supplier.name.charAt(0).toUpperCase()
                   )}
                 </div>
-                <div className="flex-1">
-                  <h2 className="text-lg font-bold text-gray-900 line-clamp-1">{group.supplier.name}</h2>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-bold text-gray-900 line-clamp-1 hover:text-[#2db84c] transition-colors">{group.supplier.name}</h2>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="flex items-center text-xs font-semibold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md">⭐ 5.0 (99+)</span>
+                    {(() => {
+                      const bpId = group.supplier.businessProfileId;
+                      const stat = bpId ? ratingsMap[bpId] : null;
+                      if (stat && stat.totalReviews > 0) {
+                        return (
+                          <span className="flex items-center text-xs font-semibold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md">
+                            ⭐ {stat.averageRating !== null ? stat.averageRating.toFixed(1) : '5.0'} ({stat.totalReviews})
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="flex items-center text-xs font-medium text-amber-500 bg-amber-50/70 px-1.5 py-0.5 rounded-md">
+                          ⭐ Mới
+                        </span>
+                      );
+                    })()}
                     <span className="text-gray-300">•</span>
-                    <span className="text-xs text-gray-500 flex items-center gap-1 line-clamp-1"><MapPin size={12}/> {group.posts[0].pickupAddress}</span>
+                    <span className="text-xs text-gray-500 flex items-center gap-1 line-clamp-1"><MapPin size={12}/> {group.supplier.address || group.posts[0].pickupAddress}</span>
                   </div>
                 </div>
-                <button className="text-[#2db84c] font-medium text-xs px-3 py-1.5 rounded-lg bg-[#2db84c]/10 hover:bg-[#2db84c]/20 transition-colors whitespace-nowrap">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const targetId = group.supplier.businessProfileId || group.posts[0]?.supplier?.businessProfileId || 0;
+                    navigate(`/organization/stores/${targetId}`, {
+                      state: {
+                        supplier: {
+                          id: targetId,
+                          businessProfileId: group.supplier.businessProfileId,
+                          name: group.supplier.name,
+                          avatar: group.supplier.avatar,
+                          address: group.supplier.address || group.posts[0]?.pickupAddress,
+                          rating: 5.0,
+                        }
+                      }
+                    });
+                  }}
+                  className="text-[#2db84c] font-medium text-xs px-3 py-1.5 rounded-lg bg-[#2db84c]/10 hover:bg-[#2db84c]/20 transition-colors whitespace-nowrap cursor-pointer"
+                >
                   Tới quán
                 </button>
               </div>

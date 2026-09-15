@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { User } from '../types';
-import { apiFetch } from '../services/api';
+import { apiFetch, clearAccessToken, setAccessToken } from '../services/api';
+import { unregisterBrowserDevice } from '../services/deviceService';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -24,33 +25,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setState({ isAuthenticated: false, isLoading: false, user: null });
-      return;
-    }
-
     try {
       const user = await apiFetch<Partial<User>>('/users/me');
       setState({ isAuthenticated: true, isLoading: false, user });
     } catch (error) {
       console.error('Check auth failed:', error);
-      localStorage.removeItem('accessToken');
+      clearAccessToken();
       setState({ isAuthenticated: false, isLoading: false, user: null });
     }
   };
 
   useEffect(() => {
     checkAuth();
+
+    const handleAuthExpired = () => {
+      clearAccessToken();
+      setState({ isAuthenticated: false, isLoading: false, user: null });
+    };
+
+    window.addEventListener('auth:expired', handleAuthExpired);
+    return () => {
+      window.removeEventListener('auth:expired', handleAuthExpired);
+    };
   }, []);
 
   const login = (token: string, user: Partial<User>) => {
-    localStorage.setItem('accessToken', token);
+    setAccessToken(token);
     setState({ isAuthenticated: true, isLoading: false, user });
   };
 
   const logout = () => {
-    localStorage.removeItem('accessToken');
+    void unregisterBrowserDevice().catch(() => undefined);
+    void apiFetch('/auth/logout', { method: 'POST' }).catch(() => undefined);
+    clearAccessToken();
     setState({ isAuthenticated: false, isLoading: false, user: null });
   };
 

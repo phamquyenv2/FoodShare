@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Search, Loader2, ChevronDown, Shield, ShieldOff, Eye,
-  X, User as UserIcon, Mail, Phone, Calendar,
-} from 'lucide-react';
+  Search, Loader2, Shield, ShieldOff, Eye,
+  X, User as UserIcon, Mail, Phone, Calendar } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { ROLE_MAP } from '../../constants';
 
 interface UserItem {
@@ -32,6 +32,7 @@ function formatDate(iso: string) {
 }
 
 export default function UsersPage() {
+  const { showError } = useToast();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -53,22 +54,25 @@ export default function UsersPage() {
       setTotalPages(res.totalPages || 0);
       setTotalElements(res.totalElements || 0);
     } catch (err) {
-      console.error('Failed to fetch users:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải danh sách người dùng');
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, roleFilter]);
+  }, [page, search, roleFilter, showError]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const handleToggleStatus = async (userId: number, activate: boolean) => {
     setActionLoading(userId);
     try {
-      await apiFetch(`/admin/users/${userId}/${activate ? 'activate' : 'deactivate'}`, { method: 'PATCH' });
+      await apiFetch(`/admin/users/${userId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ active: activate }),
+      });
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, active: activate } : u));
       if (selectedUser?.id === userId) setSelectedUser(prev => prev ? { ...prev, active: activate } : null);
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      showError(err.message || 'Thao tác thất bại');
     } finally {
       setActionLoading(null);
     }

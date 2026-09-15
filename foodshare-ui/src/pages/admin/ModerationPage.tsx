@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, X, CheckCircle, FileText, Flag, Eye } from 'lucide-react';
+import { Loader2, X, CheckCircle, FileText, Eye } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { timeAgo } from '../../utils/format';
 
 interface BusinessProfile {
@@ -32,6 +33,7 @@ const STATUS_TABS = [
 ];
 
 export default function ModerationPage() {
+  const { showError, showSuccess } = useToast();
   const [users, setUsers] = useState<SupplierUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState('ALL');
@@ -54,11 +56,11 @@ export default function ModerationPage() {
       setTotalPages(res.totalPages || 0);
       setTotalElements(res.totalElements || 0);
     } catch (err) {
-      console.error('Failed to fetch suppliers:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải hồ sơ kiểm duyệt');
     } finally {
       setIsLoading(false);
     }
-  }, [page, tab]);
+  }, [page, tab, showError]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -72,14 +74,13 @@ export default function ModerationPage() {
       fetchUsers();
       setDetailUser(null);
       setConfirmAction(null);
+      showSuccess(status === 'VERIFIED' ? 'Đã xác minh hồ sơ' : 'Đã từ chối hồ sơ');
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      showError(err.message || 'Thao tác thất bại');
     } finally {
       setActionLoading(null);
     }
   };
-
-  const getStatusConfig = (key: string) => STATUS_TABS.find(t => t.key === key) || STATUS_TABS[0];
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">

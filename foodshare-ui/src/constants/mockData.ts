@@ -18,7 +18,7 @@ export const MOCK_FOOD_POSTS: FoodPost[] = [
     availableQuantity: 7,
     unitPrice: 0,
     postType: 'FREE',
-    postStatus: 'ACTIVE',
+    postStatus: 'AVAILABLE',
     pickupAddress: '123 Lê Lợi, Q.1, TP.HCM',
     pickupStartAt: '11:00',
     pickupEndAt: '13:00',
@@ -40,7 +40,7 @@ export const MOCK_FOOD_POSTS: FoodPost[] = [
     availableQuantity: 22,
     unitPrice: 15000,
     postType: 'PAID',
-    postStatus: 'ACTIVE',
+    postStatus: 'AVAILABLE',
     pickupAddress: '88 Nguyễn Trãi, Q.5, TP.HCM',
     pickupStartAt: '06:00',
     pickupEndAt: '10:00',
@@ -62,7 +62,7 @@ export const MOCK_FOOD_POSTS: FoodPost[] = [
     availableQuantity: 5,
     unitPrice: 45000,
     postType: 'PAID',
-    postStatus: 'ACTIVE',
+    postStatus: 'AVAILABLE',
     pickupAddress: '12 Đinh Tiên Hoàng, Q.1, TP.HCM',
     pickupStartAt: '06:30',
     pickupEndAt: '09:30',
@@ -84,7 +84,7 @@ export const MOCK_FOOD_POSTS: FoodPost[] = [
     availableQuantity: 43,
     unitPrice: 35000,
     postType: 'PAID',
-    postStatus: 'ACTIVE',
+    postStatus: 'AVAILABLE',
     pickupAddress: '456 Cách Mạng Tháng 8, Q.10, TP.HCM',
     pickupStartAt: '10:30',
     pickupEndAt: '13:30',
@@ -128,7 +128,7 @@ export const MOCK_FOOD_POSTS: FoodPost[] = [
     availableQuantity: 15,
     unitPrice: 0,
     postType: 'FREE',
-    postStatus: 'ACTIVE',
+    postStatus: 'AVAILABLE',
     pickupAddress: '234 Lý Thường Kiệt, Q.11, TP.HCM',
     pickupStartAt: '14:00',
     pickupEndAt: '17:00',
@@ -174,14 +174,14 @@ export const MOCK_SUPPLIER_ORDERS: Order[] = [
 // ─── PAYOUT ──────────────────────────────────────────────────────────────────
 export const MOCK_PAYOUTS: PayoutTransaction[] = [
   {
-    id: 'py1', orderId: 'o5', orderCode: 'FS-2026-0005',
-    grossAmount: 70000, platformFee: 7000, netAmount: 63000,
-    status: 'COMPLETED', createdAt: '2026-08-24T15:00:00',
+    id: 'py1', orderId: 'o5', payoutCode: 'PO-0001',
+    grossAmount: 63000, platformFee: 0, netAmount: 63000, requestedAmount: 63000,
+    status: 'SUCCESS', bankName: 'Vietcombank', accountNumber: '123456789', createdAt: '2026-08-24T15:00:00',
   },
   {
-    id: 'py2', orderId: 'o4', orderCode: 'FS-2026-0004',
-    grossAmount: 30000, platformFee: 3000, netAmount: 27000,
-    status: 'PENDING', createdAt: '2026-08-25T09:00:00',
+    id: 'py2', orderId: 'o4', payoutCode: 'PO-0002',
+    grossAmount: 27000, platformFee: 0, netAmount: 27000, requestedAmount: 27000,
+    status: 'PENDING', bankName: 'MB Bank', accountNumber: '987654321', createdAt: '2026-08-25T09:00:00',
   },
 ];
 
@@ -196,7 +196,7 @@ export const MOCK_ADMIN_USERS: User[] = [
 
 // ─── ADMIN REPORTS ───────────────────────────────────────────────────────────
 export const MOCK_ADMIN_REPORTS: AdminReport[] = [
-  { id: 'r1', reporterName: 'Nguyễn Văn An', targetName: 'Bún Bò Mệ Hoa', targetType: 'FOODPOST', reason: 'Thực phẩm đã hết hạn nhưng vẫn đăng', status: 'PENDING', createdAt: '2026-08-25T08:00:00', postStatus: 'ACTIVE', reportCount: 3 },
+  { id: 'r1', reporterName: 'Nguyễn Văn An', targetName: 'Bún Bò Mệ Hoa', targetType: 'FOODPOST', reason: 'Thực phẩm đã hết hạn nhưng vẫn đăng', status: 'PENDING', createdAt: '2026-08-25T08:00:00', postStatus: 'AVAILABLE', reportCount: 3 },
   { id: 'r2', reporterName: 'Trần Thị Bình', targetName: 'Phở 24 Sài Gòn', targetType: 'USER', reason: 'Cung cấp thực phẩm kém chất lượng', status: 'REVIEWING', createdAt: '2026-08-24T14:20:00', reportCount: 1 },
   { id: 'r3', reporterName: 'Lê Minh Cường', targetName: 'Hộp cơm văn phòng', targetType: 'FOODPOST', reason: 'Ảnh không khớp thực tế', status: 'RESOLVED', createdAt: '2026-08-23T10:00:00', postStatus: 'HIDDEN', reportCount: 2 },
   { id: 'r4', reporterName: 'Phạm Thị Dung', targetName: 'Bánh mì pate thịt nguội', targetType: 'ORDER', reason: 'Đơn hàng bị huỷ không rõ lý do', status: 'PENDING', createdAt: '2026-08-25T09:30:00', reportCount: 1 },

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Bell, BellOff, ShoppingBag, MessageSquare, AlertTriangle, Check, Loader2, CreditCard } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { timeAgo } from '../../utils/format';
 
 interface NotificationItem {
@@ -31,11 +32,12 @@ const TABS = [
 ];
 
 export default function RecipientNotificationsPage() {
+  const { showError } = useToast();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeTab, setActiveTab] = useState('ALL');
   const [isLoading, setIsLoading] = useState(true);
-  const [page, setPage] = useState(0);
+  const [, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -60,13 +62,13 @@ export default function RecipientNotificationsPage() {
       
       setHasMore(!res.last && newItems.length > 0);
     } catch (err) {
-      console.error('Failed to fetch notifications:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải thông báo');
       if (isInitial) setNotifications([]);
     } finally {
       setIsLoading(false);
       setIsFetchingNextPage(false);
     }
-  }, []);
+  }, [showError]);
 
   useEffect(() => { 
     setPage(0);
@@ -96,21 +98,25 @@ export default function RecipientNotificationsPage() {
 
   const markAsRead = async (id: number) => {
     // Optimistic UI update
+    const previousNotifications = notifications;
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     try {
       await apiFetch(`/notifications/${id}/read`, { method: 'PATCH' });
     } catch (err) {
-      // silently fail
+      setNotifications(previousNotifications);
+      showError(err instanceof Error ? err.message : 'Không thể đánh dấu thông báo đã đọc');
     }
   };
 
   const markAllRead = async () => {
     // Optimistic UI update
+    const previousNotifications = notifications;
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     try {
       await apiFetch('/notifications/read-all', { method: 'PATCH' });
     } catch (err) {
-      // silently fail
+      setNotifications(previousNotifications);
+      showError(err instanceof Error ? err.message : 'Không thể đánh dấu tất cả thông báo đã đọc');
     }
   };
 
@@ -132,37 +138,40 @@ export default function RecipientNotificationsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Thông báo</h1>
+      {/* Sticky Header & Filter Bar */}
+      <div className="sticky top-0 z-20 bg-[#f5f7f5]/95 backdrop-blur-md -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 md:pt-6 pb-3 flex flex-col gap-4 border-b border-gray-200/60 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Thông báo</h1>
+            {unreadCount > 0 && (
+              <p className="text-sm text-gray-500 mt-0.5">{unreadCount} chưa đọc</p>
+            )}
+          </div>
           {unreadCount > 0 && (
-            <p className="text-sm text-gray-500 mt-0.5">{unreadCount} chưa đọc</p>
+            <button
+              onClick={markAllRead}
+              className="flex items-center gap-1.5 text-sm text-[#2db84c] font-medium cursor-pointer hover:underline"
+            >
+              <Check size={14} /> Đọc tất cả
+            </button>
           )}
         </div>
-        {unreadCount > 0 && (
-          <button
-            onClick={markAllRead}
-            className="flex items-center gap-1.5 text-sm text-[#2db84c] font-medium cursor-pointer hover:underline"
-          >
-            <Check size={14} /> Đọc tất cả
-          </button>
-        )}
-      </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden">
-        {TABS.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap cursor-pointer transition-all ${
-              activeTab === tab.key
-                ? 'bg-[#2db84c] text-white shadow-md shadow-green-500/20'
-                : 'bg-white border border-gray-100 text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
+          {TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap cursor-pointer transition-all ${
+                activeTab === tab.key
+                  ? 'bg-[#2db84c] text-white shadow-md shadow-green-500/20'
+                  : 'bg-white border border-gray-100 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (

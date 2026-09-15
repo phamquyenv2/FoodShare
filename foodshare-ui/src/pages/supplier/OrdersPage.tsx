@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
-import { Check, X, Package, Truck, Loader2, Clock, ChevronDown, Search } from 'lucide-react';
+import { Check, X, Package, Truck, Loader2, ChevronDown, Search } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { formatVND, timeAgo } from '../../utils/format';
 
 interface OrderItem {
@@ -11,6 +12,8 @@ interface OrderItem {
   orderStatus: string;
   totalAmount: number;
   createdAt: string;
+  completedAt?: string;
+  deliveredAt?: string;
   receiver: { fullName: string; phone: string };
   orderDetails: {
     foodPost: { name: string };
@@ -39,6 +42,7 @@ const TABS = [
 ];
 
 export default function OrdersPage() {
+  const { showError } = useToast();
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -90,6 +94,8 @@ export default function OrdersPage() {
         orderStatus: o.orderStatus,
         totalAmount: o.totalAmount,
         createdAt: o.createdAt,
+        completedAt: o.completedAt,
+        deliveredAt: o.deliveredAt,
         receiver: o.receiver,
         orderDetails: o.orderDetails,
         rejectionReason: o.rejectedReason || o.rejectionReason,
@@ -98,11 +104,11 @@ export default function OrdersPage() {
       setOrders(mappedOrders);
       setTotalPages(res.totalPages || 0);
     } catch (err) {
-      console.error('Failed to fetch orders:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải đơn hàng');
     } finally {
       setIsLoading(false);
     }
-  }, [page, tab, keyword]);
+  }, [page, tab, keyword, showError]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -115,7 +121,7 @@ export default function OrdersPage() {
       });
       fetchOrders();
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      showError(err.message || 'Thao tác thất bại');
     } finally {
       setActionLoading(null);
     }
@@ -123,7 +129,7 @@ export default function OrdersPage() {
 
   const handleReject = async () => {
     if (!rejectReason.trim()) return;
-    await handleAction(rejectModal.id, 'reject', { reason: rejectReason });
+    await handleAction(rejectModal.id, 'reject', { rejectionReason: rejectReason.trim() });
     setRejectModal({ id: 0, open: false });
     setRejectReason('');
   };
@@ -298,7 +304,7 @@ function OrderCard({
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-bold text-gray-900">
-              {order.totalAmount > 0 ? formatVND(order.totalAmount) : '🎁 Miễn phí'}
+              {order.totalAmount > 0 ? formatVND(order.totalAmount) : 'Miễn phí'}
             </p>
           </div>
           <ChevronDown size={18} className={`transition-transform duration-300 ${expanded ? 'rotate-180 text-[#2db84c]' : 'text-gray-400'}`} />
@@ -307,7 +313,7 @@ function OrderCard({
 
       {expanded && (
         <div className="border-t border-gray-100 p-4 bg-gray-50/50">
-          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+          <div className={`grid gap-4 text-sm mb-4 ${order.completedAt ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Khách hàng</p>
               <p className="font-medium text-gray-900">{recipientName}</p>
@@ -320,6 +326,12 @@ function OrderCard({
                 Tổng: {order.totalAmount > 0 ? formatVND(order.totalAmount) : 'Miễn phí'}
               </p>
             </div>
+            {order.completedAt && (
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5">Thời gian hoàn thành</p>
+                <p className="font-medium text-gray-900">{new Date(order.completedAt).toLocaleString('vi-VN')}</p>
+              </div>
+            )}
           </div>
 
           {/* Rejection Reason */}

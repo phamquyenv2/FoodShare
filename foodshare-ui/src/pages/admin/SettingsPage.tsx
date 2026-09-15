@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Loader2, Save, CreditCard, Bell, Shield, Globe } from 'lucide-react';
+import { Loader2, Save, CreditCard, Shield, Globe } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 
 interface PlatformSettings {
   platformFeePercent: number;
@@ -13,6 +14,7 @@ interface PlatformSettings {
 }
 
 export default function SettingsPage() {
+  const { showError, showSuccess } = useToast();
   const [settings, setSettings] = useState<PlatformSettings>({
     platformFeePercent: 5,
     minPayoutAmount: 50000,
@@ -29,24 +31,26 @@ export default function SettingsPage() {
     const fetchSettings = async () => {
       try {
         const res = await apiFetch<any[]>('/admin/configs');
-        const newSettings = { ...settings };
-        res.forEach(item => {
-          if (item.configKey === 'PLATFORM_FEE_PERCENTAGE') newSettings.platformFeePercent = parseFloat(item.configValue) * 100;
-          if (item.configKey === 'MIN_PAYOUT_AMOUNT') newSettings.minPayoutAmount = parseInt(item.configValue);
-          if (item.configKey === 'MAX_PAYOUT_AMOUNT') newSettings.maxPayoutAmount = parseInt(item.configValue);
-          if (item.configKey === 'MAINTENANCE_MODE') newSettings.maintenanceMode = item.configValue === 'true';
-          if (item.configKey === 'CONTACT_EMAIL') newSettings.contactEmail = item.configValue;
-          if (item.configKey === 'HOTLINE_SUPPORT') newSettings.supportPhone = item.configValue;
+        setSettings(current => {
+          const next = { ...current };
+          res.forEach(item => {
+            if (item.configKey === 'PLATFORM_FEE_PERCENTAGE') next.platformFeePercent = parseFloat(item.configValue) * 100;
+            if (item.configKey === 'MIN_PAYOUT_AMOUNT') next.minPayoutAmount = parseInt(item.configValue);
+            if (item.configKey === 'MAX_PAYOUT_AMOUNT') next.maxPayoutAmount = parseInt(item.configValue);
+            if (item.configKey === 'MAINTENANCE_MODE') next.maintenanceMode = item.configValue === 'true';
+            if (item.configKey === 'CONTACT_EMAIL') next.contactEmail = item.configValue;
+            if (item.configKey === 'HOTLINE_SUPPORT') next.supportPhone = item.configValue;
+          });
+          return next;
         });
-        setSettings(newSettings);
       } catch (err) {
-        console.error('Failed to load configs', err);
+        showError(err instanceof Error ? err.message : 'Không thể tải cấu hình');
       } finally {
         setIsLoading(false);
       }
     };
     fetchSettings();
-  }, []);
+  }, [showError]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -70,8 +74,9 @@ export default function SettingsPage() {
 
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      showSuccess('Đã lưu cài đặt');
     } catch (err: any) {
-      alert(err.message || 'Lưu cài đặt thất bại');
+      showError(err.message || 'Lưu cài đặt thất bại');
     } finally {
       setIsSaving(false);
     }

@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Loader2, X, Eye, EyeOff, CheckCircle, Flag,
-  AlertTriangle, Filter, ChevronRight,
-} from 'lucide-react';
+  Search, Loader2, X, Eye, EyeOff, CheckCircle, Flag } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { timeAgo } from '../../utils/format';
 
 interface ReportItem {
@@ -42,6 +41,7 @@ const STATUS_TABS = [
 ];
 
 export default function AdminReportsPage() {
+  const { showError } = useToast();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState('all');
@@ -64,11 +64,11 @@ export default function AdminReportsPage() {
       setTotalPages(res.totalPages || 0);
       setTotalElements(res.totalElements || 0);
     } catch (err) {
-      console.error('Failed to fetch reports:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải danh sách báo cáo');
     } finally {
       setIsLoading(false);
     }
-  }, [page, tab]);
+  }, [page, tab, showError]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
 
@@ -86,7 +86,7 @@ export default function AdminReportsPage() {
       setConfirmModal(null);
       setAdminNote('');
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      showError(err.message || 'Thao tác thất bại');
     } finally {
       setActionLoading(null);
     }
@@ -103,7 +103,7 @@ export default function AdminReportsPage() {
         setDetailReport({ ...detailReport, reportStatus: 'REVIEWING' });
       }
     } catch (err: any) {
-      console.error('Failed to mark as reviewing:', err);
+      showError(err.message || 'Không thể cập nhật trạng thái báo cáo');
     }
   };
 
@@ -113,7 +113,7 @@ export default function AdminReportsPage() {
       await apiFetch(`/admin/food-posts/${postId}/hide`, { method: 'PATCH' });
       await handleAction(reportId, 'resolve');
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      showError(err.message || 'Thao tác thất bại');
       setActionLoading(null);
     }
   };

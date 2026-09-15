@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft, Minus, Plus, Trash2, ShoppingBag, Loader2, X, CheckCircle,
-} from 'lucide-react';
+  ArrowLeft, Minus, Plus, Trash2, ShoppingBag, Loader2, CheckCircle } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { formatVND } from '../../utils/format';
 
 interface CartItem {
@@ -24,10 +24,10 @@ function saveCart(items: CartItem[]) {
 }
 
 export default function OrgCartPage() {
+  const { showError } = useToast();
   const navigate = useNavigate();
   const [cart, setCart] = useState<CartItem[]>(loadCart);
   const [isOrdering, setIsOrdering] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   const updateQty = (postId: number, delta: number) => {
@@ -65,19 +65,18 @@ export default function OrgCartPage() {
   const supplierCount = Object.keys(grouped).length;
 
   const handleBatchOrder = async () => {
-    setError('');
     setIsOrdering(true);
     try {
       // Use batch API — backend groups by supplier automatically
-      const items = cart.map(c => ({ foodPostId: c.post.id, quantity: c.quantity }));
+      const orders = cart.map(c => ({ foodPostId: c.post.id, quantity: c.quantity }));
       await apiFetch('/orders/batch', {
         method: 'POST',
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ orders }),
       });
       clearCart();
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Đặt hàng thất bại');
+      showError(err.message || 'Đặt hàng thất bại');
     } finally {
       setIsOrdering(false);
     }
@@ -151,7 +150,7 @@ export default function OrgCartPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{item.post.name}</p>
-                      <p className="text-xs text-gray-500">{item.post.postType === 'FREE' ? '🎁 Miễn phí' : formatVND(item.post.unitPrice) + ' / phần'}</p>
+                      <p className="text-xs text-gray-500">{item.post.postType === 'FREE' ? 'Miễn phí' : formatVND(item.post.unitPrice) + ' / phần'}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button onClick={() => updateQty(item.post.id, -1)} disabled={item.quantity <= 1}
@@ -178,14 +177,12 @@ export default function OrgCartPage() {
               <div className="flex justify-between"><span className="text-gray-500">Đơn hàng sẽ tạo</span><span className="text-gray-900">{supplierCount} đơn</span></div>
               <div className="border-t border-gray-200 pt-2 mt-1 flex justify-between">
                 <span className="font-semibold text-gray-900">Tổng tiền</span>
-                <span className="text-lg font-bold text-gray-900">{totalAmount > 0 ? formatVND(totalAmount) : '🎁 Miễn phí'}</span>
+                <span className="text-lg font-bold text-gray-900">{totalAmount > 0 ? formatVND(totalAmount) : 'Miễn phí'}</span>
               </div>
             </div>
             <p className="text-xs text-gray-400 mb-4">
               💡 Hệ thống sẽ tự động tạo đơn hàng riêng cho mỗi nhà cung cấp.
             </p>
-
-            {error && <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100 mb-4">{error}</div>}
 
             <button onClick={handleBatchOrder} disabled={isOrdering}
               className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-70 flex items-center justify-center gap-2">

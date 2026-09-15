@@ -59,6 +59,18 @@ body {
   border-radius: 4px;
 }
 
+/* Native form validation: show the field itself, while details are reported by Toast. */
+:is(input, textarea, select):user-invalid,
+:is(input, textarea, select)[aria-invalid='true'] {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12) !important;
+}
+
+:is(input, textarea, select):user-invalid:focus,
+:is(input, textarea, select)[aria-invalid='true']:focus {
+  outline-color: #ef4444;
+}
+
 /* Line clamp utility */
 .line-clamp-2 {
   display: -webkit-box;

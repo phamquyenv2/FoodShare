@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Users, ShoppingBag, Leaf, TrendingUp, Loader2, Calendar,
-  CreditCard, FileText, AlertTriangle,
-} from 'lucide-react';
+  Users, ShoppingBag, TrendingUp, Loader2, Calendar,
+  CreditCard, FileText } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
-} from 'recharts';
+  Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { formatVND } from '../../utils/format';
 
 interface DashStats {
@@ -41,6 +40,7 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 export default function AnalyticsPage() {
+  const { showError } = useToast();
   const [stats, setStats] = useState<DashStats | null>(null);
   const [userChart, setUserChart] = useState<any[]>([]);
   const [orderChart, setOrderChart] = useState<any[]>([]);
@@ -102,13 +102,13 @@ export default function AnalyticsPage() {
           }
         }
       } catch (err) {
-        console.error('Failed to load analytics:', err);
+        showError(err instanceof Error ? err.message : 'Không thể tải dữ liệu thống kê');
       } finally {
         setIsLoading(false);
       }
     };
     fetchAll();
-  }, [dateRange, startDate, endDate]);
+  }, [dateRange, startDate, endDate, showError]);
 
   const STAT_CARDS = stats ? [
     { icon: Users, label: 'Tổng người dùng', value: stats.totalUsers.toLocaleString(), change: stats.userGrowthPercent ? `+${stats.userGrowthPercent}%` : '', color: '#2563eb', bg: '#dbeafe' },

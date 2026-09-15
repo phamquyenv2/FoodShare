@@ -4,39 +4,50 @@ import { apiFetch } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, UtensilsCrossed, ShoppingBag, Wallet,
-  Users, ShieldAlert, BarChart3, Bell, LogOut, Menu, X,
-  Settings, User, Star, BellRing, Compass, Flag,
-} from 'lucide-react';
+  Users, ShieldAlert, BarChart3, Bell, X,
+  Settings, User, Star, Compass, Flag } from 'lucide-react';
 import Logo from '../components/shared/Logo';
 import { useAuth } from '../contexts/AuthContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import type { UserRole } from '../types';
+import { registerBrowserDevice } from '../services/deviceService';
 
-/* ─── Nav config per role ────────────────────────────────────────────────── */
+function NotificationPermissionButton() {
+  const [loading, setLoading] = useState(false);
+  const [enabled, setEnabled] = useState(typeof Notification !== 'undefined' && Notification.permission === 'granted');
+  const enable = async () => {
+    setLoading(true);
+    try { setEnabled(await registerBrowserDevice()); } catch { setEnabled(false); }
+    finally { setLoading(false); }
+  };
+  if (enabled) return <span className="text-xs text-green-600">Thông báo đã bật</span>;
+  return <button type="button" onClick={enable} disabled={loading} className="text-sm text-green-700 hover:text-green-900 disabled:opacity-50">{loading ? 'Đang bật…' : 'Bật thông báo'}</button>;
+}
+
 const SUPPLIER_NAV = [
-  { key: 'dashboard',      icon: LayoutDashboard,  label: 'Tổng quan',      path: '/supplier' },
-  { key: 'posts',          icon: UtensilsCrossed,  label: 'Bài đăng',       path: '/supplier/posts' },
-  { key: 'orders',         icon: ShoppingBag,      label: 'Đơn tiếp nhận',       path: '/supplier/orders' },
-  { key: 'wallet',         icon: Wallet,           label: 'Ví tiền',        path: '/supplier/wallet' },
-  { key: 'reviews',        icon: Star,             label: 'Đánh giá',       path: '/supplier/reviews' },
+  { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/supplier' },
+  { key: 'posts', icon: UtensilsCrossed, label: 'Bài đăng', path: '/supplier/posts' },
+  { key: 'orders', icon: ShoppingBag, label: 'Đơn tiếp nhận', path: '/supplier/orders' },
+  { key: 'wallet', icon: Wallet, label: 'Ví tiền', path: '/supplier/wallet' },
+  { key: 'reviews', icon: Star, label: 'Đánh giá', path: '/supplier/reviews' },
 ];
 
 const ADMIN_NAV = [
-  { key: 'analytics',   icon: BarChart3,     label: 'Tổng quan',    path: '/admin' },
-  { key: 'users',       icon: Users,         label: 'Người dùng',   path: '/admin/users' },
-  { key: 'moderation',  icon: ShieldAlert,   label: 'Kiểm duyệt',  path: '/admin/moderation' },
-  { key: 'reports',     icon: Flag,          label: 'Khiếu nại',    path: '/admin/reports' },
-  { key: 'settings',    icon: Settings,      label: 'Cài đặt',      path: '/admin/settings' },
+  { key: 'analytics', icon: BarChart3, label: 'Tổng quan', path: '/admin' },
+  { key: 'users', icon: Users, label: 'Người dùng', path: '/admin/users' },
+  { key: 'moderation', icon: ShieldAlert, label: 'Kiểm duyệt', path: '/admin/moderation' },
+  { key: 'reports', icon: Flag, label: 'Khiếu nại', path: '/admin/reports' },
+  { key: 'settings', icon: Settings, label: 'Cài đặt', path: '/admin/settings' },
 ];
 
 const RECIPIENT_NAV = [
-  { key: 'explore',       icon: Compass,          label: 'Khám phá',      path: '/recipient' },
-  { key: 'orders',        icon: ShoppingBag,      label: 'Đơn tiếp nhận',      path: '/recipient/orders' },
+  { key: 'explore', icon: Compass, label: 'Khám phá', path: '/recipient' },
+  { key: 'orders', icon: ShoppingBag, label: 'Đơn tiếp nhận', path: '/recipient/orders' },
 ];
 
 const ORGANIZATION_NAV = [
-  { key: 'explore',       icon: Compass,          label: 'Khám phá',      path: '/organization' },
-  { key: 'orders',        icon: ShoppingBag,      label: 'Đơn tiếp nhận',      path: '/organization/orders' },
+  { key: 'explore', icon: Compass, label: 'Khám phá', path: '/organization' },
+  { key: 'orders', icon: ShoppingBag, label: 'Đơn tiếp nhận', path: '/organization/orders' },
 ];
 
 function getNavForRole(role: UserRole) {
@@ -46,9 +57,8 @@ function getNavForRole(role: UserRole) {
   return RECIPIENT_NAV;
 }
 
-/* ─── Desktop Sidebar ────────────────────────────────────────────────────── */
 function Sidebar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const role = user?.role || 'RECIPIENT';
@@ -56,12 +66,9 @@ function Sidebar() {
 
   return (
     <aside className="hidden md:flex w-[260px] flex-shrink-0 h-screen sticky top-0 flex-col bg-white border-r border-gray-200">
-      {/* Logo */}
-      <div className="p-5 border-b border-gray-100">
-        <Logo size="md" />
+      <div className="h-16 flex items-center px-6 border-b border-gray-200">
+        <Logo size="md" layout="row" />
       </div>
-
-      {/* Role Display */}
       <div className="px-4 pt-4 pb-2 relative">
         <div
           className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-green-50 text-sm text-green-700 font-medium transition-colors"
@@ -70,7 +77,6 @@ function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto">
         {nav.map(item => {
           const active = location.pathname === item.path;
@@ -90,21 +96,10 @@ function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Logout */}
-      <div className="p-4 border-t border-gray-100">
-        <button
-          onClick={logout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 text-sm cursor-pointer transition-colors"
-        >
-          <LogOut size={16} /> Đăng xuất
-        </button>
-      </div>
     </aside>
   );
 }
 
-/* ─── Mobile Bottom Navbar ───────────────────────────────────────────────── */
 function BottomNav() {
   const { user } = useAuth();
   const location = useLocation();
@@ -136,9 +131,8 @@ function BottomNav() {
   );
 }
 
-/* ─── Mobile Header ──────────────────────────────────────────────────────── */
 function MobileHeader() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const role = user?.role || 'RECIPIENT';
@@ -147,17 +141,17 @@ function MobileHeader() {
 
   useEffect(() => {
     if (!user) return;
-    apiFetch<number>('/notifications/unread-count')
-      .then(res => {
-        setUnreadCount(res || 0);
-      })
-      .catch(() => {});
+    const refresh = () => apiFetch<number>('/notifications/unread-count')
+      .then(res => setUnreadCount(res || 0)).catch(() => {});
+    void refresh();
+    window.addEventListener('notifications:refresh', refresh);
+    return () => window.removeEventListener('notifications:refresh', refresh);
   }, [user]);
 
   return (
     <>
       <header className="md:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 h-14 flex items-center justify-between">
-        <Logo size="sm" />
+        <Logo size="sm" layout="row" />
         <div className="flex items-center gap-2">
           {role !== 'ADMIN' && (
             <button
@@ -205,17 +199,12 @@ function MobileHeader() {
               </div>
             </div>
             <div className="flex flex-col gap-2">
+              <div className="px-3 py-2.5"><NotificationPermissionButton /></div>
               <button
                 onClick={() => { setMenuOpen(false); navigate(`/${role.toLowerCase()}/profile`); }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <User size={18} className="text-gray-400" /> Hồ sơ
-              </button>
-              <button
-                onClick={() => { setMenuOpen(false); logout(); }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-              >
-                <LogOut size={18} className="text-red-500" /> Đăng xuất
               </button>
             </div>
           </motion.div>
@@ -225,7 +214,6 @@ function MobileHeader() {
   );
 }
 
-/* ─── Desktop Header ─────────────────────────────────────────────────────── */
 function DesktopHeader() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -235,11 +223,11 @@ function DesktopHeader() {
 
   useEffect(() => {
     if (!user) return;
-    apiFetch<number>('/notifications/unread-count')
-      .then(res => {
-        setUnreadCount(res || 0);
-      })
-      .catch(() => {});
+    const refresh = () => apiFetch<number>('/notifications/unread-count')
+      .then(res => setUnreadCount(res || 0)).catch(() => {});
+    void refresh();
+    window.addEventListener('notifications:refresh', refresh);
+    return () => window.removeEventListener('notifications:refresh', refresh);
   }, [user]);
   
   return (
@@ -266,6 +254,7 @@ function DesktopHeader() {
           </span>
         )}
       </button>
+      <NotificationPermissionButton />
       <div 
         onClick={() => navigate(`/${role.toLowerCase()}/profile`)}
         className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
@@ -279,7 +268,6 @@ function DesktopHeader() {
   );
 }
 
-/* ─── Main Layout ────────────────────────────────────────────────────────── */
 export default function MainLayout() {
   const isMobile = useIsMobile();
 

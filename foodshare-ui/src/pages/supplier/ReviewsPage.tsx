@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Star, MessageSquare, Loader2 } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { timeAgo } from '../../utils/format';
 
 interface ReviewItem {
@@ -16,6 +17,7 @@ interface ReviewItem {
 }
 
 export default function ReviewsPage() {
+  const { showError } = useToast();
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -28,11 +30,11 @@ export default function ReviewsPage() {
       setReviews(res.content || []);
       setTotalPages(res.totalPages || 0);
     } catch (err) {
-      console.error('Failed to fetch reviews:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải đánh giá');
     } finally {
       setIsLoading(false);
     }
-  }, [page]);
+  }, [page, showError]);
 
   useEffect(() => { fetchReviews(); }, [fetchReviews]);
 
