@@ -127,7 +127,13 @@ export default function AdminNotificationsPage() {
     if (notif.referenceType === 'USER' || notif.notificationType === 'NEW_SUPPLIER') {
       navigate(`/admin/moderation`);
     } else if (notif.referenceType === 'REPORT') {
-      navigate('/admin/reports');
+      navigate(`/admin/reports?reportId=${notif.referenceId || ''}`);
+    } else if (notif.referenceType === 'ORDER') {
+      navigate(`/admin/orders?orderId=${notif.referenceId || ''}`);
+    } else if (notif.referenceType === 'PAYMENT') {
+      navigate(notif.title?.toLowerCase().includes('rút tiền') ? '/admin/payouts' : `/admin/payments?paymentId=${notif.referenceId || ''}`);
+    } else if (notif.referenceType === 'FOOD_POST') {
+      navigate(`/admin/food-posts?postId=${notif.referenceId || ''}`);
     }
   };
 

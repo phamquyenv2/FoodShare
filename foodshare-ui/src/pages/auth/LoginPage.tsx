@@ -67,7 +67,7 @@ export default function LoginPage() {
     try {
       const res = await apiFetch<any>('/auth/google', {
         method: 'POST',
-        body: JSON.stringify({ idToken: credentialResponse.credential, role: 'RECIPIENT' }),
+        body: JSON.stringify({ idToken: credentialResponse.credential }),
       });
 
       setAccessToken(res.accessToken);
@@ -88,8 +88,7 @@ export default function LoginPage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Đăng nhập</h1>
       <p className="text-sm text-gray-500 mb-8">Chào mừng bạn quay trở lại FoodShare</p>
 
-      <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
-
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Số điện thoại</label>
           <input
@@ -97,6 +96,7 @@ export default function LoginPage() {
             value={email}
             onChange={e => { setEmail(e.target.value); setInvalidField(null); }}
             placeholder="0912345678"
+            required
             className={`w-full px-4 py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all bg-white ${
               invalidField === 'identifier' || invalidField === 'all'
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-100'
@@ -127,7 +127,6 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
-
 
         <button
           type="submit"

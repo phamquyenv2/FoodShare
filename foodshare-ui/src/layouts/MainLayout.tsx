@@ -5,12 +5,32 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, UtensilsCrossed, ShoppingBag, Wallet,
   Users, ShieldAlert, BarChart3, Bell, X,
-  Settings, User, Star, Compass, Flag } from 'lucide-react';
+  User, Star, Compass, Flag, ShoppingCart } from 'lucide-react';
 import Logo from '../components/shared/Logo';
 import { useAuth } from '../contexts/AuthContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import type { UserRole } from '../types';
+import { formatDisplayName } from '../utils/format';
 import { registerBrowserDevice } from '../services/deviceService';
+import { getCartCount } from '../services/cartService';
+
+function useCartCount() {
+  const [count, setCount] = useState<number>(() => getCartCount());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setCount(getCartCount());
+    };
+    window.addEventListener('cart:updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('cart:updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  return count;
+}
 
 function NotificationPermissionButton() {
   const [loading, setLoading] = useState(false);
@@ -36,8 +56,10 @@ const ADMIN_NAV = [
   { key: 'analytics', icon: BarChart3, label: 'Tổng quan', path: '/admin' },
   { key: 'users', icon: Users, label: 'Người dùng', path: '/admin/users' },
   { key: 'moderation', icon: ShieldAlert, label: 'Kiểm duyệt', path: '/admin/moderation' },
-  { key: 'reports', icon: Flag, label: 'Khiếu nại', path: '/admin/reports' },
-  { key: 'settings', icon: Settings, label: 'Cài đặt', path: '/admin/settings' },
+  { key: 'food-posts', icon: UtensilsCrossed, label: 'Bài đăng', path: '/admin/food-posts' },
+  { key: 'orders', icon: ShoppingBag, label: 'Đơn hàng', path: '/admin/orders' },
+  { key: 'payments', icon: Wallet, label: 'Thanh toán', path: '/admin/payments' },
+  { key: 'payouts', icon: Wallet, label: 'Duyệt rút tiền', path: '/admin/payouts' },
 ];
 
 const RECIPIENT_NAV = [
@@ -47,6 +69,7 @@ const RECIPIENT_NAV = [
 
 const ORGANIZATION_NAV = [
   { key: 'explore', icon: Compass, label: 'Khám phá', path: '/organization' },
+  { key: 'cart', icon: ShoppingCart, label: 'Giỏ hàng', path: '/organization/cart' },
   { key: 'orders', icon: ShoppingBag, label: 'Đơn tiếp nhận', path: '/organization/orders' },
 ];
 
@@ -63,6 +86,7 @@ function Sidebar() {
   const navigate = useNavigate();
   const role = user?.role || 'RECIPIENT';
   const nav = getNavForRole(role);
+  const cartCount = useCartCount();
 
   return (
     <aside className="hidden md:flex w-[260px] flex-shrink-0 h-screen sticky top-0 flex-col bg-white border-r border-gray-200">
@@ -84,14 +108,23 @@ function Sidebar() {
             <button
               key={item.key}
               onClick={() => navigate(item.path)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200
                 ${active
                   ? 'bg-[#2db84c] text-white shadow-md shadow-green-500/20'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
             >
-              <item.icon size={18} />
-              {item.label}
+              <div className="flex items-center gap-3">
+                <item.icon size={18} />
+                <span>{item.label}</span>
+              </div>
+              {item.key === 'cart' && cartCount > 0 && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                  active ? 'bg-white text-[#2db84c]' : 'bg-[#2db84c] text-white'
+                }`}>
+                  {cartCount}
+                </span>
+              )}
             </button>
           );
         })}
@@ -106,6 +139,7 @@ function BottomNav() {
   const navigate = useNavigate();
   const role = user?.role || 'RECIPIENT';
   const nav = getNavForRole(role);
+  const cartCount = useCartCount();
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 px-2 pb-[env(safe-area-inset-bottom)]">
@@ -116,10 +150,17 @@ function BottomNav() {
             <button
               key={item.key}
               onClick={() => navigate(item.path)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl cursor-pointer transition-all duration-200
+              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl cursor-pointer transition-all duration-200 relative
                 ${active ? 'text-[#2db84c]' : 'text-gray-400'}`}
             >
-              <item.icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+              <div className="relative">
+                <item.icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                {item.key === 'cart' && cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center border border-white">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
+              </div>
               <span className={`text-[10px] font-medium ${active ? 'text-[#2db84c]' : 'text-gray-400'}`}>
                 {item.label}
               </span>
@@ -136,6 +177,7 @@ function MobileHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const role = user?.role || 'RECIPIENT';
+  const cartCount = useCartCount();
 
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -153,6 +195,20 @@ function MobileHeader() {
       <header className="md:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 h-14 flex items-center justify-between">
         <Logo size="sm" layout="row" />
         <div className="flex items-center gap-2">
+          {role === 'ORGANIZATION' && (
+            <button
+              onClick={() => navigate('/organization/cart')}
+              className="w-9 h-9 rounded-full bg-gray-50 flex items-center justify-center cursor-pointer relative"
+              aria-label="Giỏ hàng"
+            >
+              <ShoppingCart size={18} className={`text-gray-500 ${cartCount > 0 ? 'text-[#2db84c]' : ''}`} />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center border border-white">
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              )}
+            </button>
+          )}
           {role !== 'ADMIN' && (
             <button
               onClick={() => navigate(`/${role.toLowerCase()}/report/0?type=SYSTEM`)}
@@ -194,7 +250,7 @@ function MobileHeader() {
                 {user?.fullName?.charAt(0) || 'U'}
               </div>
               <div>
-                <p className="font-semibold text-gray-900">{user?.fullName}</p>
+                <p className="font-semibold text-gray-900">{formatDisplayName(user?.fullName)}</p>
                 <p className="text-xs text-gray-400">{role === 'ADMIN' ? 'Quản trị viên' : role === 'ORGANIZATION' ? 'Tổ chức' : role === 'SUPPLIER' ? 'Nhà cung cấp' : 'Người nhận'}</p>
               </div>
             </div>
@@ -218,6 +274,7 @@ function DesktopHeader() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const role = user?.role || 'RECIPIENT';
+  const cartCount = useCartCount();
   
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -233,6 +290,20 @@ function DesktopHeader() {
   return (
     <header className="hidden md:flex h-16 bg-white border-b border-gray-200 items-center px-6 gap-4 sticky top-0 z-10">
       <div className="flex-1" />
+      {role === 'ORGANIZATION' && (
+        <button
+          onClick={() => navigate('/organization/cart')}
+          className="relative w-9 h-9 rounded-full bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors"
+          aria-label="Giỏ hàng"
+        >
+          <ShoppingCart size={18} className={`text-gray-500 ${cartCount > 0 ? 'text-[#2db84c]' : ''}`} />
+          {cartCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center border border-white">
+              {cartCount > 99 ? '99+' : cartCount}
+            </span>
+          )}
+        </button>
+      )}
       {role !== 'ADMIN' && (
         <button 
           onClick={() => navigate(`/${role.toLowerCase()}/report/0?type=SYSTEM`)}
@@ -262,7 +333,7 @@ function DesktopHeader() {
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xs font-bold">
           {user?.fullName?.charAt(0) || 'U'}
         </div>
-        <span className="text-sm font-medium text-gray-700">{user?.fullName}</span>
+        <span className="text-sm font-medium text-gray-700">{formatDisplayName(user?.fullName)}</span>
       </div>
     </header>
   );

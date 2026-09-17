@@ -8,7 +8,8 @@ import {
   Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { apiFetch } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { formatVND } from '../../utils/format';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatVND, formatDisplayName } from '../../utils/format';
 
 interface DashStats {
   totalUsers: number;
@@ -41,6 +42,7 @@ function ChartTooltip({ active, payload, label }: any) {
 
 export default function AnalyticsPage() {
   const { showError } = useToast();
+  const { user } = useAuth();
   const [stats, setStats] = useState<DashStats | null>(null);
   const [userChart, setUserChart] = useState<any[]>([]);
   const [orderChart, setOrderChart] = useState<any[]>([]);
@@ -129,7 +131,7 @@ export default function AnalyticsPage() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Tổng quan hệ thống</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Xin chào, {formatDisplayName(user?.fullName, 'Quản trị viên')}</h1>
           <p className="text-sm text-gray-500 mt-0.5">Thống kê hoạt động nền tảng FoodShare</p>
         </div>
         {/* Date Range Filter */}

@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { apiFetch } from '../../services/api';
 import { OrderBadge } from '../../components/shared/StatusBadge';
-import { formatVND, timeAgo } from '../../utils/format';
+import { formatVND, timeAgo, formatDisplayName } from '../../utils/format';
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const fadeUp = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.25 } } };
@@ -122,7 +122,7 @@ export default function SupplierDashboard() {
     <div className="p-4 md:p-6 flex flex-col gap-5 max-w-6xl mx-auto">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-          Xin chào, {(user as any)?.fullName || 'bạn'} 👋
+          Xin chào, {formatDisplayName((user as any)?.fullName)}
         </h1>
         <p className="text-sm text-gray-500 mt-1">Tổng quan hoạt động</p>
       </div>

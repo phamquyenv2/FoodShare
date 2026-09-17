@@ -170,15 +170,15 @@ export default function OrderDetailPage() {
   const supplierPhone = order.supplier?.phone;
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-5">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer self-start">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto w-full flex flex-col gap-5">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer self-start transition-colors">
         <ArrowLeft size={16} /> Quay lại
       </button>
 
       {/* 1. Status Header Card */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-        className={`rounded-2xl p-5 ${status.bg} border border-transparent`}
+        className={`w-full rounded-2xl p-5 ${status.bg} border border-transparent`}
       >
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-xs shrink-0">
@@ -202,7 +202,7 @@ export default function OrderDetailPage() {
       {!isCancelled && currentStep >= 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 shadow-xs"
+          className="w-full bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 shadow-xs"
         >
           <div className="relative">
             {/* Background connecting track */}
@@ -249,11 +249,11 @@ export default function OrderDetailPage() {
       )}
 
       {/* 3. Two-Column Layout: Left (Chi tiết đơn hàng), Right (Nhà cung cấp & Hủy đơn hàng / Action buttons) */}
-      <div className="grid md:grid-cols-[1fr_340px] gap-5 items-start">
+      <div className="w-full grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-4 sm:gap-5 items-start">
         {/* Left Column: Chi tiết đơn hàng */}
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs flex flex-col gap-3.5"
+          className="w-full min-w-0 bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-xs flex flex-col gap-3.5"
         >
           <h3 className="font-semibold text-gray-900 text-base">Chi tiết đơn hàng</h3>
 
@@ -288,18 +288,18 @@ export default function OrderDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div className="p-3 rounded-xl bg-gray-50">
               <p className="text-xs text-gray-400 mb-0.5">Ngày đặt</p>
-              <p className="text-sm font-semibold text-gray-800">{formatDate(order.createdAt)}</p>
+              <p className="text-sm font-semibold text-gray-800 truncate">{formatDate(order.createdAt)}</p>
             </div>
             {order.deliveredAt && (
               <div className="p-3 rounded-xl bg-gray-50">
                 <p className="text-xs text-gray-400 mb-0.5">Ngày giao</p>
-                <p className="text-sm font-semibold text-gray-800">{formatDate(order.deliveredAt)}</p>
+                <p className="text-sm font-semibold text-gray-800 truncate">{formatDate(order.deliveredAt)}</p>
               </div>
             )}
             {order.completedAt && (
               <div className="p-3 rounded-xl bg-gray-50">
                 <p className="text-xs text-gray-400 mb-0.5">Hoàn thành</p>
-                <p className="text-sm font-semibold text-gray-800">{formatDate(order.completedAt)}</p>
+                <p className="text-sm font-semibold text-gray-800 truncate">{formatDate(order.completedAt)}</p>
               </div>
             )}
             {order.paymentStatus && (
@@ -316,24 +316,24 @@ export default function OrderDetailPage() {
           {pickupAddress && (
             <div className="p-3.5 rounded-xl bg-gray-50 flex items-start gap-2">
               <MapPin size={16} className="text-gray-400 mt-0.5 shrink-0" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-400 mb-0.5">Địa điểm nhận hàng</p>
-                <p className="text-sm font-medium text-gray-800 leading-snug">{pickupAddress}</p>
+                <p className="text-sm font-medium text-gray-800 leading-snug break-words">{pickupAddress}</p>
               </div>
             </div>
           )}
         </motion.div>
 
         {/* Right Column: Nhà cung cấp & Action buttons */}
-        <div className="flex flex-col gap-4">
+        <div className="w-full min-w-0 flex flex-col gap-4">
           {/* Nhà cung cấp */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-            className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs"
+            className="w-full bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-xs"
           >
             <h3 className="font-semibold text-gray-900 mb-3 text-base">Nhà cung cấp</h3>
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-[#2db84c] flex items-center justify-center text-white text-base font-bold shrink-0 overflow-hidden shadow-xs">
+              <div className="w-10 h-10 rounded-full bg-[#2db84c] flex items-center justify-center text-white text-base font-bold shrink-0 overflow-hidden shadow-xs">
                 {supplierAvatar && !supplierAvatarFailed ? (
                   <img src={supplierAvatar} className="w-full h-full object-cover" alt="" onError={() => setSupplierAvatarFailed(true)} />
                 ) : (
@@ -343,7 +343,7 @@ export default function OrderDetailPage() {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-900 text-sm truncate">{supplierName}</p>
                 {supplierPhone && (
-                  <p className="text-xs text-gray-500 mt-0.5">{supplierPhone}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">{supplierPhone}</p>
                 )}
               </div>
             </div>
@@ -352,15 +352,15 @@ export default function OrderDetailPage() {
           {/* Action Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            className="flex flex-col gap-2.5"
+            className="w-full flex flex-col gap-2.5"
           >
             {canPay && (
               <button
                 onClick={() => setPaymentModal(true)}
                 disabled={!!actionLoading}
-                className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2 px-3 text-center"
               >
-                <CreditCard size={16} /> Thanh toán {formatVND(order.totalAmount)}
+                <CreditCard size={16} className="shrink-0" /> <span className="truncate">Thanh toán {formatVND(order.totalAmount)}</span>
               </button>
             )}
 
@@ -368,10 +368,10 @@ export default function OrderDetailPage() {
               <button
                 onClick={() => handleAction('complete')}
                 disabled={actionLoading === 'complete' || !!actionLoading}
-                className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2 px-3 text-center"
               >
-                {actionLoading === 'complete' ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                Xác nhận đã nhận hàng
+                {actionLoading === 'complete' ? <Loader2 size={16} className="animate-spin shrink-0" /> : <CheckCircle size={16} className="shrink-0" />}
+                <span>Xác nhận đã nhận hàng</span>
               </button>
             )}
 
@@ -379,9 +379,9 @@ export default function OrderDetailPage() {
               <button
                 onClick={() => navigate(`/recipient/orders/${order.id}/review`)}
                 disabled={!!actionLoading}
-                className="w-full py-3 rounded-xl border-2 border-amber-400 text-amber-600 font-semibold text-sm cursor-pointer hover:bg-amber-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2"
+                className="w-full py-2.5 sm:py-3 rounded-xl border-2 border-amber-400 text-amber-600 font-semibold text-sm cursor-pointer hover:bg-amber-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2 px-3 text-center"
               >
-                <Star size={16} /> Đánh giá nhà cung cấp
+                <Star size={16} className="shrink-0" /> <span>Đánh giá nhà cung cấp</span>
               </button>
             )}
 
@@ -389,9 +389,9 @@ export default function OrderDetailPage() {
               <button
                 onClick={() => navigate(`/recipient/orders/${order.id}/report?type=ORDER`)}
                 disabled={!!actionLoading}
-                className="w-full py-3 rounded-xl border border-gray-200 text-gray-500 font-medium text-sm cursor-pointer hover:bg-gray-50 hover:text-red-500 hover:border-red-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2"
+                className="w-full py-2.5 sm:py-3 rounded-xl border border-gray-200 text-gray-500 font-medium text-sm cursor-pointer hover:bg-gray-50 hover:text-red-500 hover:border-red-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2 px-3 text-center"
               >
-                <Flag size={14} /> Báo cáo / Khiếu nại
+                <Flag size={14} className="shrink-0" /> <span>Báo cáo / Khiếu nại</span>
               </button>
             )}
 
@@ -399,9 +399,9 @@ export default function OrderDetailPage() {
               <button
                 onClick={() => setCancelModal(true)}
                 disabled={!!actionLoading}
-                className="w-full py-3 rounded-xl border border-red-200 text-red-500 font-medium text-sm cursor-pointer hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2"
+                className="w-full py-2.5 sm:py-3 rounded-xl border border-red-200 text-red-500 font-medium text-sm cursor-pointer hover:bg-red-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2 px-3 text-center"
               >
-                <XCircle size={15} /> Hủy đơn hàng
+                <XCircle size={15} className="shrink-0" /> <span>Hủy đơn hàng</span>
               </button>
             )}
           </motion.div>

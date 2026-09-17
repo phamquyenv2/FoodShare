@@ -41,7 +41,7 @@ export default function CompleteProfilePage() {
   const { user, checkAuth, logout } = useAuth();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
-  const [step, setStep] = useState(2);
+  const [step, setStep] = useState(1);
   const [selectedRole, setSelectedRole] = useState(user?.role || 'RECIPIENT');
   const [form, setForm] = useState({
     phone: '',
@@ -112,6 +112,7 @@ export default function CompleteProfilePage() {
       });
       setForm(current => ({ ...current, phone: response.phone }));
       setPhoneRegistrationToken(response.registrationToken);
+      setStep(1);
       showSuccess('Số điện thoại đã được xác minh');
     } catch (error) {
       showError(error instanceof Error ? error.message : 'OTP không đúng hoặc đã hết hạn');

@@ -6,6 +6,7 @@ import { apiFetch } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import LocationField from '../../components/shared/LocationField';
 import { useToast } from '../../contexts/ToastContext';
+import { formatDisplayName } from '../../utils/format';
 
 export default function SupplierProfilePage() {
   const { user, checkAuth, logout } = useAuth();
@@ -81,7 +82,7 @@ export default function SupplierProfilePage() {
           </button>
         </div>
         <div className="text-center">
-          <h2 className="text-lg font-bold text-gray-900">{(user as any)?.fullName || 'Chưa đặt tên'}</h2>
+          <h2 className="text-lg font-bold text-gray-900">{formatDisplayName((user as any)?.fullName, 'Chưa đặt tên')}</h2>
           <span className="inline-block mt-1 px-3 py-1 rounded-full bg-[#2db84c]/10 text-[#2db84c] text-xs font-semibold">
             {user?.role === 'SUPPLIER' ? 'Nhà cung cấp' : user?.role === 'ORGANIZATION' ? 'Tổ chức' : 'Người nhận'}
           </span>

@@ -3,10 +3,13 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Loader2, UtensilsCrossed, AlertTriangle, Flag,
-  ArrowLeft, Clock, ShoppingBag, MapPin, User, Minus, Plus, Star
+  ArrowLeft, Clock, ShoppingBag, MapPin, User, Minus, Plus, Star,
+  ShoppingCart, Check
 } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { addToCart } from '../../services/cartService';
 import { formatVND } from '../../utils/format';
 
 interface PostDetail {
@@ -49,7 +52,8 @@ function getTimeLeft(expiresAt: string): { text: string; urgent: boolean } {
 }
 
 export default function FoodPostDetailPage() {
-  const { showError } = useToast();
+  const { user } = useAuth();
+  const { showSuccess, showError } = useToast();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [post, setPost] = useState<PostDetail | null>(null);
@@ -59,8 +63,12 @@ export default function FoodPostDetailPage() {
   const isOrderingRef = useRef(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
+  const [addedToCart, setAddedToCart] = useState(false);
   const location = useLocation();
-  const rolePath = location.pathname.split('/')[1] || 'recipient';
+
+  const isOrganization = user?.role === 'ORGANIZATION';
+  const rolePath = isOrganization ? 'organization' : (location.pathname.split('/')[1] || 'recipient');
+  const maxAllowedQuantity = isOrganization ? (post?.availableQuantity || 1) : 1;
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -75,6 +83,14 @@ export default function FoodPostDetailPage() {
     };
     if (id) fetchPost();
   }, [id, showError]);
+
+  const handleAddToCart = () => {
+    if (!post) return;
+    addToCart(post, quantity);
+    setAddedToCart(true);
+    showSuccess(`Đã thêm ${quantity} phần "${post.name}" vào giỏ hàng`);
+    setTimeout(() => setAddedToCart(false), 2500);
+  };
 
   const handleOrder = async () => {
     if (!post || isOrderingRef.current || isOrdering) return;
@@ -143,13 +159,13 @@ export default function FoodPostDetailPage() {
           </p>
           <div className="flex gap-3">
             <button
-              onClick={() => navigate('/recipient/orders')}
+              onClick={() => navigate(isOrganization ? '/organization/orders' : '/recipient/orders')}
               className="flex-1 py-3 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] transition-all shadow-md shadow-green-500/20"
             >
               Xem đơn hàng
             </button>
             <button
-              onClick={() => navigate('/recipient')}
+              onClick={() => navigate(isOrganization ? '/organization' : '/recipient')}
               className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm cursor-pointer hover:bg-gray-50 transition-all"
             >
               Tiếp tục khám phá
@@ -311,24 +327,46 @@ export default function FoodPostDetailPage() {
               <>
                 {/* Quantity selector */}
                 <div className="mb-4">
-                  <p className="text-sm text-gray-600 mb-2">Số lượng</p>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-gray-600 font-medium">Số lượng</p>
+                    <span className="text-xs text-gray-400">
+                      {isOrganization ? `Tối đa ${post.availableQuantity} phần` : 'Tối đa 1 phần'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
                     <button
+                      type="button"
                       onClick={() => setQuantity(q => Math.max(1, q - 1))}
                       disabled={isOrdering || quantity <= 1}
-                      className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none"
+                      className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Minus size={16} />
                     </button>
-                    <span className="text-lg font-bold text-gray-900 w-10 text-center">{quantity}</span>
+                    {isOrganization ? (
+                      <input
+                        type="number"
+                        min={1}
+                        max={maxAllowedQuantity}
+                        disabled={isOrdering}
+                        value={quantity}
+                        onChange={e => {
+                          const val = parseInt(e.target.value, 10);
+                          if (isNaN(val)) setQuantity(1);
+                          else setQuantity(Math.max(1, Math.min(maxAllowedQuantity, val)));
+                        }}
+                        className="w-16 h-10 text-center font-bold text-gray-900 border border-gray-200 rounded-xl focus:border-[#2db84c] focus:outline-hidden text-base"
+                      />
+                    ) : (
+                      <span className="text-lg font-bold text-gray-900 w-12 text-center">{quantity}</span>
+                    )}
                     <button
-                      onClick={() => setQuantity(q => Math.min(post.availableQuantity, q + 1))}
-                      disabled={isOrdering || rolePath === 'recipient' || quantity >= post.availableQuantity}
-                      className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none"
+                      type="button"
+                      onClick={() => setQuantity(q => Math.min(maxAllowedQuantity, q + 1))}
+                      disabled={isOrdering || quantity >= maxAllowedQuantity}
+                      className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Plus size={16} />
                     </button>
-                    <span className="text-xs text-gray-400 ml-auto">{rolePath === 'recipient' ? 'Tối đa 1 phần' : `Tối đa ${post.availableQuantity}`}</span>
                   </div>
                 </div>
 
@@ -350,15 +388,39 @@ export default function FoodPostDetailPage() {
                   </div>
                 </div>
 
+                {isOrganization ? (
+                  <div className="flex flex-col gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      disabled={isOrdering}
+                      className="w-full py-3 rounded-xl border-2 border-[#2db84c] text-[#2db84c] hover:bg-green-50 font-semibold text-sm cursor-pointer active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
+                      {addedToCart ? <Check size={16} /> : <ShoppingCart size={16} />}
+                      {addedToCart ? 'Đã thêm vào giỏ hàng' : 'Thêm vào giỏ hàng'}
+                    </button>
 
-                <button
-                  onClick={handleOrder}
-                  disabled={isOrdering}
-                  className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2"
-                >
-                  {isOrdering ? <Loader2 size={16} className="animate-spin" /> : <ShoppingBag size={16} />}
-                  {isOrdering ? 'Đang xử lý...' : 'Đặt hàng ngay'}
-                </button>
+                    <button
+                      type="button"
+                      onClick={handleOrder}
+                      disabled={isOrdering}
+                      className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isOrdering ? <Loader2 size={16} className="animate-spin" /> : <ShoppingBag size={16} />}
+                      {isOrdering ? 'Đang xử lý...' : 'Đặt hàng ngay'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleOrder}
+                    disabled={isOrdering}
+                    className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2"
+                  >
+                    {isOrdering ? <Loader2 size={16} className="animate-spin" /> : <ShoppingBag size={16} />}
+                    {isOrdering ? 'Đang xử lý...' : 'Đặt hàng ngay'}
+                  </button>
+                )}
               </>
             )}
           </div>

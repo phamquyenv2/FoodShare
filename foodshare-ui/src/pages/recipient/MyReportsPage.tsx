@@ -4,7 +4,7 @@ import { Loader2, Flag, ArrowLeft, X } from 'lucide-react';
 import { apiFetch } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { timeAgo } from '../../utils/format';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ReportItem {
@@ -40,6 +40,8 @@ export default function MyReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [detailReport, setDetailReport] = useState<ReportItem | null>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const reportIdParam = searchParams.get('reportId');
 
   const fetchReports = useCallback(async () => {
     setIsLoading(true);
@@ -61,6 +63,24 @@ export default function MyReportsPage() {
   }, [showError, user?.role]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
+
+  // Handle reportId from URL query param to open detail modal
+  useEffect(() => {
+    if (!reportIdParam) return;
+    const targetId = Number(reportIdParam);
+    if (isNaN(targetId) || targetId <= 0) return;
+
+    const found = reports.find(r => r.id === targetId);
+    if (found) {
+      setDetailReport(found);
+    } else if (!isLoading) {
+      apiFetch<ReportItem>(`/reports/${targetId}`)
+        .then(data => {
+          if (data) setDetailReport(data);
+        })
+        .catch(() => {});
+    }
+  }, [reportIdParam, reports, isLoading]);
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto flex flex-col gap-5">
@@ -88,7 +108,11 @@ export default function MyReportsPage() {
             return (
               <motion.div key={r.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
                 onClick={() => setDetailReport(r)}
-                className="bg-white rounded-2xl border border-gray-100 p-4 cursor-pointer hover:border-[#2db84c]/30 hover:shadow-md transition-all">
+                className={`bg-white rounded-2xl border p-4 cursor-pointer hover:border-[#2db84c]/30 hover:shadow-md transition-all ${
+                  r.id === Number(reportIdParam)
+                    ? 'border-[#2db84c] ring-2 ring-[#2db84c]/20 bg-green-50/20'
+                    : 'border-gray-100'
+                }`}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 text-sm">

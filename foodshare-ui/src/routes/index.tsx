@@ -25,6 +25,10 @@ import AnalyticsPage from '../pages/admin/AnalyticsPage';
 import UsersPage from '../pages/admin/UsersPage';
 import ModerationPage from '../pages/admin/ModerationPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
+import AdminFoodPostsPage from '../pages/admin/AdminFoodPostsPage';
+import AdminOrdersPage from '../pages/admin/AdminOrdersPage';
+import AdminPaymentsPage from '../pages/admin/AdminPaymentsPage';
+import AdminPayoutsPage from '../pages/admin/AdminPayoutsPage';
 import SettingsPage from '../pages/admin/SettingsPage';
 import AdminNotificationsPage from '../pages/admin/AdminNotificationsPage';
 
@@ -82,6 +86,10 @@ export const router = createBrowserRouter([
       { path: 'admin/dashboard',            element: <AuthGuard allowedRoles={['ADMIN']}><AnalyticsPage /></AuthGuard> },
       { path: 'admin/users',      element: <AuthGuard allowedRoles={['ADMIN']}><UsersPage /></AuthGuard> },
       { path: 'admin/moderation', element: <AuthGuard allowedRoles={['ADMIN']}><ModerationPage /></AuthGuard> },
+      { path: 'admin/food-posts', element: <AuthGuard allowedRoles={['ADMIN']}><AdminFoodPostsPage /></AuthGuard> },
+      { path: 'admin/orders', element: <AuthGuard allowedRoles={['ADMIN']}><AdminOrdersPage /></AuthGuard> },
+      { path: 'admin/payments', element: <AuthGuard allowedRoles={['ADMIN']}><AdminPaymentsPage /></AuthGuard> },
+      { path: 'admin/payouts', element: <AuthGuard allowedRoles={['ADMIN']}><AdminPayoutsPage /></AuthGuard> },
       { path: 'admin/reports',    element: <AuthGuard allowedRoles={['ADMIN']}><AdminReportsPage /></AuthGuard> },
       { path: 'admin/notifications', element: <AuthGuard allowedRoles={['ADMIN']}><AdminNotificationsPage /></AuthGuard> },
       { path: 'admin/settings',   element: <AuthGuard allowedRoles={['ADMIN']}><SettingsPage /></AuthGuard> },
@@ -100,7 +108,7 @@ export const router = createBrowserRouter([
       { path: 'recipient/profile',                 element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><ProfilePage /></AuthGuard> },
       // Organization
       { path: 'organization',                      element: <AuthGuard allowedRoles={['ORGANIZATION']}><OrgExplorePage /></AuthGuard> },
-      { path: 'organization/explore',                      element: <AuthGuard allowedRoles={['ORGANIZATION']}><OrgExplorePage /></AuthGuard> },
+      { path: 'organization/explore',              element: <AuthGuard allowedRoles={['ORGANIZATION']}><OrgExplorePage /></AuthGuard> },
       { path: 'organization/stores/:id',           element: <AuthGuard allowedRoles={['ORGANIZATION']}><StoreDetailPage /></AuthGuard> },
       { path: 'organization/cart',                 element: <AuthGuard allowedRoles={['ORGANIZATION']}><OrgCartPage /></AuthGuard> },
       { path: 'organization/posts/:id',            element: <AuthGuard allowedRoles={['ORGANIZATION']}><FoodPostDetailPage /></AuthGuard> },
@@ -110,6 +118,7 @@ export const router = createBrowserRouter([
       { path: 'organization/orders/:id/report',    element: <AuthGuard allowedRoles={['ORGANIZATION']}><ReportPage /></AuthGuard> },
       { path: 'organization/reports',              element: <AuthGuard allowedRoles={['ORGANIZATION']}><MyReportsPage /></AuthGuard> },
       { path: 'organization/notifications',        element: <AuthGuard allowedRoles={['ORGANIZATION']}><RecipientNotificationsPage /></AuthGuard> },
+      { path: 'organization/profile',              element: <AuthGuard allowedRoles={['ORGANIZATION']}><ProfilePage /></AuthGuard> },
     ],
   },
 ]);

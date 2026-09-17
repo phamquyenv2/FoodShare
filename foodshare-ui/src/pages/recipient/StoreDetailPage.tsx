@@ -3,12 +3,14 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Search, MapPin, Star, Phone, UtensilsCrossed,
-  Loader2, ChevronRight, Filter, X, RotateCcw
+  Loader2, Filter, X, RotateCcw
 } from 'lucide-react';
 import { apiFetch } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { formatVND, timeAgo } from '../../utils/format';
 import { getCategories, type Category } from '../../services/categoryApi';
+import FoodCard from '../../components/shared/FoodCard';
+import FloatingCartButton from '../../components/shared/FloatingCartButton';
 
 interface ReviewItem {
   id: number;
@@ -635,94 +637,20 @@ export default function StoreDetailPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {displayedPosts.map(post => {
-            const isFree = post.postType === 'FREE' || post.unitPrice === 0;
-            const hasDiscount = post.originalPrice && post.originalPrice > post.unitPrice;
-            const discountPercent = hasDiscount ? Math.round((1 - post.unitPrice / post.originalPrice) * 100) : 0;
-
-            return (
-              <motion.div
-                key={post.id}
-                whileHover={{ y: -3 }}
-                onClick={() => navigate(`/${rolePath}/posts/${post.id}`)}
-                className="bg-white rounded-2xl border border-gray-100 hover:border-green-300 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col cursor-pointer group"
-              >
-                {/* Food Image */}
-                <div className="relative h-44 bg-gray-100 overflow-hidden">
-                  {post.images && post.images.length > 0 ? (
-                    <img
-                      src={post.images[0]}
-                      alt={post.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                      <UtensilsCrossed size={32} />
-                    </div>
-                  )}
-
-                  {/* Top-Left Badges */}
-                  {isFree ? (
-                    <div className="absolute top-2.5 left-2.5 bg-[#2db84c] text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm">
-                      Miễn phí
-                    </div>
-                  ) : hasDiscount ? (
-                    <div className="absolute top-2.5 left-2.5 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-lg shadow-sm">
-                      -{discountPercent}%
-                    </div>
-                  ) : null}
-
-                  {/* Quantity Pill */}
-                  <div className="absolute bottom-2.5 right-2.5 bg-black/60 backdrop-blur-xs text-white text-[11px] font-medium px-2 py-0.5 rounded-md">
-                    Còn: <strong>{post.availableQuantity}</strong>/{post.totalQuantity || post.availableQuantity}
-                  </div>
-                </div>
-
-                {/* Food Info */}
-                <div className="p-4 flex-1 flex flex-col justify-between gap-3">
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-base line-clamp-1 group-hover:text-[#2db84c] transition-colors">
-                      {post.name}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
-                      <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 font-medium text-[11px]">
-                        {post.category?.name || 'Món ăn'}
-                      </span>
-                    </div>
-                    {post.description && (
-                      <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">
-                        {post.description}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Price & Action */}
-                  <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
-                    <div>
-                      {isFree ? (
-                        <p className="font-bold text-lg text-[#2db84c] leading-none">Miễn phí</p>
-                      ) : (
-                        <div className="flex items-baseline gap-1.5">
-                          <p className="font-bold text-lg text-gray-900 leading-none">{formatVND(post.unitPrice)}</p>
-                          {hasDiscount && (
-                            <span className="text-xs text-gray-400 line-through leading-none">{formatVND(post.originalPrice)}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={e => { e.stopPropagation(); navigate(`/${rolePath}/posts/${post.id}`); }}
-                      className="px-3.5 py-1.5 rounded-xl bg-[#2db84c] text-white text-xs font-semibold hover:bg-[#259e40] transition-colors flex items-center gap-1 shadow-sm shadow-green-500/20 cursor-pointer"
-                    >
-                      <span>Xem & Đặt</span>
-                      <ChevronRight size={13} />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+          {displayedPosts.map(post => (
+            <FoodCard
+              key={post.id}
+              post={{
+                ...post,
+                supplier: {
+                  name: supplierInfo.name,
+                  businessProfileId: Number(id),
+                },
+              }}
+              rolePath={rolePath as 'recipient' | 'organization'}
+              showDirectQuantity={true}
+            />
+          ))}
         </div>
       )}
 
@@ -813,6 +741,8 @@ export default function StoreDetailPage() {
           </div>
         )}
       </div>
+
+      {rolePath === 'organization' && <FloatingCartButton />}
     </div>
   );
 }

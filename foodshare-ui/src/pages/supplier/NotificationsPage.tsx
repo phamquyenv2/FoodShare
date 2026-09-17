@@ -133,8 +133,8 @@ export default function NotificationsPage() {
       navigate(`/supplier/posts?id=${notif.referenceId}`);
     } else if (notif.referenceType === 'PAYMENT' || notif.referenceType === 'PAYOUT') {
       navigate('/supplier/wallet');
-    } else if (notif.referenceType === 'REPORT') {
-      navigate('/supplier/reviews');
+    } else if (notif.referenceType === 'REPORT' || notif.notificationType === 'REPORT') {
+      navigate(notif.referenceId ? `/supplier/reports?reportId=${notif.referenceId}` : '/supplier/reports');
     }
   };
 

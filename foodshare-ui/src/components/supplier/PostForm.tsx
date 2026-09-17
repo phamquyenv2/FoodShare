@@ -28,6 +28,8 @@ export interface PostFormData {
   unitPrice: number;
   originalPrice: number;
   pickupAddress: string;
+  pickupLatitude?: number;
+  pickupLongitude?: number;
   pickupStartAt: string;
   pickupEndAt: string;
   expiresAt: string;
@@ -77,6 +79,8 @@ export default function PostForm({
     unitPrice: initialData?.unitPrice || 0,
     originalPrice: initialData?.originalPrice || 0,
     pickupAddress: initialData?.pickupAddress || (mode === 'create' ? storeAddress : ''),
+    pickupLatitude: initialData?.pickupLatitude,
+    pickupLongitude: initialData?.pickupLongitude,
     pickupStartAt: initialData?.pickupStartAt || '',
     pickupEndAt: initialData?.pickupEndAt || '',
     expiresAt: initialData?.expiresAt || '',
@@ -259,6 +263,8 @@ export default function PostForm({
         unitPrice: form.postType === 'FREE' ? 0 : form.unitPrice,
         originalPrice: form.postType === 'FREE' ? 0 : form.originalPrice,
         pickupAddress: form.pickupAddress.trim(),
+        pickupLatitude: form.pickupLatitude,
+        pickupLongitude: form.pickupLongitude,
         pickupStartAt: form.pickupStartAt,
         pickupEndAt: form.pickupEndAt,
         expiresAt: form.expiresAt,
@@ -555,6 +561,8 @@ export default function PostForm({
                     value={form.pickupAddress}
                     onChange={e => {
                       update('pickupAddress', e.target.value);
+                      update('pickupLatitude', undefined);
+                      update('pickupLongitude', undefined);
                       setIsLocationDropdownOpen(true);
                     }}
                     onFocus={() => {
@@ -598,6 +606,8 @@ export default function PostForm({
                         onClick={() => {
                           selectedAddressRef.current = item.formattedAddress;
                           update('pickupAddress', item.formattedAddress);
+                          update('pickupLatitude', item.latitude);
+                          update('pickupLongitude', item.longitude);
                           setLocationSuggestions([]);
                           setIsLocationDropdownOpen(false);
                         }}

@@ -26,6 +26,8 @@ export default function CreatePostPage() {
           unitPrice: data.unitPrice,
           originalPrice: data.originalPrice,
           pickupAddress: data.pickupAddress,
+          pickupLatitude: data.pickupLatitude,
+          pickupLongitude: data.pickupLongitude,
           pickupStartAt: new Date(data.pickupStartAt).toISOString(),
           pickupEndAt: new Date(data.pickupEndAt).toISOString(),
           expiresAt: new Date(data.expiresAt).toISOString(),

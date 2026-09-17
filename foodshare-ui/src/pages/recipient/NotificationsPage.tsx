@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Bell, BellOff, ShoppingBag, MessageSquare, AlertTriangle, Check, Loader2, CreditCard } from 'lucide-react';
 import { apiFetch } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { timeAgo } from '../../utils/format';
 
 interface NotificationItem {
@@ -33,7 +34,9 @@ const TABS = [
 
 export default function RecipientNotificationsPage() {
   const { showError } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const role = (user?.role || 'RECIPIENT').toLowerCase();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeTab, setActiveTab] = useState('ALL');
   const [isLoading, setIsLoading] = useState(true);
@@ -122,9 +125,42 @@ export default function RecipientNotificationsPage() {
 
   const handleClick = (notif: NotificationItem) => {
     if (!notif.isRead) markAsRead(notif.id);
-    // Navigate to relevant page based on type
-    if (notif.referenceType === 'ORDER' && notif.referenceId) {
-      navigate(`/recipient/orders/${notif.referenceId}`);
+
+    // 1. Report / Khiếu nại notifications
+    const isReport =
+      notif.referenceType === 'REPORT' ||
+      notif.notificationType === 'REPORT' ||
+      (notif.title && (notif.title.toLowerCase().includes('báo cáo') || notif.title.toLowerCase().includes('khiếu nại')));
+
+    if (isReport) {
+      if (notif.referenceId) {
+        navigate(`/${role}/reports?reportId=${notif.referenceId}`);
+      } else {
+        navigate(`/${role}/reports`);
+      }
+      return;
+    }
+
+    // 2. Order notifications
+    if (notif.referenceType === 'ORDER' || notif.notificationType === 'ORDER') {
+      if (notif.referenceId) {
+        navigate(`/${role}/orders/${notif.referenceId}`);
+      } else {
+        navigate(`/${role}/orders`);
+      }
+      return;
+    }
+
+    // 3. Food post notifications
+    if (notif.referenceType === 'FOOD_POST' && notif.referenceId) {
+      navigate(`/${role}/posts/${notif.referenceId}`);
+      return;
+    }
+
+    // 4. Review notifications
+    if (notif.referenceType === 'REVIEW' && notif.referenceId) {
+      navigate(`/${role}/orders/${notif.referenceId}`);
+      return;
     }
   };
 

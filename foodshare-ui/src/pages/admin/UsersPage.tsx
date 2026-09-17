@@ -36,6 +36,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -47,7 +48,7 @@ export default function UsersPage() {
     setIsLoading(true);
     try {
       let url = `/admin/users?page=${page}&size=20`;
-      if (search.trim()) url += `&keyword=${encodeURIComponent(search.trim())}`;
+       if (debouncedSearch) url += `&keyword=${encodeURIComponent(debouncedSearch)}`;
       if (roleFilter !== 'all') url += `&role=${roleFilter}`;
       const res = await apiFetch<any>(url);
       setUsers(res.content || []);
@@ -58,9 +59,10 @@ export default function UsersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, roleFilter, showError]);
+  }, [page, debouncedSearch, roleFilter, showError]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => { const timer = window.setTimeout(() => { setDebouncedSearch(search.trim()); setPage(0); }, 500); return () => window.clearTimeout(timer); }, [search]);
 
   const handleToggleStatus = async (userId: number, activate: boolean) => {
     setActionLoading(userId);

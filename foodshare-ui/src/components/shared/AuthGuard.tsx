@@ -37,8 +37,11 @@ export default function AuthGuard({ children, allowedRoles, requireProfileComple
     return <Navigate to="/auth/complete-profile" replace />;
   }
 
-  // Check verification status for SUPPLIER
-  if (requireProfileCompleted && user.role === 'SUPPLIER' && user.profile?.verificationStatus !== 'VERIFIED' && location.pathname !== '/auth/pending') {
+  // Check verification status for SUPPLIER and ORGANIZATION
+  if (requireProfileCompleted
+      && (user.role === 'SUPPLIER' || user.role === 'ORGANIZATION')
+      && user.profile?.verificationStatus !== 'VERIFIED'
+      && location.pathname !== '/auth/pending') {
     return <Navigate to="/auth/pending" replace />;
   }
 
