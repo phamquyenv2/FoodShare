@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Loader2, UtensilsCrossed, AlertTriangle, Star, Flag,
-  ArrowLeft, Clock, ShoppingBag, MapPin, User, Minus, Plus
+  Loader2, UtensilsCrossed, AlertTriangle, Flag,
+  ArrowLeft, Clock, ShoppingBag, MapPin, User, Minus, Plus, Star,
+  ShoppingCart, Check
 } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import { addToCart } from '../../services/cartService';
 import { formatVND } from '../../utils/format';
 
 interface PostDetail {
@@ -48,18 +52,23 @@ function getTimeLeft(expiresAt: string): { text: string; urgent: boolean } {
 }
 
 export default function FoodPostDetailPage() {
+  const { user } = useAuth();
+  const { showSuccess, showError } = useToast();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [post, setPost] = useState<PostDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [isOrdering, setIsOrdering] = useState(false);
+  const isOrderingRef = useRef(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
-  const [orderError, setOrderError] = useState('');
   const [activeImg, setActiveImg] = useState(0);
+  const [addedToCart, setAddedToCart] = useState(false);
   const location = useLocation();
-  const rolePath = location.pathname.split('/')[1] || 'recipient';
+
+  const isOrganization = user?.role === 'ORGANIZATION';
+  const rolePath = isOrganization ? 'organization' : (location.pathname.split('/')[1] || 'recipient');
+  const maxAllowedQuantity = isOrganization ? (post?.availableQuantity || 1) : 1;
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -67,17 +76,25 @@ export default function FoodPostDetailPage() {
         const data = await apiFetch<PostDetail>(`/food-posts/${id}`);
         setPost(data);
       } catch (err: any) {
-        setError(err.message || 'Không thể tải thông tin');
+        showError(err.message || 'Không thể tải thông tin');
       } finally {
         setIsLoading(false);
       }
     };
     if (id) fetchPost();
-  }, [id]);
+  }, [id, showError]);
+
+  const handleAddToCart = () => {
+    if (!post) return;
+    addToCart(post, quantity);
+    setAddedToCart(true);
+    showSuccess(`Đã thêm ${quantity} phần "${post.name}" vào giỏ hàng`);
+    setTimeout(() => setAddedToCart(false), 2500);
+  };
 
   const handleOrder = async () => {
-    if (!post) return;
-    setOrderError('');
+    if (!post || isOrderingRef.current || isOrdering) return;
+    isOrderingRef.current = true;
     setIsOrdering(true);
     try {
       await apiFetch('/orders', {
@@ -89,8 +106,9 @@ export default function FoodPostDetailPage() {
       });
       setOrderSuccess(true);
     } catch (err: any) {
-      setOrderError(err.message || 'Đặt hàng thất bại');
+      showError(err.message || 'Đặt hàng thất bại');
     } finally {
+      isOrderingRef.current = false;
       setIsOrdering(false);
     }
   };
@@ -103,7 +121,7 @@ export default function FoodPostDetailPage() {
     );
   }
 
-  if (error || !post) {
+  if (!post) {
     return (
       <div className="p-4 md:p-6 max-w-3xl mx-auto">
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-4 cursor-pointer">
@@ -111,7 +129,7 @@ export default function FoodPostDetailPage() {
         </button>
         <div className="text-center py-16 text-gray-400">
           <AlertTriangle size={48} className="mx-auto mb-3 opacity-50" />
-          <p className="text-sm">{error || 'Không tìm thấy bài đăng'}</p>
+          <p className="text-sm">Không tìm thấy bài đăng</p>
         </div>
       </div>
     );
@@ -141,13 +159,13 @@ export default function FoodPostDetailPage() {
           </p>
           <div className="flex gap-3">
             <button
-              onClick={() => navigate('/recipient/orders')}
+              onClick={() => navigate(isOrganization ? '/organization/orders' : '/recipient/orders')}
               className="flex-1 py-3 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] transition-all shadow-md shadow-green-500/20"
             >
               Xem đơn hàng
             </button>
             <button
-              onClick={() => navigate('/recipient')}
+              onClick={() => navigate(isOrganization ? '/organization' : '/recipient')}
               className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm cursor-pointer hover:bg-gray-50 transition-all"
             >
               Tiếp tục khám phá
@@ -160,15 +178,9 @@ export default function FoodPostDetailPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer">
+      <div className="mb-4">
+        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 cursor-pointer">
           <ArrowLeft size={16} /> Quay lại
-        </button>
-        <button 
-          onClick={() => navigate(`/${rolePath}/report/${id}?type=FOOD_POST`)} 
-          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
-        >
-          <Flag size={14} /> Báo cáo
         </button>
       </div>
 
@@ -187,9 +199,8 @@ export default function FoodPostDetailPage() {
               )}
               {/* Expiry */}
               <div className="absolute top-3 right-3">
-                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold backdrop-blur-md flex items-center gap-1 ${
-                  timeLeft.urgent ? 'bg-red-500/90 text-white' : 'bg-black/50 text-white'
-                }`}>
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold backdrop-blur-md flex items-center gap-1 ${timeLeft.urgent ? 'bg-red-500/90 text-white' : 'bg-black/50 text-white'
+                  }`}>
                   <Clock size={12} /> {timeLeft.text}
                 </span>
               </div>
@@ -200,9 +211,8 @@ export default function FoodPostDetailPage() {
                   <button
                     key={i}
                     onClick={() => setActiveImg(i)}
-                    className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 cursor-pointer transition-all ${
-                      activeImg === i ? 'border-[#2db84c] shadow-sm' : 'border-transparent opacity-60 hover:opacity-100'
-                    }`}
+                    className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border-2 cursor-pointer transition-all ${activeImg === i ? 'border-[#2db84c] shadow-sm' : 'border-transparent opacity-60 hover:opacity-100'
+                      }`}
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
                   </button>
@@ -235,7 +245,7 @@ export default function FoodPostDetailPage() {
               <div className="p-3 rounded-xl bg-gray-50">
                 <p className="text-xs text-gray-500 mb-0.5">Giá</p>
                 <p className="font-semibold text-gray-900">
-                  {post.postType === 'FREE' ? '🎁 Miễn phí' : formatVND(post.unitPrice) + ' / phần'}
+                  {post.postType === 'FREE' ? 'Miễn phí' : formatVND(post.unitPrice) + ' / phần'}
                 </p>
               </div>
             </div>
@@ -264,14 +274,23 @@ export default function FoodPostDetailPage() {
           </div>
 
           {/* Supplier Info */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Nhà cung cấp</h3>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <h3 className="text-xs font-semibold text-gray-700 mb-2.5">Nhà cung cấp</h3>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-                {post.supplier?.name?.charAt(0)?.toUpperCase() || <User size={20} />}
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-base font-bold flex-shrink-0 shadow-xs">
+                {post.supplier?.name?.charAt(0)?.toUpperCase() || <User size={18} />}
               </div>
-              <div>
-                <p className="font-semibold text-gray-900">{post.supplier?.name || 'Không rõ'}</p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-gray-900 text-sm truncate">{post.supplier?.name || 'Không rõ'}</p>
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200/60 text-amber-700 text-[11px] font-semibold">
+                    <Star size={11} className="text-amber-400 fill-amber-400 shrink-0" />
+                    <span>{(post.supplier as any)?.rating ? (post.supplier as any).rating.toFixed(1) : '5.0'}</span>
+                    <span className="text-[10px] text-amber-600/70 font-normal">
+                      ({(post.supplier as any)?.reviewCount ?? 0} đánh giá)
+                    </span>
+                  </div>
+                </div>
                 {post.supplier?.description && (
                   <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{post.supplier.description}</p>
                 )}
@@ -286,7 +305,18 @@ export default function FoodPostDetailPage() {
           className="md:sticky md:top-20 h-fit"
         >
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <h3 className="font-semibold text-gray-900 mb-4">Đặt hàng</h3>
+            <div className="flex items-center justify-between mb-4 pb-2.5 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Đặt hàng</h3>
+              <button
+                type="button"
+                onClick={() => navigate(`/${rolePath}/report/${id}?type=FOOD_POST`)}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors cursor-pointer px-2 py-1 rounded-lg hover:bg-red-50"
+                title="Báo cáo bài đăng"
+              >
+                <Flag size={13} />
+                <span>Báo cáo</span>
+              </button>
+            </div>
 
             {!isAvailable ? (
               <div className="p-4 bg-gray-50 rounded-xl text-center">
@@ -297,24 +327,46 @@ export default function FoodPostDetailPage() {
               <>
                 {/* Quantity selector */}
                 <div className="mb-4">
-                  <p className="text-sm text-gray-600 mb-2">Số lượng</p>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-gray-600 font-medium">Số lượng</p>
+                    <span className="text-xs text-gray-400">
+                      {isOrganization ? `Tối đa ${post.availableQuantity} phần` : 'Tối đa 1 phần'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
                     <button
+                      type="button"
                       onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                      disabled={quantity <= 1}
-                      className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-30"
+                      disabled={isOrdering || quantity <= 1}
+                      className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Minus size={16} />
                     </button>
-                    <span className="text-lg font-bold text-gray-900 w-10 text-center">{quantity}</span>
+                    {isOrganization ? (
+                      <input
+                        type="number"
+                        min={1}
+                        max={maxAllowedQuantity}
+                        disabled={isOrdering}
+                        value={quantity}
+                        onChange={e => {
+                          const val = parseInt(e.target.value, 10);
+                          if (isNaN(val)) setQuantity(1);
+                          else setQuantity(Math.max(1, Math.min(maxAllowedQuantity, val)));
+                        }}
+                        className="w-16 h-10 text-center font-bold text-gray-900 border border-gray-200 rounded-xl focus:border-[#2db84c] focus:outline-hidden text-base"
+                      />
+                    ) : (
+                      <span className="text-lg font-bold text-gray-900 w-12 text-center">{quantity}</span>
+                    )}
                     <button
-                      onClick={() => setQuantity(q => Math.min(post.availableQuantity, q + 1))}
-                      disabled={quantity >= post.availableQuantity}
-                      className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-30"
+                      type="button"
+                      onClick={() => setQuantity(q => Math.min(maxAllowedQuantity, q + 1))}
+                      disabled={isOrdering || quantity >= maxAllowedQuantity}
+                      className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Plus size={16} />
                     </button>
-                    <span className="text-xs text-gray-400 ml-auto">Tối đa {post.availableQuantity}</span>
                   </div>
                 </div>
 
@@ -331,23 +383,44 @@ export default function FoodPostDetailPage() {
                   <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between">
                     <span className="text-sm font-semibold text-gray-900">Tổng cộng</span>
                     <span className={`text-lg font-bold ${post.postType === 'FREE' ? 'text-[#2db84c]' : 'text-gray-900'}`}>
-                      {post.postType === 'FREE' ? '🎁 Miễn phí' : formatVND(totalPrice)}
+                      {post.postType === 'FREE' ? 'Miễn phí' : formatVND(totalPrice)}
                     </span>
                   </div>
                 </div>
 
-                {orderError && (
-                  <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100 mb-4">{orderError}</div>
-                )}
+                {isOrganization ? (
+                  <div className="flex flex-col gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      disabled={isOrdering}
+                      className="w-full py-3 rounded-xl border-2 border-[#2db84c] text-[#2db84c] hover:bg-green-50 font-semibold text-sm cursor-pointer active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
+                      {addedToCart ? <Check size={16} /> : <ShoppingCart size={16} />}
+                      {addedToCart ? 'Đã thêm vào giỏ hàng' : 'Thêm vào giỏ hàng'}
+                    </button>
 
-                <button
-                  onClick={handleOrder}
-                  disabled={isOrdering}
-                  className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-70 flex items-center justify-center gap-2"
-                >
-                  {isOrdering ? <Loader2 size={16} className="animate-spin" /> : <ShoppingBag size={16} />}
-                  {isOrdering ? 'Đang xử lý...' : 'Đặt hàng ngay'}
-                </button>
+                    <button
+                      type="button"
+                      onClick={handleOrder}
+                      disabled={isOrdering}
+                      className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isOrdering ? <Loader2 size={16} className="animate-spin" /> : <ShoppingBag size={16} />}
+                      {isOrdering ? 'Đang xử lý...' : 'Đặt hàng ngay'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleOrder}
+                    disabled={isOrdering}
+                    className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2"
+                  >
+                    {isOrdering ? <Loader2 size={16} className="animate-spin" /> : <ShoppingBag size={16} />}
+                    {isOrdering ? 'Đang xử lý...' : 'Đặt hàng ngay'}
+                  </button>
+                )}
               </>
             )}
           </div>

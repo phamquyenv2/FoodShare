@@ -1,0 +1,23 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "foodshare: classes",
+            "type": "shell",
+            "command": ".\\gradlew.bat",
+            "args": [
+                "classes",
+                "--console=plain"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/foodshare"
+            },
+            "group": "build",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated"
+            }
+        }
+    ]
+}

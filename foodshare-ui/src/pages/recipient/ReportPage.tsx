@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Flag, Loader2, CheckCircle, ImagePlus, X } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 
 const ALL_REPORT_TYPES = {
   ORDER: [
@@ -29,6 +30,7 @@ const ALL_REPORT_TYPES = {
 };
 
 export default function ReportPage() {
+  const { showError } = useToast();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const refType = searchParams.get('type') || 'ORDER';
@@ -37,10 +39,10 @@ export default function ReportPage() {
   
   const navigate = useNavigate();
   const [reportType, setReportType] = useState('');
+  const [reportTypeInvalid, setReportTypeInvalid] = useState(false);
   const [reason, setReason] = useState('');
   const [images, setImages] = useState<{ file: File, preview: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,14 +65,10 @@ export default function ReportPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reportType) {
-      setError('Vui lòng chọn loại báo cáo');
+      setReportTypeInvalid(true);
+      showError('Vui lòng chọn loại báo cáo');
       return;
     }
-    if (!reason.trim()) {
-      setError('Vui lòng nhập nội dung báo cáo');
-      return;
-    }
-    setError('');
     setIsLoading(true);
     try {
       let finalEvidenceUrl = null;
@@ -98,7 +96,7 @@ export default function ReportPage() {
       });
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Gửi báo cáo thất bại');
+      showError(err.message || 'Gửi báo cáo thất bại');
     } finally {
       setIsLoading(false);
     }
@@ -144,11 +142,7 @@ export default function ReportPage() {
         </h1>
         <p className="text-sm text-gray-500 mb-6">Cho chúng tôi biết vấn đề bạn gặp phải</p>
 
-        {error && (
-          <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100 mb-4">{error}</div>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* Report Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Phân loại <span className="text-red-500">*</span></label>
@@ -157,11 +151,13 @@ export default function ReportPage() {
                 <button
                   key={rt.key}
                   type="button"
-                  onClick={() => setReportType(rt.key)}
+                  onClick={() => { setReportType(rt.key); setReportTypeInvalid(false); }}
                   className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all ${
                     reportType === rt.key
                       ? 'border-[#2db84c] bg-[#2db84c]/5'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : reportTypeInvalid
+                        ? 'border-red-400 bg-red-50/40'
+                        : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <p className="text-sm font-medium text-gray-900">{rt.label}</p>
@@ -178,6 +174,7 @@ export default function ReportPage() {
               value={reason}
               onChange={e => setReason(e.target.value)}
               rows={4}
+              required
               placeholder="Mô tả chi tiết vấn đề bạn gặp phải..."
               className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2db84c]/30 focus:border-[#2db84c] transition-all resize-none"
             />

@@ -9,19 +9,43 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import jakarta.persistence.OptimisticLockException;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final String SYSTEM_ERROR_MESSAGE = "Lỗi hệ thống, xin lỗi vì sự bất tiện này.";
+
+    @ExceptionHandler(value = {
+            ObjectOptimisticLockingFailureException.class,
+            OptimisticLockException.class
+    })
+    public ResponseEntity<RestResponse<Object>> handleOptimisticLockingException(Exception ex) {
+        log.warn("Optimistic locking conflict: {}", ex.getMessage());
+        RestResponse<Object> res = new RestResponse<>();
+        res.setStatusCode(HttpStatus.CONFLICT.value());
+        res.setError("Conflict");
+        res.setMessage("Số lượng thực phẩm vừa được cập nhật bởi một yêu cầu khác. Vui lòng làm mới và thử lại.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(res);
+    }
 
     @ExceptionHandler(value = {
             IdInvalidException.class,
@@ -74,9 +98,42 @@ public class GlobalExceptionHandler {
         BindingResult result = ex.getBindingResult();
         List<FieldError> fieldErrors = result.getFieldErrors();
 
-        List<String> errors = fieldErrors.stream()
-                .map(f -> f.getField() + ": " + f.getDefaultMessage())
-                .toList();
+        Map<String, List<FieldError>> errorsByField = fieldErrors.stream()
+                .collect(Collectors.groupingBy(
+                        FieldError::getField,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
+        List<String> errors = new ArrayList<>();
+
+        for (List<FieldError> errorsForField : errorsByField.values()) {
+            if (errorsForField.isEmpty()) {
+                continue;
+            }
+            // Prioritize NotBlank / NotEmpty / NotNull when a field is empty/missing
+            FieldError selected = errorsForField.stream()
+                    .filter(err -> {
+                        String code = err.getCode();
+                        return "NotBlank".equals(code) || "NotEmpty".equals(code) || "NotNull".equals(code);
+                    })
+                    .findFirst()
+                    .orElse(errorsForField.get(0));
+
+            String msg = selected.getDefaultMessage();
+            if (msg != null && !msg.isBlank()) {
+                errors.add(msg);
+            }
+        }
+
+        for (ObjectError globalError : result.getGlobalErrors()) {
+            String msg = globalError.getDefaultMessage();
+            if (msg != null && !msg.isBlank()) {
+                errors.add(msg);
+            }
+        }
+
+        errors = errors.stream().distinct().toList();
 
         RestResponse<Object> res = new RestResponse<>();
         res.setStatusCode(HttpStatus.BAD_REQUEST.value());
@@ -103,13 +160,32 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(res);
     }
 
+    @ExceptionHandler(ExternalServiceException.class)
+    public ResponseEntity<RestResponse<Object>> handleExternalServiceException(ExternalServiceException ex) {
+        log.error("External service failure", ex);
+        RestResponse<Object> res = new RestResponse<>();
+        res.setStatusCode(HttpStatus.SERVICE_UNAVAILABLE.value());
+        res.setError("Service Unavailable");
+        res.setMessage(SYSTEM_ERROR_MESSAGE);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(res);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<RestResponse<Object>> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        RestResponse<Object> res = new RestResponse<>();
+        res.setStatusCode(HttpStatus.BAD_REQUEST.value());
+        res.setError("Bad Request");
+        res.setMessage("Tham số yêu cầu không hợp lệ: " + ex.getName());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<RestResponse<Object>> handleAllExceptions(Exception ex) {
         log.error("Unhandled exception: {}", ex.getMessage(), ex);
         RestResponse<Object> res = new RestResponse<>();
         res.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
         res.setError("Internal Server Error");
-        res.setMessage(ex.getMessage() != null ? ex.getMessage() : "Đã xảy ra lỗi không xác định trên hệ thống");
+        res.setMessage(SYSTEM_ERROR_MESSAGE);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(res);
     }
 }

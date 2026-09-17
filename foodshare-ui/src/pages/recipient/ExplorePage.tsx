@@ -2,12 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Search, Filter, MapPin, Sparkles, ChevronDown,
-  Loader2, UtensilsCrossed, X,
-} from 'lucide-react';
+  Search, Filter, MapPin, Loader2, UtensilsCrossed, X, Flame, Zap } from 'lucide-react';
 import { apiFetch } from '../../services/api';
-import { formatVND } from '../../utils/format';
-import HorizontalFoodCard from '../../components/recipient/HorizontalFoodCard';
+import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatVND, formatDisplayName, formatTimeRemaining } from '../../utils/format';
 
 interface FoodPostItem {
   id: number;
@@ -23,18 +22,18 @@ interface FoodPostItem {
   postStatus: string;
   pickupAddress: string;
   expiresAt: string;
-  supplier: { name: string };
+  supplier?: {
+    name: string;
+    businessProfileId?: number;
+    description?: string;
+  };
   supplierAvatar?: string;
   distanceKm?: number;
   matchScore?: number;
 }
 
-const CATEGORIES = [
-  { id: 0, name: 'Tất cả' },
-  { id: 1, name: 'Cơm' }, { id: 2, name: 'Phở / Bún' }, { id: 3, name: 'Bánh mì' },
-  { id: 4, name: 'Đồ uống' }, { id: 5, name: 'Trái cây' }, { id: 6, name: 'Rau củ' },
-  { id: 7, name: 'Đồ khô' }, { id: 8, name: 'Khác' },
-];
+import { getCategories, DEFAULT_CATEGORIES, type Category } from '../../services/categoryApi';
+import StoreCard from '../../components/shared/StoreCard';
 
 const TYPE_FILTERS = [
   { key: 'all', label: 'Tất cả' },
@@ -45,18 +44,30 @@ const TYPE_FILTERS = [
 
 
 export default function ExplorePage() {
+  const { showError } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<FoodPostItem[]>([]);
   const [recommendations, setRecommendations] = useState<FoodPostItem[]>([]);
+  const [recommendationMode, setRecommendationMode] = useState<"BEST_MATCH" | "URGENT">("BEST_MATCH");
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState(0);
+  const [categories, setCategories] = useState<Category[]>([{ id: 0, name: 'Tất cả' }, ...DEFAULT_CATEGORIES]);
+  const [ratingsMap, setRatingsMap] = useState<Record<number, { averageRating: number | null; totalReviews: number }>>({});
+
+  useEffect(() => {
+    getCategories().then(list => {
+      if (list && list.length > 0) {
+        setCategories([{ id: 0, name: 'Tất cả' }, ...list]);
+      }
+    });
+  }, []);
   const [typeFilter, setTypeFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   
-  // New UI states
   const [distance, setDistance] = useState(5);
   const [maxPrice, setMaxPrice] = useState(50000);
   const [timeFilter, setTimeFilter] = useState('all');
@@ -76,24 +87,41 @@ export default function ExplorePage() {
       setPosts(res.content || []);
       setTotalPages(res.totalPages || 0);
     } catch (err) {
-      console.error('Failed to fetch posts:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải bài đăng');
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, categoryId, typeFilter]);
+  }, [page, search, categoryId, typeFilter, showError]);
 
-  const fetchRecommendations = useCallback(async () => {
+  const fetchRecommendations = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await apiFetch<any>('/matching/recommendations?size=6');
-      setRecommendations(res.content || res || []);
+      const res = await apiFetch<any>(`/matching/recommendations?size=6&mode=${recommendationMode}`, { signal });
+      if (!signal?.aborted) setRecommendations(res.content || res || []);
     } catch {
-      // Recommendations are optional
-      setRecommendations([]);
+      if (!signal?.aborted) setRecommendations([]);
     }
-  }, []);
+  }, [recommendationMode]);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
-  useEffect(() => { fetchRecommendations(); }, [fetchRecommendations]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchRecommendations(controller.signal);
+    return () => controller.abort();
+  }, [fetchRecommendations]);
+
+  // Fetch real review ratings for stores on page
+  useEffect(() => {
+    if (posts.length === 0) return;
+    const bpIds = Array.from(new Set(
+      posts.map(p => p.supplier?.businessProfileId).filter((id): id is number => typeof id === 'number' && id > 0)
+    ));
+    if (bpIds.length === 0) return;
+    apiFetch<Record<number, { averageRating: number | null; totalReviews: number }>>(`/reviews/business/summaries?ids=${bpIds.join(',')}`)
+      .then(res => {
+        if (res) setRatingsMap(prev => ({ ...prev, ...res }));
+      })
+      .catch(() => {});
+  }, [posts]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,16 +130,33 @@ export default function ExplorePage() {
   };
 
   const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } };
-  const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.25 } } };
 
   const groupedPosts = useMemo(() => {
-    const groups: Record<string, { supplier: { name: string; avatar?: string }; posts: FoodPostItem[] }> = {};
+    const groups: Record<string, {
+      supplier: {
+        name: string;
+        avatar?: string;
+        businessProfileId?: number;
+        address?: string;
+      };
+      posts: FoodPostItem[];
+    }> = {};
     for (const post of posts) {
       const supplierName = post.supplier?.name || 'Quán ăn chưa rõ';
-      if (!groups[supplierName]) {
-        groups[supplierName] = { supplier: { name: supplierName, avatar: post.supplierAvatar }, posts: [] };
+      const bpId = post.supplier?.businessProfileId;
+      const key = bpId ? `bp_${bpId}` : supplierName;
+      if (!groups[key]) {
+        groups[key] = {
+          supplier: {
+            name: supplierName,
+            avatar: post.supplierAvatar,
+            businessProfileId: bpId,
+            address: post.pickupAddress,
+          },
+          posts: [],
+        };
       }
-      groups[supplierName].posts.push(post);
+      groups[key].posts.push(post);
     }
     return Object.values(groups);
   }, [posts]);
@@ -120,7 +165,7 @@ export default function ExplorePage() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
       {/* Header */}
       <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Khám phá món ăn</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Xin chào, {formatDisplayName(user?.fullName)}</h1>
         <p className="text-sm text-gray-500 mt-0.5">Tìm kiếm thực phẩm được chia sẻ gần bạn</p>
       </div>
 
@@ -172,10 +217,10 @@ export default function ExplorePage() {
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide flex items-center justify-between">
                   Danh mục
-                  <span className="text-gray-400 font-normal normal-case">{CATEGORIES.find(c => c.id === categoryId)?.name}</span>
+                  <span className="text-gray-400 font-normal normal-case">{categories.find(c => c.id === categoryId)?.name}</span>
                 </p>
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
-                  {CATEGORIES.map(c => (
+                  {categories.map(c => (
                     <button
                       key={c.id}
                       onClick={() => { setCategoryId(c.id); setPage(0); }}
@@ -299,57 +344,115 @@ export default function ExplorePage() {
 
       {/* Recommendations Section */}
       {recommendations.length > 0 && !search && categoryId === 0 && typeFilter === 'all' && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-              <Sparkles size={16} className="text-white" />
-            </div>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div>
-              <h2 className="text-sm font-bold text-gray-900">Gợi ý cho bạn</h2>
-              <p className="text-xs text-gray-400">Dựa trên vị trí và sở thích</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight">Gợi ý cho bạn</h2>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors ${
+                  recommendationMode === "BEST_MATCH"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                    : "bg-amber-50 text-amber-700 border-amber-200/60"
+                }`}>
+                  {recommendationMode === "BEST_MATCH" ? "Gần bạn nhất" : "⚡ Giải cứu gấp"}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {recommendationMode === "BEST_MATCH"
+                  ? "Tối ưu món ăn gần bạn nhất với lượng phần dồi dào"
+                  : "Món ăn sắp hết hạn trong ngày cần nhận sớm để tránh lãng phí"}
+              </p>
+            </div>
+
+            <div className="inline-flex items-center p-1 bg-gray-100/90 rounded-xl border border-gray-200/60 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setRecommendationMode("BEST_MATCH")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  recommendationMode === "BEST_MATCH"
+                    ? "bg-white text-emerald-700 shadow-xs border border-emerald-100"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                <MapPin size={13} className={recommendationMode === "BEST_MATCH" ? "text-emerald-600" : "text-gray-400"} />
+                Gần bạn nhất
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecommendationMode("URGENT")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  recommendationMode === "URGENT"
+                    ? "bg-white text-amber-700 shadow-xs border border-amber-100"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                <Flame size={13} className={recommendationMode === "URGENT" ? "text-amber-500 fill-amber-500" : "text-gray-400"} />
+                Giải cứu gấp
+              </button>
             </div>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-            {recommendations.map(post => (
-              <motion.div
-                key={`rec-${post.id}`}
-                whileHover={{ scale: 1.02 }}
-                onClick={() => navigate(`/recipient/posts/${post.id}`)}
-                className="min-w-[200px] max-w-[200px] bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer hover:shadow-md transition-shadow flex-shrink-0"
-              >
-                <div className="h-28 bg-gray-100 relative">
-                  {post.images && post.images.length > 0 ? (
-                    <img src={post.images[0]} alt={post.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <UtensilsCrossed size={24} className="text-gray-300" />
-                    </div>
-                  )}
-                  {post.matchScore != null && post.matchScore > 0 && (
-                    <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-amber-500/90 text-white text-[10px] font-bold backdrop-blur-sm">
-                      ⚡ {Math.round(post.matchScore)}%
-                    </span>
-                  )}
-                </div>
-                <div className="p-3">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{post.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5 truncate">{post.supplier?.name}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className={`text-xs font-bold ${post.postType === 'FREE' ? 'text-[#2db84c]' : 'text-gray-900'}`}>
-                      {post.postType === 'FREE' ? '🎁 Miễn phí' : (
-                        <div className="flex flex-col">
-                          {post.originalPrice && post.originalPrice > post.unitPrice && (
-                            <span className="text-[10px] line-through text-gray-400 font-normal">{formatVND(post.originalPrice)}</span>
-                          )}
-                          <span>{formatVND(post.unitPrice)}</span>
-                        </div>
-                      )}
-                    </span>
-                    <span className="text-[10px] text-gray-400">SL: {post.availableQuantity}</span>
+            {recommendations.map(post => {
+              const timeInfo = formatTimeRemaining(post.expiresAt);
+              return (
+                <motion.div
+                  key={`rec-${post.id}`}
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => navigate(`/recipient/posts/${post.id}`)}
+                  className="min-w-[200px] max-w-[200px] bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer hover:shadow-md transition-shadow flex-shrink-0"
+                >
+                  <div className="h-28 bg-gray-100 relative">
+                    {post.images && post.images.length > 0 ? (
+                      <img src={post.images[0]} alt={post.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <UtensilsCrossed size={24} className="text-gray-300" />
+                      </div>
+                    )}
+
+                    {/* Top Left: Distance */}
+                    {post.distanceKm != null && (
+                      <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-lg bg-black/65 backdrop-blur-sm text-white text-[10px] font-bold flex items-center gap-1 shadow-xs">
+                        <MapPin size={10} className="text-emerald-400 shrink-0" />
+                        {post.distanceKm < 1 ? `${Math.round(post.distanceKm * 1000)}m` : `${post.distanceKm.toFixed(1)} km`}
+                      </span>
+                    )}
+
+                    {/* Top Right: Mode-Specific Badge */}
+                    {recommendationMode === "URGENT" ? (
+                      <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-lg text-white text-[10px] font-bold flex items-center gap-1 shadow-xs ${
+                        timeInfo.isUrgent ? 'bg-amber-500/95' : 'bg-gray-800/85'
+                      }`}>
+                        <Flame size={10} className="text-amber-200 shrink-0 fill-amber-200" />
+                        {timeInfo.text || "Hôm nay"}
+                      </span>
+                    ) : post.matchScore != null && post.matchScore > 0 ? (
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-emerald-600/90 backdrop-blur-sm text-white text-[10px] font-bold flex items-center gap-1 shadow-xs">
+                        <Zap size={10} className="text-emerald-200 shrink-0 fill-emerald-200" />
+                        {Math.round(post.matchScore)}%
+                      </span>
+                    ) : null}
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="p-3">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{post.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">{post.supplier?.name}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className={`text-xs font-bold ${post.postType === 'FREE' ? 'text-[#2db84c]' : 'text-gray-900'}`}>
+                        {post.postType === 'FREE' ? 'Miễn phí' : (
+                          <div className="flex flex-col">
+                            {post.originalPrice && post.originalPrice > post.unitPrice && (
+                              <span className="text-[10px] line-through text-gray-400 font-normal">{formatVND(post.originalPrice)}</span>
+                            )}
+                            <span>{formatVND(post.unitPrice)}</span>
+                          </div>
+                        )}
+                      </span>
+                      <span className="text-[10px] text-gray-400">SL: {post.availableQuantity}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </motion.div>
       )}
@@ -366,38 +469,15 @@ export default function ExplorePage() {
           {search && <p className="text-xs mt-1">Thử tìm kiếm với từ khóa khác</p>}
         </div>
       ) : (
-        <motion.div className="grid grid-cols-1 lg:grid-cols-2 gap-6" variants={stagger} initial="hidden" animate="show">
+        <motion.div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5" variants={stagger} initial="hidden" animate="show">
           {groupedPosts.map((group, idx) => (
-            <motion.div key={idx} variants={fadeUp} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-              {/* Supplier Header */}
-              <div className="p-4 flex items-center gap-4 bg-gray-50/50 border-b border-gray-100">
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-xl font-bold flex-shrink-0 shadow-inner">
-                  {group.supplier.avatar ? (
-                    <img src={group.supplier.avatar} className="w-full h-full rounded-xl object-cover" alt="" />
-                  ) : (
-                    group.supplier.name.charAt(0).toUpperCase()
-                  )}
-                </div>
-                <div className="flex-1">
-                  <h2 className="text-lg font-bold text-gray-900 line-clamp-1">{group.supplier.name}</h2>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="flex items-center text-xs font-semibold text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md">⭐ 5.0 (99+)</span>
-                    <span className="text-gray-300">•</span>
-                    <span className="text-xs text-gray-500 flex items-center gap-1 line-clamp-1"><MapPin size={12}/> {group.posts[0].pickupAddress}</span>
-                  </div>
-                </div>
-                <button className="text-[#2db84c] font-medium text-xs px-3 py-1.5 rounded-lg bg-[#2db84c]/10 hover:bg-[#2db84c]/20 transition-colors whitespace-nowrap">
-                  Tới quán
-                </button>
-              </div>
-
-              {/* Posts Content */}
-              <div className="p-4 grid grid-rows-2 grid-flow-col gap-3 overflow-x-auto pb-4 snap-x">
-                {group.posts.map(post => (
-                  <HorizontalFoodCard key={post.id} post={post} />
-                ))}
-              </div>
-            </motion.div>
+            <StoreCard
+              key={idx}
+              supplier={group.supplier}
+              posts={group.posts}
+              ratingsMap={ratingsMap}
+              rolePath="recipient"
+            />
           ))}
         </motion.div>
       )}

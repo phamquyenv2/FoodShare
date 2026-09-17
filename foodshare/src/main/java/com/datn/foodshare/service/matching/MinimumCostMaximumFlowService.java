@@ -3,6 +3,7 @@ package com.datn.foodshare.service.matching;
 import com.datn.foodshare.domain.entity.FoodPost;
 import com.datn.foodshare.service.matching.MatchingScoreCalculator.MatchingScoreResult;
 import com.datn.foodshare.util.constant.PostStatus;
+import com.datn.foodshare.util.constant.Role;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -61,6 +62,12 @@ public class MinimumCostMaximumFlowService {
             return AllocationResult.empty();
         }
 
+        Map<Long, Long> policyCapacities = new HashMap<>();
+        for (PreparedCandidateSet set : preparedSets) {
+            for (PreparedCandidate candidate : set.candidates())
+                policyCapacities.merge(candidate.candidateId(), candidate.receiverCapacity(), Math::min);
+        }
+
         List<Long> orderedCandidateIds = candidateIds.stream().sorted().toList();
         int source = 0;
         int firstFoodPostNode = 1;
@@ -74,7 +81,8 @@ public class MinimumCostMaximumFlowService {
             int candidateNode = firstCandidateNode + index;
             candidateNodes.put(candidateId, candidateNode);
             Integer configuredCapacity = recipientCapacities.get(candidateId);
-            long capacity = configuredCapacity == null ? totalSupply : configuredCapacity;
+            long capacity = Math.min(configuredCapacity == null ? totalSupply : configuredCapacity,
+                    policyCapacities.getOrDefault(candidateId, Long.MAX_VALUE));
             network.addEdge(candidateNode, sink, capacity, 0.0);
         }
 
@@ -89,7 +97,7 @@ public class MinimumCostMaximumFlowService {
                         candidate.candidateId(),
                         candidateSet.availableQuantity()
                 );
-                long capacity = Math.min(candidateSet.availableQuantity(), recipientCapacity);
+                long capacity = Math.min(Math.min(candidateSet.availableQuantity(), recipientCapacity), candidate.edgeCapacity());
                 FlowEdge edge = network.addEdge(
                         foodPostNode,
                         candidateNodes.get(candidate.candidateId()),
@@ -146,10 +154,14 @@ public class MinimumCostMaximumFlowService {
                     throw new IllegalArgumentException("Top-K candidate ID phải khác null");
                 }
                 validateScore(result.score());
+                Role role = result.candidate().getRole();
+                if (result.activeOrderCount() < 0) throw new IllegalArgumentException("Negative active order count");
+                long remainingSlots = Math.max(0, 2 - result.activeOrderCount());
+                long receiverLimit = role == Role.RECIPIENT ? remainingSlots
+                        : role == Role.ORGANIZATION && remainingSlots == 0 ? 0 : Long.MAX_VALUE;
                 PreparedCandidate prepared = new PreparedCandidate(
-                        result.candidate().getId(),
-                        result.score()
-                );
+                        result.candidate().getId(), result.score(),
+                        role == Role.RECIPIENT ? 1 : Long.MAX_VALUE, receiverLimit);
                 bestCandidateById.merge(
                         prepared.candidateId(),
                         prepared,
@@ -239,7 +251,7 @@ public class MinimumCostMaximumFlowService {
     ) {
     }
 
-    private record PreparedCandidate(long candidateId, double score) {
+    private record PreparedCandidate(long candidateId, double score, long edgeCapacity, long receiverCapacity) {
     }
 
     private record AllocationArc(long foodPostId, long candidateId, double score, FlowEdge edge) {
@@ -277,63 +289,60 @@ public class MinimumCostMaximumFlowService {
 
         private FlowResult solve(int source, int sink) {
             long totalFlow = 0;
-            double totalCost = 0.0;
+            double totalCost = 0;
             int nodeCount = adjacency.size();
-
+            // Initial forward costs are 1-score >= 0, hence zero potentials are feasible.
+            double[] potential = new double[nodeCount];
+            final double epsilon = 1e-12;
             while (true) {
                 double[] distance = new double[nodeCount];
                 Arrays.fill(distance, Double.POSITIVE_INFINITY);
-                distance[source] = 0.0;
-                int[] previousNode = new int[nodeCount];
-                int[] previousEdge = new int[nodeCount];
+                distance[source] = 0;
+                int[] previousNode = new int[nodeCount], previousEdge = new int[nodeCount];
                 Arrays.fill(previousNode, -1);
-
-                for (int iteration = 0; iteration < nodeCount - 1; iteration++) {
-                    boolean changed = false;
-                    for (int from = 0; from < nodeCount; from++) {
-                        if (!Double.isFinite(distance[from])) {
-                            continue;
-                        }
-                        List<FlowEdge> edges = adjacency.get(from);
-                        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++) {
-                            FlowEdge edge = edges.get(edgeIndex);
-                            if (edge.capacity == 0) {
-                                continue;
-                            }
-                            double candidateDistance = distance[from] + edge.cost;
-                            if (candidateDistance < distance[edge.to]) {
-                                distance[edge.to] = candidateDistance;
-                                previousNode[edge.to] = from;
-                                previousEdge[edge.to] = edgeIndex;
-                                changed = true;
-                            }
+                boolean[] settled = new boolean[nodeCount];
+                java.util.PriorityQueue<QueueEntry> queue = new java.util.PriorityQueue<>(
+                        Comparator.comparingDouble(QueueEntry::distance).thenComparingInt(QueueEntry::node));
+                queue.add(new QueueEntry(source, 0));
+                while (!queue.isEmpty()) {
+                    QueueEntry entry = queue.remove();
+                    int from = entry.node();
+                    if (settled[from] || entry.distance() > distance[from] + epsilon) continue;
+                    settled[from] = true;
+                    List<FlowEdge> edges = adjacency.get(from);
+                    for (int index = 0; index < edges.size(); index++) {
+                        FlowEdge edge = edges.get(index);
+                        if (edge.capacity == 0 || settled[edge.to]) continue;
+                        double reducedCost = edge.cost + potential[from] - potential[edge.to];
+                        if (reducedCost < -epsilon)
+                            throw new IllegalStateException("Infeasible residual potential");
+                        double next = distance[from] + Math.max(0, reducedCost);
+                        if (next + epsilon < distance[edge.to]) {
+                            distance[edge.to] = next;
+                            previousNode[edge.to] = from; previousEdge[edge.to] = index;
+                            queue.add(new QueueEntry(edge.to, next));
                         }
                     }
-                    if (!changed) {
-                        break;
-                    }
                 }
-
-                if (previousNode[sink] == -1) {
-                    return new FlowResult(totalFlow, totalCost);
-                }
-
+                if (previousNode[sink] == -1) return new FlowResult(totalFlow, totalCost);
+                for (int node = 0; node < nodeCount; node++)
+                    if (Double.isFinite(distance[node])) potential[node] += distance[node];
                 long augmentation = Long.MAX_VALUE;
+                double pathCost = 0;
                 for (int node = sink; node != source; node = previousNode[node]) {
                     FlowEdge edge = adjacency.get(previousNode[node]).get(previousEdge[node]);
                     augmentation = Math.min(augmentation, edge.capacity);
+                    pathCost += edge.cost;
                 }
                 for (int node = sink; node != source; node = previousNode[node]) {
-                    int from = previousNode[node];
-                    FlowEdge edge = adjacency.get(from).get(previousEdge[node]);
+                    FlowEdge edge = adjacency.get(previousNode[node]).get(previousEdge[node]);
                     edge.capacity -= augmentation;
                     adjacency.get(edge.to).get(edge.reverseIndex).capacity += augmentation;
                 }
-
-                totalFlow += augmentation;
-                totalCost += augmentation * distance[sink];
+                totalFlow += augmentation; totalCost += augmentation * pathCost;
             }
         }
+        private record QueueEntry(int node, double distance) {}
     }
 
     private static final class FlowEdge {

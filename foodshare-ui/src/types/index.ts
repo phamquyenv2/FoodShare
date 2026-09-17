@@ -8,10 +8,25 @@ export interface User {
   phone: string;
   role: UserRole;
   avatar?: string;
+  avatarUrl?: string;
+  specificAddress?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isActive: boolean;
   createdAt: string;
   orderCount?: number;
   profileCompleted?: boolean;
+  profile?: {
+    id: number;
+    name: string;
+    description: string | null;
+    taxCode: string | null;
+    verificationStatus: 'UNVERIFIED' | 'VERIFIED' | 'REJECTED';
+    profileType: 'SUPPLIER' | 'ORGANIZATION';
+    supplierType: 'INDIVIDUAL' | 'RESTAURANT' | 'BAKERY' | 'GROCERY_STORE' | 'SUPERMARKET' | 'OTHER' | null;
+    organizationType: 'CHARITY' | 'ORPHANAGE' | 'NURSING_HOME' | 'RELIGIOUS' | 'COMMUNITY_GROUP' | 'OTHER' | null;
+    licenseUrls: string[];
+  } | null;
 }
 
 // ─── Food Post ───────────────────────────────────────────────────────────────
@@ -66,16 +81,20 @@ export interface Order {
 }
 
 // ─── Payout ──────────────────────────────────────────────────────────────────
-export type PayoutStatus = 'PENDING' | 'COMPLETED';
+export type PayoutStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
 
 export interface PayoutTransaction {
   id: string;
-  orderId: string;
-  orderCode: string;
+  orderId?: string;
+  payoutCode: string;
   grossAmount: number;
   platformFee: number;
   netAmount: number;
+  requestedAmount: number;
   status: PayoutStatus;
+  bankName: string;
+  accountNumber: string;
+  rejectionReason?: string;
   createdAt: string;
 }
 

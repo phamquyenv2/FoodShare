@@ -3,24 +3,26 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Star, Loader2, CheckCircle } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 
 export default function WriteReviewPage() {
+  const { showError } = useToast();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [rating, setRating] = useState(0);
+  const [ratingInvalid, setRatingInvalid] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) {
-      setError('Vui lòng chọn số sao đánh giá');
+      setRatingInvalid(true);
+      showError('Vui lòng chọn số sao đánh giá');
       return;
     }
-    setError('');
     setIsLoading(true);
     try {
       await apiFetch('/reviews', {
@@ -33,7 +35,7 @@ export default function WriteReviewPage() {
       });
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Gửi đánh giá thất bại');
+      showError(err.message || 'Gửi đánh giá thất bại');
     } finally {
       setIsLoading(false);
     }
@@ -82,20 +84,16 @@ export default function WriteReviewPage() {
         <h1 className="text-xl font-bold text-gray-900 mb-1">Đánh giá nhà cung cấp</h1>
         <p className="text-sm text-gray-500 mb-6">Chia sẻ trải nghiệm của bạn để giúp cộng đồng tốt hơn</p>
 
-        {error && (
-          <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100 mb-4">{error}</div>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* Star Rating */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">Đánh giá <span className="text-red-500">*</span></label>
-            <div className="flex gap-2 justify-center">
+            <div className={`flex gap-2 justify-center rounded-xl p-2 ${ratingInvalid ? 'ring-2 ring-red-500/70 bg-red-50' : ''}`}>
               {[1, 2, 3, 4, 5].map(s => (
                 <button
                   key={s}
                   type="button"
-                  onClick={() => setRating(s)}
+                  onClick={() => { setRating(s); setRatingInvalid(false); }}
                   onMouseEnter={() => setHoverRating(s)}
                   onMouseLeave={() => setHoverRating(0)}
                   className="cursor-pointer transition-transform hover:scale-110 active:scale-95"
@@ -136,7 +134,7 @@ export default function WriteReviewPage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={isLoading || rating === 0}
+            disabled={isLoading}
             className="w-full py-3.5 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] active:scale-[0.98] transition-all shadow-md shadow-green-500/20 disabled:opacity-70 flex items-center justify-center gap-2"
           >
             {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Star size={16} />}

@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Loader2, X, Eye, EyeOff, CheckCircle, Flag,
-  AlertTriangle, Filter, ChevronRight,
-} from 'lucide-react';
+  Search, Loader2, X, Eye, EyeOff, CheckCircle, Flag } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { timeAgo } from '../../utils/format';
 
 interface ReportItem {
@@ -13,6 +12,8 @@ interface ReportItem {
   targetName?: string;
   referenceId: number;
   referenceType: string;
+  targetBusinessProfileId?: number;
+  targetBusinessName?: string;
   reportType: string;
   content: string;
   reportStatus: string;
@@ -42,11 +43,13 @@ const STATUS_TABS = [
 ];
 
 export default function AdminReportsPage() {
+  const { showError } = useToast();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState('all');
   const [page, setPage] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -64,13 +67,22 @@ export default function AdminReportsPage() {
       setTotalPages(res.totalPages || 0);
       setTotalElements(res.totalElements || 0);
     } catch (err) {
-      console.error('Failed to fetch reports:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải danh sách báo cáo');
     } finally {
       setIsLoading(false);
     }
-  }, [page, tab]);
+  }, [page, tab, showError]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get('reportId'));
+    if (!id) return;
+    apiFetch<ReportItem>(`/admin/reports/${id}`).then(setDetailReport).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm.trim()), 500);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
   const handleAction = async (reportId: number, action: string) => {
     setActionLoading(reportId);
@@ -86,7 +98,7 @@ export default function AdminReportsPage() {
       setConfirmModal(null);
       setAdminNote('');
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      showError(err.message || 'Thao tác thất bại');
     } finally {
       setActionLoading(null);
     }
@@ -103,7 +115,7 @@ export default function AdminReportsPage() {
         setDetailReport({ ...detailReport, reportStatus: 'REVIEWING' });
       }
     } catch (err: any) {
-      console.error('Failed to mark as reviewing:', err);
+      showError(err.message || 'Không thể cập nhật trạng thái báo cáo');
     }
   };
 
@@ -113,17 +125,18 @@ export default function AdminReportsPage() {
       await apiFetch(`/admin/food-posts/${postId}/hide`, { method: 'PATCH' });
       await handleAction(reportId, 'resolve');
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      showError(err.message || 'Thao tác thất bại');
       setActionLoading(null);
     }
   };
 
   const filtered = reports.filter(r => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
+    if (!debouncedSearch) return true;
+    const term = debouncedSearch.toLowerCase();
     return (
       r.reporter?.fullName.toLowerCase().includes(term) ||
       (r.targetName && r.targetName.toLowerCase().includes(term)) ||
+      (r.targetBusinessName && r.targetBusinessName.toLowerCase().includes(term)) ||
       r.content.toLowerCase().includes(term) ||
       r.referenceId.toString().includes(term)
     );
@@ -131,33 +144,37 @@ export default function AdminReportsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+      <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Khiếu nại & Báo cáo</h1>
           <p className="text-sm text-gray-500 mt-0.5">{totalElements} khiếu nại từ người dùng</p>
         </div>
-        
-        {/* Search Bar */}
-        <div className="relative w-full md:w-72">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Tìm kiếm người báo cáo, nội dung..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#2db84c] focus:ring-1 focus:ring-[#2db84c] transition-colors bg-white shadow-sm"
-          />
-        </div>
       </div>
 
-      {/* Status Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {STATUS_TABS.map(t => (
-          <button key={t.key} onClick={() => { setTab(t.key); setPage(0); }}
-            className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap cursor-pointer transition-all ${tab === t.key ? 'bg-[#2db84c] text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-            {t.label}
-          </button>
-        ))}
+      {/* Search + Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <form onSubmit={(e) => { e.preventDefault(); setPage(0); }} className="flex-1 flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5">
+          <Search size={16} className="text-gray-400" />
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Tìm kiếm người báo cáo, nội dung..."
+            className="bg-transparent text-sm text-gray-900 outline-none flex-1 placeholder:text-gray-400"
+          />
+          {searchTerm && (
+            <button type="button" onClick={() => { setSearchTerm(''); setPage(0); }} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+              <X size={14} />
+            </button>
+          )}
+        </form>
+        <div className="flex gap-2 overflow-x-auto">
+          {STATUS_TABS.map(t => (
+            <button key={t.key} onClick={() => { setTab(t.key); setPage(0); }}
+              className={`px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap cursor-pointer transition-all ${tab === t.key ? 'bg-[#2db84c] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (
@@ -187,7 +204,7 @@ export default function AdminReportsPage() {
                       <motion.tr key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
                         className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                         <td className="px-4 py-3.5 text-gray-700 text-xs">{r.reporter?.fullName}</td>
-                        <td className="px-4 py-3.5 text-gray-900 font-medium text-xs max-w-[140px] truncate">{r.targetName || `${TYPE_LABEL[r.referenceType] || r.referenceType} #${r.referenceId}`}</td>
+                        <td className="px-4 py-3.5 text-gray-900 font-medium text-xs min-w-[240px] max-w-[320px]">{r.targetName || `${TYPE_LABEL[r.referenceType] || r.referenceType} #${r.referenceId}`}</td>
                         <td className="px-4 py-3.5">
                           <div className="flex gap-1">
                             <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-medium">{TYPE_LABEL[r.referenceType] || r.referenceType}</span>

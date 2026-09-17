@@ -6,9 +6,10 @@ import {
   ChevronRight, Leaf, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { apiFetch } from '../../services/api';
 import { OrderBadge } from '../../components/shared/StatusBadge';
-import { formatVND, timeAgo } from '../../utils/format';
+import { formatVND, timeAgo, formatDisplayName } from '../../utils/format';
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const fadeUp = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.25 } } };
@@ -26,11 +27,14 @@ interface DashOrder {
 
 export default function SupplierDashboard() {
   const { user } = useAuth();
+  const { showError } = useToast();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<DashOrder[]>([]);
   const [postCount, setPostCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [rejectOrderId, setRejectOrderId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,13 +61,13 @@ export default function SupplierDashboard() {
         setOrders(mappedOrders);
         setPostCount(postsRes.totalElements || 0);
       } catch (err) {
-        console.error('Dashboard fetch failed:', err);
+        showError(err instanceof Error ? err.message : 'Không thể tải tổng quan');
       } finally {
         setIsLoading(false);
       }
     };
     fetchData();
-  }, []);
+  }, [showError]);
 
   const handleAction = async (orderId: number, action: string) => {
     setActionLoading(orderId);
@@ -71,7 +75,25 @@ export default function SupplierDashboard() {
       await apiFetch(`/orders/${orderId}/${action}`, { method: 'PATCH' });
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: action === 'accept' ? 'ACCEPTED' : 'REJECTED' } : o));
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      showError(err.message || 'Thao tác thất bại');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async () => {
+    if (rejectOrderId == null || !rejectReason.trim()) return;
+    setActionLoading(rejectOrderId);
+    try {
+      await apiFetch(`/orders/${rejectOrderId}/reject`, {
+        method: 'PATCH',
+        body: JSON.stringify({ rejectionReason: rejectReason.trim() }),
+      });
+      setOrders(prev => prev.map(o => o.id === rejectOrderId ? { ...o, status: 'REJECTED' } : o));
+      setRejectOrderId(null);
+      setRejectReason('');
+    } catch (err: any) {
+      showError(err.message || 'Từ chối đơn thất bại');
     } finally {
       setActionLoading(null);
     }
@@ -100,7 +122,7 @@ export default function SupplierDashboard() {
     <div className="p-4 md:p-6 flex flex-col gap-5 max-w-6xl mx-auto">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-          Xin chào, {(user as any)?.fullName || 'bạn'} 👋
+          Xin chào, {formatDisplayName((user as any)?.fullName)}
         </h1>
         <p className="text-sm text-gray-500 mt-1">Tổng quan hoạt động</p>
       </div>
@@ -149,7 +171,7 @@ export default function SupplierDashboard() {
                     {actionLoading === order.id ? <Loader2 size={16} className="animate-spin" /> : <Check size={18} />}
                   </button>
                   <button
-                    onClick={() => handleAction(order.id, 'reject')}
+                    onClick={() => { setRejectOrderId(order.id); setRejectReason(''); }}
                     disabled={actionLoading === order.id}
                     className="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center cursor-pointer hover:bg-red-100 transition-colors disabled:opacity-50"
                     title="Từ chối"
@@ -195,6 +217,25 @@ export default function SupplierDashboard() {
           )}
         </div>
       </motion.div>
+
+      {rejectOrderId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setRejectOrderId(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="mb-3 font-semibold text-gray-900">Lý do từ chối</h3>
+            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3}
+              placeholder="Nhập lý do từ chối đơn..." autoFocus
+              className="mb-4 w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-200" />
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setRejectOrderId(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm text-gray-600">Hủy</button>
+              <button type="button" onClick={handleReject} disabled={!rejectReason.trim() || actionLoading === rejectOrderId}
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                {actionLoading === rejectOrderId ? 'Đang xử lý…' : 'Từ chối'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

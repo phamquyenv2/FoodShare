@@ -70,11 +70,19 @@ public class OrderController {
     @Secured("ROLE_SUPPLIER")
     @ApiMessage("Lấy danh sách đơn tiếp nhận của nhà cung cấp thành công")
     public ResponseEntity<Page<OrderResponse>> getSupplierOrders(
-            @org.springframework.web.bind.annotation.RequestParam(value = "status", required = false) com.datn.foodshare.util.constant.OrderStatus status,
+            @org.springframework.web.bind.annotation.RequestParam(value = "status", required = false) String status,
             @org.springframework.web.bind.annotation.RequestParam(value = "keyword", required = false) String keyword,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable)
             throws PermissionException {
-        return ResponseEntity.ok(orderService.getSupplierOrders(status, keyword, pageable));
+        com.datn.foodshare.util.constant.OrderStatus orderStatus = null;
+        if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status.trim())) {
+            try {
+                orderStatus = com.datn.foodshare.util.constant.OrderStatus.valueOf(status.trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                orderStatus = null;
+            }
+        }
+        return ResponseEntity.ok(orderService.getSupplierOrders(orderStatus, keyword, pageable));
     }
 
     @PatchMapping("/{id}/accept")
@@ -89,7 +97,7 @@ public class OrderController {
     @ApiMessage("Từ chối đơn tiếp nhận thành công")
     public ResponseEntity<OrderResponse> rejectOrder(
             @PathVariable("id") Long id,
-            @Valid @RequestBody com.datn.foodshare.domain.request.RejectOrderRequest request) throws PermissionException {
+            @Valid @RequestBody(required = false) com.datn.foodshare.domain.request.RejectOrderRequest request) throws PermissionException {
         return ResponseEntity.ok(orderService.rejectOrder(id, request));
     }
 

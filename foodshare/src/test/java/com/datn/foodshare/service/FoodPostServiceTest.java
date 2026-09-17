@@ -18,6 +18,7 @@ import com.datn.foodshare.util.SecurityUtil;
 import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.PostType;
 import com.datn.foodshare.util.constant.Role;
+import com.datn.foodshare.util.constant.VerificationStatus;
 import com.datn.foodshare.util.error.BusinessException;
 import com.datn.foodshare.util.error.PermissionException;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -58,6 +60,9 @@ class FoodPostServiceTest {
     private CloudinaryService cloudinaryService;
     @Mock
     private DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+    private PermissionService permissionService;
 
     private FoodPostService foodPostService;
 
@@ -68,13 +73,16 @@ class FoodPostServiceTest {
 
     @BeforeEach
     void setUp() {
+        permissionService = new PermissionService(userRepository);
         foodPostService = new FoodPostService(
                 foodPostRepository,
                 categoryRepository,
                 businessProfileRepository,
                 userRepository,
                 cloudinaryService,
-                matchingGraphSynchronizer
+                matchingGraphSynchronizer,
+                eventPublisher,
+                permissionService
         );
     }
 
@@ -98,9 +106,8 @@ class FoodPostServiceTest {
             assertEquals("Bánh mì", response.getName());
             assertEquals(10, response.getTotalQuantity());
             assertEquals(10, response.getAvailableQuantity());
-            assertEquals(PostStatus.DRAFT, response.getPostStatus());
+            assertEquals(PostStatus.AVAILABLE, response.getPostStatus());
             verify(foodPostRepository).save(any(FoodPost.class));
-            verify(matchingGraphSynchronizer).foodPostChangedAfterCommit(POST_ID);
             verify(matchingGraphSynchronizer).foodPostChangedAfterCommit(POST_ID);
         }
     }
@@ -129,6 +136,16 @@ class FoodPostServiceTest {
             assertThrows(BusinessException.class, () -> foodPostService.create(validCreateRequest()));
             verify(foodPostRepository, never()).save(any());
         }
+    }
+
+    @Test
+    void create_rejectsUnverifiedBusinessProfile() {
+        assertCreateRejectedForVerificationStatus(VerificationStatus.UNVERIFIED);
+    }
+
+    @Test
+    void create_rejectsRejectedBusinessProfile() {
+        assertCreateRejectedForVerificationStatus(VerificationStatus.REJECTED);
     }
 
     @Test
@@ -236,6 +253,7 @@ class FoodPostServiceTest {
             FoodPostResponse response = foodPostService.hide(POST_ID);
 
             assertEquals(PostStatus.HIDDEN, response.getPostStatus());
+            assertFalse(post.isHiddenByAdmin());
         }
     }
 
@@ -252,6 +270,21 @@ class FoodPostServiceTest {
             FoodPostResponse response = foodPostService.unhide(POST_ID);
 
             assertEquals(PostStatus.AVAILABLE, response.getPostStatus());
+        }
+    }
+
+    @Test
+    void unhide_rejectsPostHiddenByAdmin() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
+            when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
+            FoodPost post = availablePost();
+            post.setPostStatus(PostStatus.HIDDEN);
+            post.setHiddenByAdmin(true);
+            when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+
+            assertThrows(PermissionException.class, () -> foodPostService.unhide(POST_ID));
+            verify(foodPostRepository, never()).save(any());
         }
     }
 
@@ -279,18 +312,21 @@ class FoodPostServiceTest {
         FoodPostResponse response = foodPostService.adminHide(POST_ID);
 
         assertEquals(PostStatus.HIDDEN, response.getPostStatus());
+        assertTrue(post.isHiddenByAdmin());
     }
 
     @Test
     void adminRestore_success() {
         FoodPost post = availablePost();
         post.setPostStatus(PostStatus.HIDDEN);
+        post.setHiddenByAdmin(true);
         when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
         when(foodPostRepository.save(post)).thenReturn(post);
 
         FoodPostResponse response = foodPostService.adminRestore(POST_ID);
 
         assertEquals(PostStatus.AVAILABLE, response.getPostStatus());
+        assertFalse(post.isHiddenByAdmin());
     }
 
     @Test
@@ -383,7 +419,7 @@ class FoodPostServiceTest {
     }
 
     @Test
-    void update_cleansUpCloudinaryOnImageReplace() throws PermissionException {
+    void update_doesNotDeleteClientReferencedCloudinaryAsset() throws PermissionException {
         try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
             su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
             when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
@@ -401,7 +437,7 @@ class FoodPostServiceTest {
 
             foodPostService.update(POST_ID, req);
 
-            verify(cloudinaryService).deleteFoodPostImage("https://res.cloudinary.com/old/image.jpg");
+            verifyNoInteractions(cloudinaryService);
         }
     }
 
@@ -497,6 +533,21 @@ class FoodPostServiceTest {
 
         assertEquals(5, post.getAvailableQuantity());
         assertEquals(PostStatus.AVAILABLE, post.getPostStatus());
+    }
+
+    @Test
+    void restoreQuantity_doesNotReviveExpiredPost() {
+        FoodPost post = availablePost();
+        post.setAvailableQuantity(0);
+        post.setPostStatus(PostStatus.OUT_OF_STOCK);
+        post.setExpiresAt(Instant.now().minus(1, ChronoUnit.MINUTES));
+        when(foodPostRepository.findById(POST_ID)).thenReturn(Optional.of(post));
+        when(foodPostRepository.save(post)).thenReturn(post);
+
+        foodPostService.restoreQuantity(POST_ID, 5);
+
+        assertEquals(5, post.getAvailableQuantity());
+        assertEquals(PostStatus.EXPIRED, post.getPostStatus());
     }
 
     @Test
@@ -609,7 +660,22 @@ class FoodPostServiceTest {
         bp.setId(1L);
         bp.setUser(user);
         bp.setName("Cửa hàng A");
+        bp.setVerificationStatus(VerificationStatus.VERIFIED);
         return bp;
+    }
+
+    private void assertCreateRejectedForVerificationStatus(VerificationStatus status) {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(SUPPLIER_USER_ID));
+            when(userRepository.findById(SUPPLIER_USER_ID)).thenReturn(Optional.of(supplierUser()));
+            BusinessProfile profile = businessProfile();
+            profile.setVerificationStatus(status);
+            when(businessProfileRepository.findByUserId(SUPPLIER_USER_ID)).thenReturn(Optional.of(profile));
+
+            assertThrows(BusinessException.class, () -> foodPostService.create(validCreateRequest()));
+            verify(categoryRepository, never()).findById(any());
+            verify(foodPostRepository, never()).save(any());
+        }
     }
 
     private Category category() {

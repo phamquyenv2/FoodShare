@@ -41,11 +41,15 @@ public class UpdateFoodPostRequest {
     @Size(max = 500, message = "Địa điểm nhận tối đa 500 ký tự")
     private String pickupAddress;
 
+    private BigDecimal pickupLatitude;
+    private BigDecimal pickupLongitude;
+
     private Instant pickupStartAt;
 
     private Instant pickupEndAt;
 
     private Boolean isDraft;
 
-    private List<String> images;
+    @Size(max = 10, message = "Mỗi bài đăng chỉ được có tối đa 10 ảnh")
+    private List<@Size(max = 500, message = "URL ảnh tối đa 500 ký tự") String> images;
 }

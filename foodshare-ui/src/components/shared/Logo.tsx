@@ -1,25 +1,38 @@
-import { Leaf } from 'lucide-react';
+import logoImg from '../../assets/logo.png';
 
 interface LogoProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   showText?: boolean;
+  layout?: 'col' | 'row';
+  className?: string;
 }
 
 const sizes = {
-  sm: { box: 'w-8 h-8', icon: 16, text: 'text-lg' },
-  md: { box: 'w-10 h-10', icon: 20, text: 'text-xl' },
-  lg: { box: 'w-14 h-14', icon: 28, text: 'text-3xl' },
+  sm: { img: 'w-7 h-auto', text: 'text-lg font-bold', colGap: 'gap-0.5', rowGap: 'gap-2' },
+  md: { img: 'w-8 h-auto', text: 'text-xl font-bold', colGap: 'gap-1', rowGap: 'gap-2.5' },
+  lg: { img: 'w-16 h-auto', text: 'text-3xl font-extrabold', colGap: 'gap-1.5', rowGap: 'gap-3' },
+  xl: { img: 'w-24 h-auto', text: 'text-4xl font-extrabold', colGap: 'gap-2', rowGap: 'gap-4' },
 };
 
-export default function Logo({ size = 'md', showText = true }: LogoProps) {
+export default function Logo({ size = 'md', showText = true, layout = 'col', className = '' }: LogoProps) {
   const s = sizes[size];
+  const isCol = layout === 'col';
+  const gap = isCol ? s.colGap : s.rowGap;
+
   return (
-    <div className="flex items-center gap-2.5">
-      <div className={`${s.box} rounded-xl bg-[#2db84c] flex items-center justify-center shadow-md shadow-green-500/20`}>
-        <Leaf size={s.icon} className="text-white" />
-      </div>
+    <div className={`flex ${isCol ? 'flex-col items-center text-center' : 'items-center'} ${gap} ${className}`}>
+      <img
+        src="/logo.png"
+        alt="FoodShare Logo"
+        className={`${s.img} max-w-full object-contain flex-shrink-0 drop-shadow-sm`}
+        onError={(e) => {
+          if (e.currentTarget.src !== logoImg) {
+            e.currentTarget.src = logoImg;
+          }
+        }}
+      />
       {showText && (
-        <span className={`${s.text} font-bold text-gray-900 tracking-tight`}>
+        <span className={`${s.text} text-gray-900 tracking-tight leading-none`}>
           Food<span className="text-[#2db84c]">Share</span>
         </span>
       )}

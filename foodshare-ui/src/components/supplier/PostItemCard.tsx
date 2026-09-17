@@ -99,14 +99,15 @@ export default function PostItemCard({ post, variants, actionLoading, onToggleVi
         <div className="flex gap-2 mt-auto">
           <button
             onClick={() => navigate(`/supplier/posts/${post.id}/edit`)}
-            className="flex-1 flex items-center justify-center py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            disabled={actionLoading !== null}
+            className="flex-1 flex items-center justify-center py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
           >
             Sửa
           </button>
           <button
             onClick={() => onToggleVisibility(post)}
-            disabled={actionLoading === post.id}
-            className="flex-1 flex items-center justify-center py-1.5 rounded-lg border border-[#2db84c]/30 text-[#2db84c] hover:bg-[#2db84c]/10 text-[11px] font-medium transition-colors disabled:opacity-50"
+            disabled={actionLoading !== null}
+            className="flex-1 flex items-center justify-center py-1.5 rounded-lg border border-[#2db84c]/30 text-[#2db84c] hover:bg-[#2db84c]/10 text-[11px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
           >
             {actionLoading === post.id ? (
               <Loader2 size={12} className="animate-spin" />

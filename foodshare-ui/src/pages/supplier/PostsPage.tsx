@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Package, Loader2, Search } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import PostItemCard, { type PostItem } from '../../components/supplier/PostItemCard';
 
 const TABS = [
@@ -14,6 +15,7 @@ const TABS = [
 ];
 
 export default function PostsPage() {
+  const { showError } = useToast();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,12 +64,12 @@ export default function PostsPage() {
       setPosts(prev => (pageNum === 0 || desktopMode) ? res.content || [] : [...prev, ...(res.content || [])]);
       setTotalPages(res.totalPages || 0);
     } catch (err) {
-      console.error('Failed to fetch posts:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải bài đăng');
     } finally {
       setIsLoading(false);
       setIsFetchingMore(false);
     }
-  }, [tab, keyword]);
+  }, [tab, keyword, showError]);
 
   useEffect(() => { 
     fetchPosts(page, isDesktop); 
@@ -92,7 +94,11 @@ export default function PostsPage() {
     return () => observer.disconnect();
   }, [isLoading, isFetchingMore, page, totalPages, isDesktop]);
 
+  const isTogglingRef = useRef(false);
+
   const handleToggleVisibility = async (post: PostItem) => {
+    if (isTogglingRef.current || actionLoading !== null) return;
+    isTogglingRef.current = true;
     setActionLoading(post.id);
     try {
       const endpoint = post.postStatus === 'HIDDEN'
@@ -102,8 +108,9 @@ export default function PostsPage() {
       setPage(0);
       if (page === 0) fetchPosts(0, isDesktop);
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      showError(err.message || 'Thao tác thất bại');
     } finally {
+      isTogglingRef.current = false;
       setActionLoading(null);
     }
   };

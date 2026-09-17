@@ -22,7 +22,7 @@ public class FCMService {
 
     public void sendPushNotification(String fcmToken, String title, String body, Map<String, String> data) {
         if (firebaseMessaging == null) {
-            log.debug("FirebaseMessaging chưa được cấu hình. Bỏ qua việc gửi FCM đến token: {}", fcmToken);
+            log.debug("FirebaseMessaging chưa được cấu hình. Bỏ qua việc gửi FCM.");
             return;
         }
 
@@ -41,7 +41,7 @@ public class FCMService {
             String response = firebaseMessaging.send(messageBuilder.build());
             log.info("Gửi thông báo FCM thành công: {}", response);
         } catch (Exception e) {
-            log.error("Lỗi khi gửi thông báo FCM đến token: {}. Lỗi: {}", fcmToken, e.getMessage());
+            log.error("Lỗi khi gửi thông báo FCM: {}", e.getMessage());
         }
     }
 }

@@ -5,6 +5,7 @@ import com.datn.foodshare.domain.entity.Review;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.CreateReviewRequest;
 import com.datn.foodshare.domain.response.ReviewResponse;
+import com.datn.foodshare.domain.response.ReviewSummaryResponse;
 import com.datn.foodshare.repository.OrderRepository;
 import com.datn.foodshare.repository.ReviewRepository;
 import com.datn.foodshare.repository.UserRepository;
@@ -24,6 +25,11 @@ import com.datn.foodshare.event.NotificationEvent;
 import com.datn.foodshare.util.constant.NotificationType;
 import com.datn.foodshare.util.constant.NotificationReferenceType;
 import org.springframework.context.ApplicationEventPublisher;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -101,6 +107,41 @@ public class ReviewService {
         }
 
         return reviewRepository.findByBusinessProfileId(currentUser.getBusinessProfile().getId(), pageable)
+                .map(ReviewResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewSummaryResponse getBusinessReviewSummary(Long businessProfileId) {
+        Double avg = reviewRepository.getAverageRatingByBusinessProfileId(businessProfileId);
+        long count = reviewRepository.countByBusinessProfileId(businessProfileId);
+        return ReviewSummaryResponse.builder()
+                .averageRating(avg != null ? Math.round(avg * 10.0) / 10.0 : null)
+                .totalReviews(count)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, ReviewSummaryResponse> getBusinessReviewSummaries(List<Long> businessProfileIds) {
+        if (businessProfileIds == null || businessProfileIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Object[]> rows = reviewRepository.getReviewSummariesByBusinessProfileIds(businessProfileIds);
+        Map<Long, ReviewSummaryResponse> map = new HashMap<>();
+        for (Object[] row : rows) {
+            Long bpId = ((Number) row[0]).longValue();
+            Double avg = row[1] != null ? ((Number) row[1]).doubleValue() : null;
+            long count = row[2] != null ? ((Number) row[2]).longValue() : 0L;
+            map.put(bpId, ReviewSummaryResponse.builder()
+                    .averageRating(avg != null ? Math.round(avg * 10.0) / 10.0 : null)
+                    .totalReviews(count)
+                    .build());
+        }
+        return map;
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReviewResponse> getBusinessReviews(Long businessProfileId, Pageable pageable) {
+        return reviewRepository.findByBusinessProfileId(businessProfileId, pageable)
                 .map(ReviewResponse::from);
     }
 

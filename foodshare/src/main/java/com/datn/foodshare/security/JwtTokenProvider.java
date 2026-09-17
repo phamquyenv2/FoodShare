@@ -14,9 +14,11 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -25,26 +27,32 @@ public class JwtTokenProvider {
     private static final String TOKEN_TYPE_CLAIM = "type";
     private static final String ACCESS_TOKEN_TYPE = "access";
     private static final String REFRESH_TOKEN_TYPE = "refresh";
+    private static final String PHONE_OTP_CHALLENGE_TYPE = "phone_otp_challenge";
+    private static final String PHONE_REGISTRATION_TYPE = "phone_registration";
+    private static final long PHONE_OTP_CHALLENGE_EXPIRATION_MS = 15 * 60 * 1000L;
+    private static final long PHONE_REGISTRATION_EXPIRATION_MS = 10 * 60 * 1000L;
 
     private final SecretKey secretKey;
     private final long accessTokenExpirationInMs;
     private final long refreshTokenExpirationInMs;
 
     public JwtTokenProvider(
-            @Value("${app.jwt.secret:dGhpc19pc19hX3Zlcnlfc2VjdXJlX2tleV9mb3JfZm9vZHNoYXJlX2FwcGxpY2F0aW9uXzI1NmJpdHNfc2VjcmV0}") String jwtSecret,
-            @Value("${app.jwt.access-token-expiration-in-seconds:86400}") long accessTokenExpirationInSeconds,
+            @Value("${app.jwt.secret:}") String jwtSecret,
+            @Value("${app.jwt.access-token-expiration-in-seconds:900}") long accessTokenExpirationInSeconds,
             @Value("${app.jwt.refresh-token-expiration-in-seconds:2592000}") long refreshTokenExpirationInSeconds) {
         
+        if (jwtSecret == null || jwtSecret.isBlank()
+                || jwtSecret.contains("CHANGE_ME") || jwtSecret.contains("your_")) {
+            throw new IllegalStateException("JWT_SECRET must be explicitly configured");
+        }
         byte[] keyBytes;
         try {
             keyBytes = Decoders.BASE64.decode(jwtSecret);
         } catch (Exception e) {
-            keyBytes = jwtSecret.getBytes();
+            keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
         }
         if (keyBytes.length < 32) {
-            byte[] paddedKey = new byte[32];
-            System.arraycopy(keyBytes, 0, paddedKey, 0, Math.min(keyBytes.length, 32));
-            keyBytes = paddedKey;
+            throw new IllegalStateException("JWT_SECRET must contain at least 256 bits of key material");
         }
         this.secretKey = Keys.hmacShaKeyFor(keyBytes);
         this.accessTokenExpirationInMs = accessTokenExpirationInSeconds * 1000;
@@ -59,9 +67,6 @@ public class JwtTokenProvider {
                 .subject(String.valueOf(user.getId()))
                 .claim("userId", user.getId())
                 .claim("role", user.getRole().name())
-                .claim("phone", user.getPhone())
-                .claim("email", user.getEmail())
-                .claim("fullName", user.getFullName())
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
                 .expiration(expiryDate)
@@ -74,6 +79,7 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + refreshTokenExpirationInMs);
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(String.valueOf(user.getId()))
                 .claim("userId", user.getId())
                 .claim(TOKEN_TYPE_CLAIM, REFRESH_TOKEN_TYPE)
@@ -91,6 +97,47 @@ public class JwtTokenProvider {
         return validateToken(token, REFRESH_TOKEN_TYPE);
     }
 
+    public String createPhoneOtpChallengeToken(String phone, String pinId) {
+        return createPurposeToken(phone, PHONE_OTP_CHALLENGE_TYPE,
+                PHONE_OTP_CHALLENGE_EXPIRATION_MS, "pinId", pinId);
+    }
+
+    public boolean validatePhoneOtpChallengeToken(String token) {
+        return validateToken(token, PHONE_OTP_CHALLENGE_TYPE);
+    }
+
+    public String createPhoneRegistrationToken(String phone) {
+        return createPurposeToken(phone, PHONE_REGISTRATION_TYPE,
+                PHONE_REGISTRATION_EXPIRATION_MS, null, null);
+    }
+
+    public boolean validatePhoneRegistrationToken(String token) {
+        return validateToken(token, PHONE_REGISTRATION_TYPE);
+    }
+
+    public String getPhoneFromToken(String token) {
+        return getClaims(token).getSubject();
+    }
+
+    public String getPinIdFromChallengeToken(String token) {
+        return getClaims(token).get("pinId", String.class);
+    }
+
+    private String createPurposeToken(String subject, String type, long expirationMs,
+                                      String claimName, String claimValue) {
+        Date now = new Date();
+        JwtBuilder builder = Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject(subject)
+                .claim(TOKEN_TYPE_CLAIM, type)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + expirationMs));
+        if (claimName != null) {
+            builder.claim(claimName, claimValue);
+        }
+        return builder.signWith(secretKey).compact();
+    }
+
     private boolean validateToken(String token, String expectedType) {
         try {
             Claims claims = Jwts.parser()
@@ -100,13 +147,13 @@ public class JwtTokenProvider {
                     .getPayload();
             return expectedType.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
         } catch (SecurityException | MalformedJwtException e) {
-            log.error("Chữ ký JWT không hợp lệ: {}", e.getMessage());
+            log.debug("Chữ ký JWT không hợp lệ");
         } catch (ExpiredJwtException e) {
-            log.error("Token JWT đã hết hạn: {}", e.getMessage());
+            log.debug("Token JWT đã hết hạn");
         } catch (UnsupportedJwtException e) {
-            log.error("Token JWT không được hỗ trợ: {}", e.getMessage());
+            log.debug("Token JWT không được hỗ trợ");
         } catch (IllegalArgumentException e) {
-            log.error("Chuỗi JWT claims trống: {}", e.getMessage());
+            log.debug("Chuỗi JWT claims trống");
         }
         return false;
     }

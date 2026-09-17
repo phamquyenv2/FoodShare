@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -20,22 +19,16 @@ public class CorsConfiguration {
     public CorsConfigurationSource corsConfigurationSource() {
         org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
 
-        List<String> allowedOrigins = new ArrayList<>(Arrays.asList(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:4173",
-                "http://localhost:8080"
-        ));
-
-        if (frontendUrl != null && !frontendUrl.isBlank()) {
-            String[] urls = frontendUrl.split(",");
-            for (String url : urls) {
-                String trimmed = url.trim();
-                if (!trimmed.isEmpty() && !allowedOrigins.contains(trimmed)) {
-                    allowedOrigins.add(trimmed);
-                }
-            }
-        }
+        List<String> allowedOrigins = frontendUrl == null ? List.of() : Arrays.stream(frontendUrl.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .peek(origin -> {
+                    if ("*".equals(origin)) {
+                        throw new IllegalStateException("Wildcard CORS origin is forbidden when credentials are enabled");
+                    }
+                })
+                .distinct()
+                .toList();
 
         configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

@@ -6,6 +6,7 @@ import com.datn.foodshare.domain.entity.Review;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.CreateReviewRequest;
 import com.datn.foodshare.domain.response.ReviewResponse;
+import com.datn.foodshare.domain.response.ReviewSummaryResponse;
 import com.datn.foodshare.repository.OrderRepository;
 import com.datn.foodshare.repository.ReviewRepository;
 import com.datn.foodshare.repository.UserRepository;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -42,6 +44,8 @@ class ReviewServiceTest {
     private OrderRepository orderRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private ReviewService reviewService;
 
@@ -53,7 +57,7 @@ class ReviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        reviewService = new ReviewService(reviewRepository, orderRepository, userRepository);
+        reviewService = new ReviewService(reviewRepository, orderRepository, userRepository, eventPublisher);
     }
 
 
@@ -315,6 +319,68 @@ class ReviewServiceTest {
 
         assertThrows(BusinessException.class, () -> reviewService.adminDeleteReview(REVIEW_ID));
         verify(reviewRepository, never()).delete(any());
+    }
+
+    @Test
+    void getBusinessReviewSummary_success() {
+        when(reviewRepository.getAverageRatingByBusinessProfileId(BUSINESS_PROFILE_ID)).thenReturn(4.78);
+        when(reviewRepository.countByBusinessProfileId(BUSINESS_PROFILE_ID)).thenReturn(15L);
+
+        ReviewSummaryResponse summary = reviewService.getBusinessReviewSummary(BUSINESS_PROFILE_ID);
+
+        assertNotNull(summary);
+        assertEquals(4.8, summary.getAverageRating());
+        assertEquals(15L, summary.getTotalReviews());
+    }
+
+    @Test
+    void getBusinessReviewSummary_noReviews() {
+        when(reviewRepository.getAverageRatingByBusinessProfileId(BUSINESS_PROFILE_ID)).thenReturn(null);
+        when(reviewRepository.countByBusinessProfileId(BUSINESS_PROFILE_ID)).thenReturn(0L);
+
+        ReviewSummaryResponse summary = reviewService.getBusinessReviewSummary(BUSINESS_PROFILE_ID);
+
+        assertNotNull(summary);
+        assertNull(summary.getAverageRating());
+        assertEquals(0L, summary.getTotalReviews());
+    }
+
+    @Test
+    void getBusinessReviewSummaries_success() {
+        Object[] row1 = new Object[]{1L, 4.5, 10L};
+        Object[] row2 = new Object[]{2L, 5.0, 3L};
+        when(reviewRepository.getReviewSummariesByBusinessProfileIds(List.of(1L, 2L)))
+                .thenReturn(List.of(row1, row2));
+
+        var map = reviewService.getBusinessReviewSummaries(List.of(1L, 2L));
+
+        assertEquals(2, map.size());
+        assertEquals(4.5, map.get(1L).getAverageRating());
+        assertEquals(10L, map.get(1L).getTotalReviews());
+        assertEquals(5.0, map.get(2L).getAverageRating());
+        assertEquals(3L, map.get(2L).getTotalReviews());
+    }
+
+    @Test
+    void getBusinessReviews_success() {
+        Review review = Review.builder()
+                .id(REVIEW_ID)
+                .order(completedOrder())
+                .reviewer(recipientUser())
+                .businessProfile(businessProfile())
+                .rating(5)
+                .comment("Tuyệt vời")
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        when(reviewRepository.findByBusinessProfileId(BUSINESS_PROFILE_ID, pageable))
+                .thenReturn(new PageImpl<>(List.of(review), pageable, 1));
+
+        Page<ReviewResponse> result = reviewService.getBusinessReviews(BUSINESS_PROFILE_ID, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(5, result.getContent().get(0).getRating());
+        assertEquals("Tuyệt vời", result.getContent().get(0).getComment());
     }
 
     // ===========================

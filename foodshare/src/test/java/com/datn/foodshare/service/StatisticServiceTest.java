@@ -4,7 +4,7 @@ import com.datn.foodshare.domain.response.AdminDashboardResponse;
 import com.datn.foodshare.repository.DailyMetricProjection;
 import com.datn.foodshare.repository.StatisticRepository;
 import com.datn.foodshare.util.constant.OrderStatus;
-import com.datn.foodshare.util.constant.TransactionStatus;
+import com.datn.foodshare.util.constant.PayoutStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -50,8 +49,8 @@ class StatisticServiceTest {
         when(statisticRepository.countTotalOrders()).thenReturn(200L);
         when(statisticRepository.countOrdersByStatus(OrderStatus.COMPLETED)).thenReturn(150L);
         when(statisticRepository.countOrdersByStatus(OrderStatus.CANCELLED)).thenReturn(10L);
-        when(statisticRepository.sumRevenue(any(Instant.class), any(Instant.class), eq(TransactionStatus.SUCCESS))).thenReturn(new BigDecimal("1000000"));
-        when(statisticRepository.sumPayout(any(Instant.class), any(Instant.class), eq(TransactionStatus.SUCCESS))).thenReturn(new BigDecimal("800000"));
+        when(statisticRepository.sumRevenue(any(Instant.class), any(Instant.class), eq(PayoutStatus.SUCCESS))).thenReturn(new BigDecimal("1000000"));
+        when(statisticRepository.sumPayout(any(Instant.class), any(Instant.class), eq(PayoutStatus.SUCCESS))).thenReturn(new BigDecimal("800000"));
 
         DailyMetricProjection mockProjection = new DailyMetricProjection() {
             @Override
@@ -68,7 +67,7 @@ class StatisticServiceTest {
                 .thenReturn(List.of(mockProjection));
         when(statisticRepository.getOrderCountsChart(any(Instant.class), any(Instant.class)))
                 .thenReturn(List.of(mockProjection));
-        when(statisticRepository.getDailyRevenueChart(any(Instant.class), any(Instant.class), eq(TransactionStatus.SUCCESS)))
+        when(statisticRepository.getDailyRevenueChart(any(Instant.class), any(Instant.class), eq(PayoutStatus.SUCCESS)))
                 .thenReturn(List.of(mockProjection));
 
         AdminDashboardResponse response = statisticService.getDashboardStatistics(fromDate, toDate);
@@ -111,8 +110,8 @@ class StatisticServiceTest {
         when(statisticRepository.countFoodPostsByStatus(com.datn.foodshare.util.constant.PostStatus.AVAILABLE)).thenReturn(0L);
         when(statisticRepository.countTotalOrders()).thenReturn(0L);
         when(statisticRepository.countOrdersByStatus(any())).thenReturn(0L);
-        when(statisticRepository.sumRevenue(any(Instant.class), any(Instant.class), eq(TransactionStatus.SUCCESS))).thenReturn(BigDecimal.ZERO);
-        when(statisticRepository.sumPayout(any(Instant.class), any(Instant.class), eq(TransactionStatus.SUCCESS))).thenReturn(BigDecimal.ZERO);
+        when(statisticRepository.sumRevenue(any(Instant.class), any(Instant.class), eq(PayoutStatus.SUCCESS))).thenReturn(BigDecimal.ZERO);
+        when(statisticRepository.sumPayout(any(Instant.class), any(Instant.class), eq(PayoutStatus.SUCCESS))).thenReturn(BigDecimal.ZERO);
 
         AdminDashboardResponse response = statisticService.getDashboardStatistics(null, null);
 

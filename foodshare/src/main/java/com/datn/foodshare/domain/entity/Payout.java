@@ -1,6 +1,6 @@
 package com.datn.foodshare.domain.entity;
 
-import com.datn.foodshare.util.constant.TransactionStatus;
+import com.datn.foodshare.util.constant.PayoutStatus;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -9,7 +9,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,9 +30,14 @@ import java.time.Instant;
 public class Payout extends BaseModel {
 
     @JsonIgnore
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "order_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
     private Order order;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "business_profile_id", nullable = false)
+    private BusinessProfile businessProfile;
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -52,10 +56,25 @@ public class Payout extends BaseModel {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal netAmount;
 
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal requestedAmount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private TransactionStatus payoutStatus = TransactionStatus.PENDING;
+    private PayoutStatus payoutStatus = PayoutStatus.PENDING;
+
+    @Column(nullable = false, length = 30)
+    private String bankCode;
+
+    @Column(nullable = false, length = 150)
+    private String bankName;
+
+    @Column(nullable = false, length = 50)
+    private String accountNumber;
+
+    @Column(nullable = false, length = 150)
+    private String accountHolderName;
 
     @Column(unique = true, length = 255)
     private String externalTransactionId;
@@ -75,4 +94,14 @@ public class Payout extends BaseModel {
 
     @Column(length = 1000)
     private String note;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewed_by")
+    private User reviewedBy;
+
+    private Instant reviewedAt;
+
+    @Column(length = 1000)
+    private String rejectionReason;
 }

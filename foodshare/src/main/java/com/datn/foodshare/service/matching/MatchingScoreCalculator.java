@@ -27,6 +27,14 @@ public class MatchingScoreCalculator {
     List<MatchingScoreResult> calculateScores(
             FoodPost foodPost,
             List<User> candidates,
+            Map<Long, Long> activeOrderCounts
+    ) {
+        return calculateScores(foodPost, candidates, activeOrderCounts, Instant.now());
+    }
+
+    List<MatchingScoreResult> calculateScores(
+            FoodPost foodPost,
+            List<User> candidates,
             Instant evaluatedAt
     ) {
         Objects.requireNonNull(foodPost, "Bài đăng thực phẩm không được rỗng");
@@ -42,6 +50,17 @@ public class MatchingScoreCalculator {
                 .filter(Objects::nonNull)
                 .toList();
         Map<Long, Long> activeOrderCounts = receiverCapacityService.countActiveOrders(receiverIds);
+
+        return calculateScores(foodPost, candidates, activeOrderCounts, evaluatedAt);
+    }
+
+    private List<MatchingScoreResult> calculateScores(
+            FoodPost foodPost,
+            List<User> candidates,
+            Map<Long, Long> activeOrderCounts,
+            Instant evaluatedAt
+    ) {
+        Objects.requireNonNull(activeOrderCounts, "Active order counts must not be null");
 
         return candidates.stream()
                 .map(candidate -> calculateScore(

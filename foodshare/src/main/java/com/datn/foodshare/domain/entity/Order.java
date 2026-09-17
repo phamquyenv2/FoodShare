@@ -96,6 +96,7 @@ public class Order extends BaseModel {
     private Review review;
 
     @JsonIgnore
-    @OneToOne(mappedBy = "order", fetch = FetchType.LAZY)
-    private Payout payout;
+    @Builder.Default
+    @OneToMany(mappedBy = "order", fetch = FetchType.LAZY)
+    private List<Payout> payouts = new ArrayList<>();
 }

@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  ShoppingBag, ChevronDown, Loader2, Package, Clock,
-  ChevronRight, Eye,
-} from 'lucide-react';
+  Loader2, Package, ChevronRight } from 'lucide-react';
 import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { formatVND, timeAgo } from '../../utils/format';
 
 interface OrderItem {
@@ -42,6 +41,7 @@ const TABS = [
 ];
 
 export default function MyOrdersPage() {
+  const { showError } = useToast();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,11 +56,11 @@ export default function MyOrdersPage() {
       setOrders(res.content || []);
       setTotalPages(res.totalPages || 0);
     } catch (err) {
-      console.error('Failed to fetch orders:', err);
+      showError(err instanceof Error ? err.message : 'Không thể tải đơn hàng');
     } finally {
       setIsLoading(false);
     }
-  }, [page]);
+  }, [page, showError]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -138,7 +138,7 @@ export default function MyOrdersPage() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="text-right">
                       <p className="text-sm font-bold text-gray-900">
-                        {order.totalAmount > 0 ? formatVND(order.totalAmount) : '🎁 Miễn phí'}
+                        {order.totalAmount > 0 ? formatVND(order.totalAmount) : 'Miễn phí'}
                       </p>
                       <p className="text-xs text-gray-400">{timeAgo(order.createdAt)}</p>
                     </div>

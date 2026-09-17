@@ -93,7 +93,7 @@ public interface FoodPostRepository extends JpaRepository<FoodPost, Long>, JpaSp
     @Query("SELECT fp FROM FoodPost fp WHERE fp.id = :id")
     Optional<FoodPost> findByIdForMatching(@Param("id") Long id);
 
-    @EntityGraph(attributePaths = {"businessProfile", "businessProfile.user"})
+    @EntityGraph(attributePaths = {"businessProfile", "businessProfile.user", "category", "images"})
     @Query("SELECT fp FROM FoodPost fp WHERE fp.id IN :ids")
     List<FoodPost> findAllByIdInForMatching(@Param("ids") Collection<Long> ids);
 

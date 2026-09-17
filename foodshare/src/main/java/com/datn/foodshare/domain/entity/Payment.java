@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -67,4 +68,7 @@ public class Payment extends BaseModel {
 
     @Column
     private Instant refundedAt;
+
+    @Transient
+    private String paymentUrl;
 }

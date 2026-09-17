@@ -2,6 +2,7 @@ package com.datn.foodshare.controller;
 
 import com.datn.foodshare.domain.request.CreateReviewRequest;
 import com.datn.foodshare.domain.response.ReviewResponse;
+import com.datn.foodshare.domain.response.ReviewSummaryResponse;
 import com.datn.foodshare.service.ReviewService;
 import com.datn.foodshare.util.annotation.ApiMessage;
 import com.datn.foodshare.util.error.PermissionException;
@@ -15,10 +16,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -50,5 +56,27 @@ public class ReviewController {
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable)
             throws PermissionException {
         return ResponseEntity.ok(reviewService.getSupplierReviews(pageable));
+    }
+
+    @GetMapping("/business/{businessProfileId}/summary")
+    @ApiMessage("Lấy thông kê đánh giá của quán thành công")
+    public ResponseEntity<ReviewSummaryResponse> getBusinessReviewSummary(
+            @PathVariable Long businessProfileId) {
+        return ResponseEntity.ok(reviewService.getBusinessReviewSummary(businessProfileId));
+    }
+
+    @GetMapping("/business/summaries")
+    @ApiMessage("Lấy thông kê đánh giá nhiều quán thành công")
+    public ResponseEntity<Map<Long, ReviewSummaryResponse>> getBusinessReviewSummaries(
+            @RequestParam List<Long> ids) {
+        return ResponseEntity.ok(reviewService.getBusinessReviewSummaries(ids));
+    }
+
+    @GetMapping("/business/{businessProfileId}")
+    @ApiMessage("Lấy danh sách đánh giá của quán thành công")
+    public ResponseEntity<Page<ReviewResponse>> getBusinessReviews(
+            @PathVariable Long businessProfileId,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getBusinessReviews(businessProfileId, pageable));
     }
 }

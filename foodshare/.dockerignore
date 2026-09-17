@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+.gradle/
+build/
+bin/
+*.log
+src/main/resources/foodshare-*.json
+**/firebase-service-account*.json

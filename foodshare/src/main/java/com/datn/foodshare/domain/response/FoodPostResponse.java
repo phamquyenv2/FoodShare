@@ -30,6 +30,8 @@ public class FoodPostResponse {
     private Instant pickupEndAt;
     private List<String> images;
     private SupplierInfo supplier;
+    private Double distanceKm;
+    private Double matchScore;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -49,6 +51,10 @@ public class FoodPostResponse {
     }
 
     public static FoodPostResponse from(FoodPost post) {
+        return from(post, null, null);
+    }
+
+    public static FoodPostResponse from(FoodPost post, Double distanceKm, Double matchScore) {
         List<String> imageUrls = post.getImages().stream()
                 .map(img -> img.getImageUrl())
                 .toList();
@@ -77,6 +83,8 @@ public class FoodPostResponse {
                         .name(post.getBusinessProfile().getName())
                         .description(post.getBusinessProfile().getDescription())
                         .build())
+                .distanceKm(distanceKm)
+                .matchScore(matchScore)
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .build();

@@ -21,3 +21,31 @@ export function timeAgo(dateStr: string): string {
 export function formatNumber(n: number): string {
   return n.toLocaleString('vi-VN');
 }
+
+/** Format display name without role/parenthetical suffix like "(Nhà cung cấp)" */
+export function formatDisplayName(fullName?: string | null, fallback = 'bạn'): string {
+  if (!fullName) return fallback;
+  const cleaned = fullName.replace(/\s*\([^)]*\)/g, '').trim();
+  return cleaned || fallback;
+}
+
+/** Remaining time until expiration: "Còn 45 phút", "Còn 2 giờ", "Hết hạn" */
+export function formatTimeRemaining(dateStr?: string | null): { text: string; isUrgent: boolean } {
+  if (!dateStr) return { text: '', isUrgent: false };
+  const diff = new Date(dateStr).getTime() - Date.now();
+  if (diff <= 0) return { text: 'Hết hạn', isUrgent: true };
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return { text: `Còn ${Math.max(1, mins)}p`, isUrgent: true };
+  const hrs = Math.floor(mins / 60);
+  const remainingMins = mins % 60;
+  if (hrs < 6) {
+    return { 
+      text: remainingMins > 0 ? `Còn ${hrs}h${remainingMins}p` : `Còn ${hrs}h`, 
+      isUrgent: true 
+    };
+  }
+  if (hrs < 24) return { text: `Còn ${hrs}h`, isUrgent: false };
+  const days = Math.floor(hrs / 24);
+  return { text: `Còn ${days} ngày`, isUrgent: false };
+}
+

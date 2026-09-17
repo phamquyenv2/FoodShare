@@ -10,12 +10,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,18 +23,10 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    @org.springframework.beans.factory.annotation.Value("${app.notification.page-size:15}")
-    private int defaultPageSize;
-
     @GetMapping
     @ApiMessage("Lấy danh sách thông báo thành công")
     public ResponseEntity<Page<Notification>> getNotifications(
-            @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", required = false) Integer size) {
-        
-        int actualSize = size != null ? size : defaultPageSize;
-        Pageable pageable = PageRequest.of(page, actualSize, Sort.by(Sort.Direction.DESC, "createdAt"));
-        
+            @PageableDefault(size = 15, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Long userId = SecurityUtil.getCurrentUserId().orElseThrow();
         return ResponseEntity.ok(notificationService.getUserNotifications(userId, pageable));
     }

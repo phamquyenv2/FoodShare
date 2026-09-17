@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Users, ShoppingBag, Leaf, TrendingUp, Loader2, Calendar,
-  CreditCard, FileText, AlertTriangle,
-} from 'lucide-react';
+  Users, ShoppingBag, TrendingUp, Loader2, Calendar,
+  CreditCard, FileText } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
-} from 'recharts';
+  Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { apiFetch } from '../../services/api';
-import { formatVND } from '../../utils/format';
+import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatVND, formatDisplayName } from '../../utils/format';
 
 interface DashStats {
   totalUsers: number;
@@ -41,6 +41,8 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 export default function AnalyticsPage() {
+  const { showError } = useToast();
+  const { user } = useAuth();
   const [stats, setStats] = useState<DashStats | null>(null);
   const [userChart, setUserChart] = useState<any[]>([]);
   const [orderChart, setOrderChart] = useState<any[]>([]);
@@ -102,13 +104,13 @@ export default function AnalyticsPage() {
           }
         }
       } catch (err) {
-        console.error('Failed to load analytics:', err);
+        showError(err instanceof Error ? err.message : 'Không thể tải dữ liệu thống kê');
       } finally {
         setIsLoading(false);
       }
     };
     fetchAll();
-  }, [dateRange, startDate, endDate]);
+  }, [dateRange, startDate, endDate, showError]);
 
   const STAT_CARDS = stats ? [
     { icon: Users, label: 'Tổng người dùng', value: stats.totalUsers.toLocaleString(), change: stats.userGrowthPercent ? `+${stats.userGrowthPercent}%` : '', color: '#2563eb', bg: '#dbeafe' },
@@ -129,7 +131,7 @@ export default function AnalyticsPage() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Tổng quan hệ thống</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Xin chào, {formatDisplayName(user?.fullName, 'Quản trị viên')}</h1>
           <p className="text-sm text-gray-500 mt-0.5">Thống kê hoạt động nền tảng FoodShare</p>
         </div>
         {/* Date Range Filter */}

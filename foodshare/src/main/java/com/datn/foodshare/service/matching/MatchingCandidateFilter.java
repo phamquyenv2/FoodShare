@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,6 +66,63 @@ public class MatchingCandidateFilter {
         return capacityFiltered;
     }
 
+    Map<Long, List<User>> filterCandidates(List<FoodPost> foodPosts) {
+        return prepareCandidates(foodPosts).candidatesByPostId();
+    }
+
+    CandidateBatch prepareCandidates(List<FoodPost> foodPosts) {
+        if (foodPosts.isEmpty()) {
+            return CandidateBatch.empty();
+        }
+
+        List<User> allReceivers = findGloballyEligibleCandidates();
+        return prepareCandidates(foodPosts, allReceivers);
+    }
+
+    List<User> findGloballyEligibleCandidates() {
+        return userRepository.findEligibleMatchingCandidates(RECEIVER_ROLES);
+    }
+
+    Map<Long, List<User>> filterCandidates(List<FoodPost> foodPosts, List<User> allReceivers) {
+        return prepareCandidates(foodPosts, allReceivers).candidatesByPostId();
+    }
+
+    private CandidateBatch prepareCandidates(List<FoodPost> foodPosts, List<User> allReceivers) {
+        if (foodPosts.isEmpty()) {
+            return CandidateBatch.empty();
+        }
+
+        List<User> globallyEligible = allReceivers.stream()
+                .filter(this::isGloballyEligibleCandidate)
+                .toList();
+        Map<Long, Long> activeOrderCounts = receiverCapacityService.countActiveOrders(
+                globallyEligible.stream().map(User::getId).toList());
+        List<User> candidatesBelowCapacity = globallyEligible.stream()
+                .filter(candidate -> activeOrderCounts.getOrDefault(candidate.getId(), 0L)
+                        < DEFAULT_MAX_ACTIVE_ORDERS)
+                .toList();
+
+        Instant evaluatedAt = Instant.now();
+        Map<Long, List<User>> candidatesByPostId = new LinkedHashMap<>();
+        for (FoodPost foodPost : foodPosts) {
+            List<User> candidates = candidatesBelowCapacity.stream()
+                    .filter(candidate -> matchesPostConstraints(
+                            foodPost, candidate, DEFAULT_MAX_DISTANCE_KM, evaluatedAt))
+                    .toList();
+            candidatesByPostId.put(foodPost.getId(), candidates);
+        }
+        return new CandidateBatch(Map.copyOf(candidatesByPostId), Map.copyOf(activeOrderCounts));
+    }
+
+    record CandidateBatch(
+            Map<Long, List<User>> candidatesByPostId,
+            Map<Long, Long> activeOrderCounts
+    ) {
+        private static CandidateBatch empty() {
+            return new CandidateBatch(Map.of(), Map.of());
+        }
+    }
+
     Set<Long> findEligibleFoodPostIds(List<FoodPost> foodPosts, User candidate) {
         if (!isGloballyEligibleCandidate(candidate) || foodPosts.isEmpty()) {
             return Set.of();
@@ -87,6 +145,16 @@ public class MatchingCandidateFilter {
                 ))
                 .map(FoodPost::getId)
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    Map<Long, Set<Long>> loadPreviouslyRequestedPosts(java.util.Collection<Long> ids) {
+        return receiverCapacityService.previouslyRequestedPosts(ids);
+    }
+
+    Map<Long, Long> loadActiveOrderCounts(java.util.Collection<Long> ids) { return receiverCapacityService.countActiveOrders(ids); }
+
+    long countFreeQuantityToday(Long receiverId) {
+        return receiverCapacityService.countFreeQuantityToday(receiverId);
     }
 
     boolean isGloballyEligibleCandidate(User candidate) {

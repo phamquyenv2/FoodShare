@@ -8,12 +8,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
+
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     boolean existsByOrderId(Long orderId);
 
-    @Query("SELECT r FROM Review r JOIN FETCH r.reviewer JOIN FETCH r.order WHERE r.businessProfile.id = :businessProfileId")
+    @Query(value = "SELECT r FROM Review r JOIN FETCH r.reviewer JOIN FETCH r.order WHERE r.businessProfile.id = :businessProfileId",
+           countQuery = "SELECT COUNT(r) FROM Review r WHERE r.businessProfile.id = :businessProfileId")
     Page<Review> findByBusinessProfileId(@Param("businessProfileId") Long businessProfileId, Pageable pageable);
 
     @Query("SELECT r FROM Review r JOIN FETCH r.reviewer JOIN FETCH r.order WHERE r.reviewer.id = :reviewerId")
@@ -21,4 +25,13 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     @Query("SELECT r FROM Review r JOIN FETCH r.reviewer JOIN FETCH r.order")
     Page<Review> findAllWithDetails(Pageable pageable);
+
+    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.businessProfile.id = :businessProfileId")
+    Double getAverageRatingByBusinessProfileId(@Param("businessProfileId") Long businessProfileId);
+
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.businessProfile.id = :businessProfileId")
+    long countByBusinessProfileId(@Param("businessProfileId") Long businessProfileId);
+
+    @Query("SELECT r.businessProfile.id, AVG(r.rating), COUNT(r) FROM Review r WHERE r.businessProfile.id IN :businessProfileIds GROUP BY r.businessProfile.id")
+    List<Object[]> getReviewSummariesByBusinessProfileIds(@Param("businessProfileIds") Collection<Long> businessProfileIds);
 }

@@ -1,34 +1,37 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../contexts/AuthContext';
-import { apiFetch } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
+import { getRoleHome } from '../../utils/roleHome';
+import { apiFetch, clearAccessToken, setAccessToken } from '../../services/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState('');
+  const [invalidField, setInvalidField] = useState<'identifier' | 'password' | 'all' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
+  const { showError } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(getRoleHome(user.role), { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleSuccess = (user: any) => {
     // If profile is not completed, AuthGuard will redirect them
-    let fallback = '/supplier';
-    if (user.role === 'ADMIN') fallback = '/admin';
-    else if (user.role === 'RECIPIENT') fallback = '/recipient';
-    else if (user.role === 'ORGANIZATION') fallback = '/organization';
-    
-    navigate(fallback);
+    navigate(getRoleHome(user.role));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
-    
+
     try {
       // The backend uses phone for login, but UI shows email right now.
       // Let's assume the field is either phone or email, but map it to phone for API
@@ -36,35 +39,45 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ identifier: email, password }),
       });
-      
-      localStorage.setItem('accessToken', res.accessToken);
+
+      setAccessToken(res.accessToken);
       const fullUser = await apiFetch<any>('/users/me');
-      
+
       login(res.accessToken, fullUser);
       handleSuccess(fullUser);
     } catch (err: any) {
-      setError(err.message || 'Đăng nhập thất bại');
+      clearAccessToken();
+      const message = err.message || 'Đăng nhập thất bại';
+      const normalized = message.toLowerCase();
+      if (normalized.includes('mật khẩu') && !normalized.includes('tài khoản')) {
+        setInvalidField('password');
+      } else if (normalized.includes('tài khoản') || normalized.includes('số điện thoại')) {
+        setInvalidField('identifier');
+      } else {
+        setInvalidField('all');
+      }
+      showError(message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
-    setError('');
     setIsLoading(true);
     try {
       const res = await apiFetch<any>('/auth/google', {
         method: 'POST',
-        body: JSON.stringify({ idToken: credentialResponse.credential, role: 'RECIPIENT' }),
+        body: JSON.stringify({ idToken: credentialResponse.credential }),
       });
-      
-      localStorage.setItem('accessToken', res.accessToken);
+
+      setAccessToken(res.accessToken);
       const fullUser = await apiFetch<any>('/users/me');
-      
+
       login(res.accessToken, fullUser);
       handleSuccess(fullUser);
     } catch (err: any) {
-      setError(err.message || 'Đăng nhập Google thất bại');
+      clearAccessToken();
+      showError(err.message || 'Đăng nhập Google thất bại');
     } finally {
       setIsLoading(false);
     }
@@ -76,21 +89,19 @@ export default function LoginPage() {
       <p className="text-sm text-gray-500 mb-8">Chào mừng bạn quay trở lại FoodShare</p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {error && (
-          <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100">
-            {error}
-          </div>
-        )}
-        
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Số điện thoại</label>
           <input
             type="text"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={e => { setEmail(e.target.value); setInvalidField(null); }}
             placeholder="0912345678"
             required
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2db84c]/30 focus:border-[#2db84c] transition-all bg-white"
+            className={`w-full px-4 py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all bg-white ${
+              invalidField === 'identifier' || invalidField === 'all'
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-100'
+                : 'border-gray-200 focus:border-[#2db84c] focus:ring-[#2db84c]/30'
+            }`}
           />
         </div>
         <div>
@@ -99,9 +110,13 @@ export default function LoginPage() {
             <input
               type={showPw ? 'text' : 'password'}
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={e => { setPassword(e.target.value); setInvalidField(null); }}
               placeholder="••••••••"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2db84c]/30 focus:border-[#2db84c] transition-all bg-white pr-12"
+              className={`w-full px-4 py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 transition-all bg-white pr-12 ${
+                invalidField === 'password' || invalidField === 'all'
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-100'
+                  : 'border-gray-200 focus:border-[#2db84c] focus:ring-[#2db84c]/30'
+              }`}
             />
             <button
               type="button"
@@ -111,14 +126,6 @@ export default function LoginPage() {
               {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
-        </div>
-
-        <div className="flex items-center justify-between text-sm">
-          <label className="flex items-center gap-2 text-gray-600 cursor-pointer">
-            <input type="checkbox" className="w-4 h-4 rounded border-gray-300 accent-[#2db84c]" />
-            Ghi nhớ đăng nhập
-          </label>
-          <a href="#" className="text-[#2db84c] font-medium hover:underline">Quên mật khẩu?</a>
         </div>
 
         <button
@@ -137,7 +144,7 @@ export default function LoginPage() {
         <div className="flex justify-center">
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
-            onError={() => setError('Đăng nhập Google thất bại')}
+            onError={() => showError('Đăng nhập Google thất bại')}
             width="100%"
             text="signin_with"
             shape="pill"

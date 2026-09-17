@@ -4,14 +4,13 @@ import com.datn.foodshare.domain.response.AdminDashboardResponse;
 import com.datn.foodshare.repository.StatisticRepository;
 import com.datn.foodshare.util.constant.OrderStatus;
 import com.datn.foodshare.util.constant.PostStatus;
-import com.datn.foodshare.util.constant.TransactionStatus;
+import com.datn.foodshare.util.constant.PayoutStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -59,8 +58,8 @@ public class StatisticService {
         long completedOrders = statisticRepository.countOrdersByStatus(OrderStatus.COMPLETED);
         long cancelledOrders = statisticRepository.countOrdersByStatus(OrderStatus.CANCELLED);
 
-        BigDecimal totalRevenue = statisticRepository.sumRevenue(fromDate, toDate, TransactionStatus.SUCCESS);
-        BigDecimal totalPayout = statisticRepository.sumPayout(fromDate, toDate, TransactionStatus.SUCCESS);
+        BigDecimal totalRevenue = statisticRepository.sumRevenue(fromDate, toDate, PayoutStatus.SUCCESS);
+        BigDecimal totalPayout = statisticRepository.sumPayout(fromDate, toDate, PayoutStatus.SUCCESS);
 
         return AdminDashboardResponse.Overview.builder()
                 .totalUsers(totalUsers)
@@ -85,7 +84,7 @@ public class StatisticService {
                 .map(p -> AdminDashboardResponse.DailyMetric.builder().date(p.getDateStr()).value(p.getVal()).build())
                 .toList();
         
-        List<AdminDashboardResponse.DailyMetric> dailyRevenue = statisticRepository.getDailyRevenueChart(fromDate, toDate, TransactionStatus.SUCCESS).stream()
+        List<AdminDashboardResponse.DailyMetric> dailyRevenue = statisticRepository.getDailyRevenueChart(fromDate, toDate, PayoutStatus.SUCCESS).stream()
                 .map(p -> AdminDashboardResponse.DailyMetric.builder().date(p.getDateStr()).value(p.getVal()).build())
                 .toList();
 

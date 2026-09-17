@@ -38,6 +38,32 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    void consecutiveRefreshTokensForSameUserAreUnique() {
+        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 60, 120);
+
+        String first = provider.createRefreshToken(user());
+        String second = provider.createRefreshToken(user());
+
+        assertNotEquals(first, second);
+    }
+
+    @Test
+    void phoneChallengeAndRegistrationTokensArePurposeBound() {
+        JwtTokenProvider provider = new JwtTokenProvider(SECRET, 60, 120);
+
+        String challenge = provider.createPhoneOtpChallengeToken("0901234567", "pin-id");
+        assertTrue(provider.validatePhoneOtpChallengeToken(challenge));
+        assertFalse(provider.validatePhoneRegistrationToken(challenge));
+        assertEquals("0901234567", provider.getPhoneFromToken(challenge));
+        assertEquals("pin-id", provider.getPinIdFromChallengeToken(challenge));
+
+        String registration = provider.createPhoneRegistrationToken("0901234567");
+        assertTrue(provider.validatePhoneRegistrationToken(registration));
+        assertFalse(provider.validateAccessToken(registration));
+        assertEquals("0901234567", provider.getPhoneFromToken(registration));
+    }
+
+    @Test
     void expiredTokenIsRejected() {
         JwtTokenProvider provider = new JwtTokenProvider(SECRET, -1, -1);
 
@@ -51,6 +77,14 @@ class JwtTokenProviderTest {
 
         assertFalse(provider.validateAccessToken("not-a-jwt"));
         assertFalse(provider.validateRefreshToken("not-a-jwt"));
+    }
+
+    @Test
+    void blankOrWeakSecretIsRejectedAtStartup() {
+        assertThrows(IllegalStateException.class, () -> new JwtTokenProvider("", 60, 120));
+        assertThrows(IllegalStateException.class, () -> new JwtTokenProvider("weak-secret", 60, 120));
+        assertThrows(IllegalStateException.class,
+                () -> new JwtTokenProvider("your_base64_encoded_256bit_secret_key", 60, 120));
     }
 
     private User user() {
