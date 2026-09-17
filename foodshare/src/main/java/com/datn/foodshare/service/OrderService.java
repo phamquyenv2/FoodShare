@@ -7,6 +7,7 @@ import com.datn.foodshare.domain.entity.OrderDetail;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.domain.request.CreateOrderRequest;
 import com.datn.foodshare.domain.response.OrderResponse;
+import com.datn.foodshare.repository.BusinessProfileRepository;
 import com.datn.foodshare.repository.FoodPostRepository;
 import com.datn.foodshare.repository.OrderRepository;
 import com.datn.foodshare.repository.UserRepository;
@@ -16,6 +17,7 @@ import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.ReportReferenceType;
 import com.datn.foodshare.util.constant.ReportStatus;
 import com.datn.foodshare.util.constant.Role;
+import com.datn.foodshare.util.constant.VerificationStatus;
 import com.datn.foodshare.util.error.BusinessException;
 import com.datn.foodshare.util.error.PermissionException;
 import com.datn.foodshare.event.NotificationEvent;
@@ -30,9 +32,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.datn.foodshare.util.constant.PostType;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +50,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class OrderService {
+
+    private static final int DAILY_FREE_LIMIT = 3;
 
     private static final Duration INSPECTION_WINDOW = Duration.ofHours(24);
     private static final List<ReportStatus> ACTIVE_REPORT_STATUSES =
@@ -63,18 +70,21 @@ public class OrderService {
     private final SupplierEarningService supplierEarningService;
     private final ApplicationEventPublisher eventPublisher;
     private final PermissionService permissionService;
+    private final BusinessProfileRepository businessProfileRepository;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) throws PermissionException {
         User currentUser = getAuthenticatedUser();
         requireReceiverRole(currentUser);
         requireProfileCompleted(currentUser);
+        requireVerifiedOrganization(currentUser);
         Instant now = Instant.now();
 
         FoodPost foodPost = foodPostRepository.findByIdWithDetails(request.getFoodPostId())
                 .orElseThrow(() -> new BusinessException("Bài đăng không tồn tại: " + request.getFoodPostId()));
 
-        validateRecipientLimits(currentUser, request.getFoodPostId(), request.getQuantity());
+        validateRecipientLimits(currentUser, foodPost, request.getQuantity(),
+                currentUser.getRole() == Role.RECIPIENT ? countFreeQuantityToday(currentUser.getId()) : 0);
         validateFoodPostAvailability(foodPost, now);
         validateQuantity(request.getQuantity(), foodPost.getAvailableQuantity());
 
@@ -127,10 +137,13 @@ public class OrderService {
         User currentUser = getAuthenticatedUser();
         requireReceiverRole(currentUser);
         requireProfileCompleted(currentUser);
+        requireVerifiedOrganization(currentUser);
         Instant now = Instant.now();
 
         Map<BusinessProfile, List<CreateOrderRequest>> ordersBySupplier = new HashMap<>();
         Set<Long> requestedPostIds = new HashSet<>();
+        long freeQuantityToday = currentUser.getRole() == Role.RECIPIENT ? countFreeQuantityToday(currentUser.getId()) : 0;
+        long freeQuantityInBatch = 0;
         
         for (CreateOrderRequest request : batchRequest.getOrders()) {
             if (!requestedPostIds.add(request.getFoodPostId())) {
@@ -139,7 +152,11 @@ public class OrderService {
             FoodPost foodPost = foodPostRepository.findByIdWithDetails(request.getFoodPostId())
                     .orElseThrow(() -> new BusinessException("Bài đăng không tồn tại: " + request.getFoodPostId()));
 
-            validateRecipientLimits(currentUser, request.getFoodPostId(), request.getQuantity());
+            validateRecipientLimits(currentUser, foodPost, request.getQuantity(),
+                    freeQuantityToday + freeQuantityInBatch);
+            if (currentUser.getRole() == Role.RECIPIENT && foodPost.getPostType() == PostType.FREE) {
+                freeQuantityInBatch += request.getQuantity();
+            }
             validateFoodPostAvailability(foodPost, now);
             validateQuantity(request.getQuantity(), foodPost.getAvailableQuantity());
             
@@ -489,6 +506,16 @@ public class OrderService {
         }
     }
 
+    private void requireVerifiedOrganization(User user) {
+        if (user.getRole() == Role.ORGANIZATION) {
+            BusinessProfile profile = businessProfileRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new BusinessException("Hồ sơ Tổ chức không tồn tại"));
+            if (profile.getVerificationStatus() != VerificationStatus.VERIFIED) {
+                throw new BusinessException("Tài khoản Tổ chức phải được xác minh trước khi tạo đơn tiếp nhận");
+            }
+        }
+    }
+
     private void validateFoodPostAvailability(FoodPost foodPost, Instant now) {
         if (foodPost.getPostStatus() != PostStatus.AVAILABLE) {
             throw new BusinessException("Bài đăng không ở trạng thái khả dụng");
@@ -510,14 +537,26 @@ public class OrderService {
         }
     }
 
-    private void validateRecipientLimits(User user, Long foodPostId, int quantity) {
+    private void validateRecipientLimits(User user, FoodPost foodPost, int quantity, long freeQuantityAlreadyConsidered) {
         if (user.getRole() != Role.RECIPIENT) return;
         if (quantity != 1) {
             throw new BusinessException("Người nhận cá nhân chỉ được nhận 1 phần cho mỗi bài đăng");
         }
-        if (orderRepository.existsByReceiverAndFoodPost(user.getId(), foodPostId)) {
+        if (foodPost.getPostType() == PostType.FREE
+                && freeQuantityAlreadyConsidered + quantity > DAILY_FREE_LIMIT) {
+            throw new BusinessException("Daily free-food limit exceeded (maximum " + DAILY_FREE_LIMIT + " portions)");
+        }
+        if (orderRepository.existsByReceiverAndFoodPost(user.getId(), foodPost.getId())) {
             throw new BusinessException("Bạn đã gửi yêu cầu cho bài đăng này rồi");
         }
+    }
+
+    private long countFreeQuantityToday(Long receiverId) {
+        ZoneId businessZone = ZoneId.of("Asia/Ho_Chi_Minh");
+        LocalDate today = LocalDate.now(businessZone);
+        Instant from = today.atStartOfDay(businessZone).toInstant();
+        Instant to = today.plusDays(1).atStartOfDay(businessZone).toInstant();
+        return orderRepository.sumFreeQuantityByReceiverBetween(receiverId, from, to);
     }
 
     private boolean transitionOrder(
@@ -706,6 +745,7 @@ public class OrderService {
                 com.datn.foodshare.service.payment.strategy.PaymentStrategy strategy = paymentStrategyFactory.getStrategy(payment.getMethod());
                 com.datn.foodshare.domain.entity.Payment refundedPayment = strategy.processRefund(payment);
                 paymentRepository.save(refundedPayment);
+                supplierEarningService.reverseForRefundedPayment(refundedPayment);
                 refunded = true;
             } else if (payment.getPaymentStatus() == com.datn.foodshare.util.constant.TransactionStatus.PENDING
                     || payment.getPaymentStatus() == com.datn.foodshare.util.constant.TransactionStatus.PROCESSING) {

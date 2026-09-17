@@ -173,6 +173,27 @@ class UserServiceTest {
     }
 
     @Test
+    void updateProfileAllowsGoogleUserToSelectRoleBeforeCompletion() {
+        User user = user(Role.RECIPIENT, AuthProvider.GOOGLE, "0901234567");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(businessProfileRepository.findByUserId(1L)).thenReturn(Optional.empty());
+        when(businessProfileRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateProfileRequest request = recipientProfileRequest();
+        request.setRole(Role.SUPPLIER);
+        request.setName("Quán ăn thiện nguyện");
+        request.setSupplierType(com.datn.foodshare.util.constant.SupplierType.RESTAURANT);
+        request.setLicenseUrls(List.of("https://res.cloudinary.com/demo/image/upload/licenses/a.jpg"));
+
+        var response = userService.updateProfile(request);
+
+        assertEquals(Role.SUPPLIER, user.getRole());
+        assertTrue(user.isProfileCompleted());
+        verify(userRepository).save(user);
+    }
+
+    @Test
     void updateCurrentUserStoresLocationAndRefreshesMatchingGraph() {
         User user = user(Role.RECIPIENT, AuthProvider.LOCAL, "0901234567");
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));

@@ -3,6 +3,8 @@ package com.datn.foodshare.service.payment.strategy;
 import com.datn.foodshare.domain.entity.Order;
 import com.datn.foodshare.domain.entity.Payment;
 import com.datn.foodshare.util.constant.TransactionStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.UUID;
@@ -13,10 +15,12 @@ import java.util.HashMap;
 import com.datn.foodshare.util.error.BusinessException;
 
 @Component
-
 public class MomoPaymentStrategy implements PaymentStrategy {
+    private static final Logger log = LoggerFactory.getLogger(MomoPaymentStrategy.class);
+
     private final RestClient client;
     @Value("${momo.endpoint:https://test-payment.momo.vn/v2/gateway/api/create}") private String endpoint;
+    @Value("${momo.refund-endpoint:https://test-payment.momo.vn/v2/gateway/api/refund}") private String refundEndpoint;
     @Value("${momo.partner-code:}") private String partnerCode;
     @Value("${momo.access-key:}") private String accessKey;
     @Value("${momo.secret-key:}") private String secretKey;
@@ -73,8 +77,45 @@ public class MomoPaymentStrategy implements PaymentStrategy {
     }
 
     @Override public Payment processRefund(Payment payment) {
+        String refundOrderId = "FS-REF-" + payment.getId() + "-" + System.currentTimeMillis();
+        String requestId = UUID.randomUUID().toString();
+
+        if (partnerCode != null && !partnerCode.isBlank() && accessKey != null && !accessKey.isBlank() && secretKey != null && !secretKey.isBlank()) {
+            try {
+                long amount = payment.getAmount().longValue();
+                String description = "Hoan tien don hang " + (payment.getOrder() != null ? payment.getOrder().getOrderCode() : payment.getId());
+                long transId = 0L;
+
+                String raw = "accessKey=" + accessKey + "&amount=" + amount
+                        + "&description=" + description + "&orderId=" + refundOrderId
+                        + "&partnerCode=" + partnerCode + "&requestId=" + requestId
+                        + "&transId=" + transId;
+
+                Map<String, Object> body = new HashMap<>();
+                body.put("partnerCode", partnerCode);
+                body.put("orderId", refundOrderId);
+                body.put("requestId", requestId);
+                body.put("amount", amount);
+                body.put("transId", transId);
+                body.put("lang", "vi");
+                body.put("description", description);
+                body.put("signature", GatewaySigning.hmacSha256(secretKey, raw));
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> response = client.post().uri(refundEndpoint).body(body).retrieve().body(Map.class);
+                if (response != null) {
+                    log.info("MoMo refund response for payment {}: {}", payment.getId(), response);
+                    if (response.get("transId") != null) {
+                        refundOrderId = String.valueOf(response.get("transId"));
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Lỗi khi gọi API MoMo refund cho payment {}: {}", payment.getId(), ex.getMessage());
+            }
+        }
+
         payment.setPaymentStatus(TransactionStatus.REFUNDED);
-        payment.setRefundTransactionId("MOMO-REF-" + UUID.randomUUID());
+        payment.setRefundTransactionId(refundOrderId);
         payment.setRefundedAt(Instant.now());
         return payment;
     }

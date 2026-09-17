@@ -61,6 +61,10 @@ public class FoodPostService {
         BusinessProfile businessProfile = resolveBusinessProfile(currentUser);
         requireVerifiedBusinessProfile(businessProfile);
         Category category = resolveCategory(request.getCategoryId());
+        BigDecimal pickupLatitude = request.getPickupLatitude() != null
+                ? request.getPickupLatitude() : currentUser.getLatitude();
+        BigDecimal pickupLongitude = request.getPickupLongitude() != null
+                ? request.getPickupLongitude() : currentUser.getLongitude();
 
         validatePrice(request.getPostType(), request.getUnitPrice());
         validatePickupWindow(request.getPickupStartAt(), request.getPickupEndAt());
@@ -79,6 +83,8 @@ public class FoodPostService {
                 .postStatus(Boolean.TRUE.equals(request.getIsDraft()) ? PostStatus.DRAFT : PostStatus.AVAILABLE)
                 .expiresAt(request.getExpiresAt())
                 .pickupAddress(request.getPickupAddress().trim())
+                .pickupLatitude(pickupLatitude)
+                .pickupLongitude(pickupLongitude)
                 .pickupStartAt(request.getPickupStartAt())
                 .pickupEndAt(request.getPickupEndAt())
                 .build();
@@ -229,6 +235,10 @@ public class FoodPostService {
 
         if (request.getPickupAddress() != null) {
             post.setPickupAddress(request.getPickupAddress().trim());
+            post.setPickupLatitude(request.getPickupLatitude() != null
+                    ? request.getPickupLatitude() : currentUser.getLatitude());
+            post.setPickupLongitude(request.getPickupLongitude() != null
+                    ? request.getPickupLongitude() : currentUser.getLongitude());
         }
 
         if (request.getImages() != null) {

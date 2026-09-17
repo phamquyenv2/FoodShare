@@ -99,4 +99,25 @@ class NotificationEventListenerTest {
         verify(notificationRepository).save(any(Notification.class));
         verifyNoInteractions(userDeviceRepository, fcmService, emailService);
     }
+
+    @Test
+    void pushDeliveryFailureDoesNotPreventEmailDelivery() {
+        User user = new User();
+        user.setId(1L);
+        user.setEmail("receiver@example.com");
+        NotificationEvent event = NotificationEvent.builder().source(this).user(user)
+                .title("Title").content("Body").type(NotificationType.SYSTEM)
+                .channels(Set.of(NotificationChannel.PUSH, NotificationChannel.EMAIL)).build();
+        UserDevice device = new UserDevice();
+        device.setFcmToken("token");
+        when(userDeviceRepository.findByUserIdAndIsActiveTrue(1L)).thenReturn(List.of(device));
+        org.mockito.Mockito.doThrow(new IllegalStateException("Push unavailable")).when(fcmService)
+                .sendPushNotification(eq("token"), eq("Title"), eq("Body"), any());
+
+        listener.handleNotificationEvent(event);
+
+        verify(emailService).sendEmail("receiver@example.com", "Title", "Body");
+        verify(notificationRepository).save(any(Notification.class));
+    }
+
 }

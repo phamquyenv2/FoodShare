@@ -41,6 +41,9 @@ public class UpdateFoodPostRequest {
     @Size(max = 500, message = "Địa điểm nhận tối đa 500 ký tự")
     private String pickupAddress;
 
+    private BigDecimal pickupLatitude;
+    private BigDecimal pickupLongitude;
+
     private Instant pickupStartAt;
 
     private Instant pickupEndAt;

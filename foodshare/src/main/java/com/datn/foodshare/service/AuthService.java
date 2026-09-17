@@ -114,15 +114,17 @@ public class AuthService {
                 emailOwner.setGoogleSubject(googleUser.getGoogleId());
                 user = userRepository.save(emailOwner);
             } else {
-                validateSelfRegistrationRole(request.getRole());
+                Role initialRole = request.getRole() != null ? request.getRole() : Role.RECIPIENT;
+                validateSelfRegistrationRole(initialRole);
                 user = User.builder()
                         .email(email)
                         .googleSubject(googleUser.getGoogleId())
                         .fullName(resolveGoogleName(googleUser))
                         .avatarUrl(uploadGoogleAvatar(googleUser.getPicture()))
-                        .role(request.getRole())
+                        .role(initialRole)
                         .authProvider(AuthProvider.GOOGLE)
                         .active(true)
+                        .profileCompleted(false)
                         .build();
                 user = userRepository.save(user);
             }

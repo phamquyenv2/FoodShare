@@ -3,7 +3,7 @@ package com.datn.foodshare.repository;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.util.constant.OrderStatus;
 import com.datn.foodshare.util.constant.PostStatus;
-import com.datn.foodshare.util.constant.TransactionStatus;
+import com.datn.foodshare.util.constant.PayoutStatus;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
@@ -36,10 +36,10 @@ public interface StatisticRepository extends Repository<User, Long> {
     long countOrdersByStatus(@Param("status") OrderStatus status);
 
     @Query("SELECT COALESCE(SUM(p.platformFee), 0) FROM Payout p WHERE p.payoutStatus = :status AND p.createdAt BETWEEN :fromTs AND :toTs")
-    BigDecimal sumRevenue(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs, @Param("status") TransactionStatus status);
+    BigDecimal sumRevenue(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs, @Param("status") PayoutStatus status);
 
     @Query("SELECT COALESCE(SUM(p.netAmount), 0) FROM Payout p WHERE p.payoutStatus = :status AND p.createdAt BETWEEN :fromTs AND :toTs")
-    BigDecimal sumPayout(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs, @Param("status") TransactionStatus status);
+    BigDecimal sumPayout(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs, @Param("status") PayoutStatus status);
 
     @Query("SELECT CAST(FUNCTION('DATE', u.createdAt) AS string) as dateStr, COUNT(u.id) as val FROM User u WHERE u.createdAt BETWEEN :fromTs AND :toTs GROUP BY CAST(FUNCTION('DATE', u.createdAt) AS string) ORDER BY dateStr")
     List<DailyMetricProjection> getUserRegistrationsChart(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs);
@@ -48,5 +48,5 @@ public interface StatisticRepository extends Repository<User, Long> {
     List<DailyMetricProjection> getOrderCountsChart(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs);
 
     @Query("SELECT CAST(FUNCTION('DATE', p.createdAt) AS string) as dateStr, SUM(p.platformFee) as val FROM Payout p WHERE p.payoutStatus = :status AND p.createdAt BETWEEN :fromTs AND :toTs GROUP BY CAST(FUNCTION('DATE', p.createdAt) AS string) ORDER BY dateStr")
-    List<DailyMetricProjection> getDailyRevenueChart(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs, @Param("status") TransactionStatus status);
+    List<DailyMetricProjection> getDailyRevenueChart(@Param("fromTs") Instant fromTs, @Param("toTs") Instant toTs, @Param("status") PayoutStatus status);
 }

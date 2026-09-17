@@ -23,6 +23,9 @@ public class ReportResponse {
     private String evidenceUrl;
     private ReportReferenceType referenceType;
     private Long referenceId;
+    private Long targetBusinessProfileId;
+    private String targetBusinessName;
+    private String targetName;
     private Instant createdAt;
     private Instant updatedAt;
     private Instant resolvedAt;
@@ -37,6 +40,14 @@ public class ReportResponse {
     }
 
     public static ReportResponse from(Report report) {
+        return from(report, null, null);
+    }
+
+    public static ReportResponse from(Report report, Long targetBusinessProfileId, String targetBusinessName) {
+        return from(report, targetBusinessProfileId, targetBusinessName, null);
+    }
+
+    public static ReportResponse from(Report report, Long targetBusinessProfileId, String targetBusinessName, String targetName) {
         return ReportResponse.builder()
                 .id(report.getId())
                 .reporter(ReporterInfo.builder()
@@ -53,6 +64,9 @@ public class ReportResponse {
                 .evidenceUrl(report.getEvidenceUrl())
                 .referenceType(report.getReferenceType())
                 .referenceId(report.getReferenceId())
+                .targetBusinessProfileId(targetBusinessProfileId)
+                .targetBusinessName(targetBusinessName)
+                .targetName(targetName)
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .resolvedAt(report.getResolvedAt())

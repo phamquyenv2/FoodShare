@@ -62,6 +62,8 @@ class OrderReliabilityTest {
     private SupplierEarningService supplierEarningService;
     @Mock
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock
+    private com.datn.foodshare.repository.BusinessProfileRepository businessProfileRepository;
     private PermissionService permissionService;
 
     private OrderService orderService;
@@ -85,8 +87,11 @@ class OrderReliabilityTest {
                 paymentStrategyFactory,
                 supplierEarningService,
                 eventPublisher,
-                permissionService
+                permissionService,
+                businessProfileRepository
         );
+        lenient().when(businessProfileRepository.findByUserId(ORGANIZATION_USER_ID))
+                .thenReturn(Optional.of(organizationBusinessProfile()));
     }
 
     // ==============================
@@ -454,5 +459,13 @@ class OrderReliabilityTest {
         request.setFoodPostId(FOOD_POST_ID);
         request.setQuantity(1);
         return request;
+    }
+
+    private BusinessProfile organizationBusinessProfile() {
+        BusinessProfile bp = new BusinessProfile();
+        bp.setId(2L);
+        bp.setVerificationStatus(com.datn.foodshare.util.constant.VerificationStatus.VERIFIED);
+        bp.setProfileType(com.datn.foodshare.util.constant.ProfileType.ORGANIZATION);
+        return bp;
     }
 }

@@ -20,6 +20,7 @@ import com.datn.foodshare.util.constant.NotificationReferenceType;
 import com.datn.foodshare.util.constant.NotificationChannel;
 import com.datn.foodshare.util.constant.NotificationType;
 import com.datn.foodshare.util.constant.ProfileType;
+import com.datn.foodshare.util.constant.AuthProvider;
 import com.datn.foodshare.util.constant.Role;
 import com.datn.foodshare.domain.entity.Notification;
 import com.datn.foodshare.util.error.BusinessException;
@@ -106,7 +107,13 @@ public class UserService {
         User user = getAuthenticatedUser();
         
         if (request.getRole() != null && request.getRole() != user.getRole()) {
-            throw new BusinessException("Không được phép thay đổi vai trò");
+            if (user.getAuthProvider() != AuthProvider.GOOGLE || user.isProfileCompleted()) {
+                throw new BusinessException("Không được phép thay đổi vai trò");
+            }
+            if (request.getRole() == Role.ADMIN) {
+                throw new BusinessException("Không thể tự đăng ký tài khoản ADMIN");
+            }
+            user.setRole(request.getRole());
         }
 
         if (user.getRole() == Role.ADMIN) {

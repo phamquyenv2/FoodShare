@@ -21,8 +21,30 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
+    @Query("""
+            SELECT o FROM Order o
+            JOIN FETCH o.receiver r
+            JOIN FETCH o.businessProfile bp
+            WHERE (:keyword IS NULL OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(r.fullName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(bp.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:status IS NULL OR o.orderStatus = :status)
+            """)
+    Page<Order> adminSearch(@Param("keyword") String keyword, @Param("status") OrderStatus status, Pageable pageable);
+
     @Query("SELECT CASE WHEN COUNT(o) > 0 THEN true ELSE false END FROM Order o JOIN o.orderDetails od WHERE o.receiver.id = :receiverId AND od.foodPost.id = :foodPostId")
     boolean existsByReceiverAndFoodPost(@Param("receiverId") Long receiverId, @Param("foodPostId") Long foodPostId);
+
+    @Query("""
+            SELECT COALESCE(SUM(od.quantity), 0)
+            FROM Order o JOIN o.orderDetails od
+            WHERE o.receiver.id = :receiverId
+              AND od.foodPost.postType = com.datn.foodshare.util.constant.PostType.FREE
+              AND o.createdAt >= :from AND o.createdAt < :to
+            """)
+    long sumFreeQuantityByReceiverBetween(@Param("receiverId") Long receiverId,
+                                          @Param("from") Instant from,
+                                          @Param("to") Instant to);
 
     @Query("""
             SELECT o.receiver.id, COUNT(o)
@@ -32,6 +54,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             GROUP BY o.receiver.id
             """)
     List<Object[]> countActiveOrdersByReceiverIds(@Param("receiverIds") Collection<Long> receiverIds, @Param("statuses") Collection<OrderStatus> statuses);
+    // Match OrderService's duplicate-request rule: history includes cancelled/rejected orders.
+    @Query("""
+            SELECT DISTINCT o.receiver.id, od.foodPost.id
+            FROM Order o JOIN o.orderDetails od
+            WHERE o.receiver.id IN :receiverIds
+            """)
+    List<Object[]> findPreviouslyRequestedPostIds(@Param("receiverIds") Collection<Long> receiverIds);
+
     Page<Order> findByReceiverId(Long receiverId, Pageable pageable);
     
     @Query("""

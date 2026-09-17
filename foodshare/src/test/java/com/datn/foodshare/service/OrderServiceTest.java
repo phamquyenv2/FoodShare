@@ -41,6 +41,18 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -78,6 +90,8 @@ class OrderServiceTest {
     private SupplierEarningService supplierEarningService;
     @Mock
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock
+    private com.datn.foodshare.repository.BusinessProfileRepository businessProfileRepository;
     private PermissionService permissionService;
 
     @BeforeEach
@@ -92,8 +106,11 @@ class OrderServiceTest {
                 paymentStrategyFactory,
                 supplierEarningService,
                 eventPublisher,
-                permissionService
+                permissionService,
+                businessProfileRepository
         );
+        lenient().when(businessProfileRepository.findByUserId(ORGANIZATION_USER_ID))
+                .thenReturn(Optional.of(organizationBusinessProfile(com.datn.foodshare.util.constant.VerificationStatus.VERIFIED)));
     }
 
     @Test
@@ -154,6 +171,51 @@ class OrderServiceTest {
 
             verify(orderRepository, never()).save(any());
             verifyNoInteractions(foodPostService);
+        }
+    }
+
+    @Test
+    void createOrder_rejectsRecipientWhenDailyFreeLimitReached() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(RECIPIENT_USER_ID));
+            when(userRepository.findById(RECIPIENT_USER_ID)).thenReturn(Optional.of(recipientUser()));
+            when(foodPostRepository.findByIdWithDetails(FOOD_POST_ID)).thenReturn(Optional.of(availableFoodPost()));
+            when(orderRepository.sumFreeQuantityByReceiverBetween(any(), any(), any())).thenReturn(3L);
+
+            assertThrows(BusinessException.class, () -> orderService.createOrder(validCreateOrderRequest()));
+            verify(orderRepository, never()).save(any());
+            verifyNoInteractions(foodPostService);
+        }
+    }
+
+    @Test
+    void createOrder_allowsRecipientUpToThreeFreePortionsPerDay() throws PermissionException {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(RECIPIENT_USER_ID));
+            when(userRepository.findById(RECIPIENT_USER_ID)).thenReturn(Optional.of(recipientUser()));
+            when(foodPostRepository.findByIdWithDetails(FOOD_POST_ID)).thenReturn(Optional.of(availableFoodPost()));
+            when(orderRepository.sumFreeQuantityByReceiverBetween(any(), any(), any())).thenReturn(2L);
+            when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            assertNotNull(orderService.createOrder(validCreateOrderRequest()));
+            verify(orderRepository).save(any(Order.class));
+        }
+    }
+
+    @Test
+    void createOrder_paidPostIsNotSubjectToDailyFreeLimit() throws PermissionException {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(RECIPIENT_USER_ID));
+            when(userRepository.findById(RECIPIENT_USER_ID)).thenReturn(Optional.of(recipientUser()));
+            FoodPost paid = availableFoodPost();
+            paid.setPostType(PostType.PAID);
+            paid.setUnitPrice(new BigDecimal("10000"));
+            when(foodPostRepository.findByIdWithDetails(FOOD_POST_ID)).thenReturn(Optional.of(paid));
+            when(orderRepository.sumFreeQuantityByReceiverBetween(any(), any(), any())).thenReturn(3L);
+            when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            assertNotNull(orderService.createOrder(validCreateOrderRequest()));
+            verify(orderRepository).save(any(Order.class));
         }
     }
 
@@ -1565,5 +1627,44 @@ class OrderServiceTest {
         request.setFoodPostId(FOOD_POST_ID);
         request.setQuantity(1);
         return request;
+    }
+
+    private BusinessProfile organizationBusinessProfile(com.datn.foodshare.util.constant.VerificationStatus status) {
+        BusinessProfile bp = new BusinessProfile();
+        bp.setId(2L);
+        bp.setVerificationStatus(status);
+        bp.setProfileType(com.datn.foodshare.util.constant.ProfileType.ORGANIZATION);
+        return bp;
+    }
+
+    @Test
+    void createOrder_rejectsUnverifiedOrganization() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(ORGANIZATION_USER_ID));
+            when(userRepository.findById(ORGANIZATION_USER_ID)).thenReturn(Optional.of(organizationUser()));
+            when(businessProfileRepository.findByUserId(ORGANIZATION_USER_ID))
+                    .thenReturn(Optional.of(organizationBusinessProfile(com.datn.foodshare.util.constant.VerificationStatus.UNVERIFIED)));
+
+            CreateOrderRequest request = validCreateOrderRequest();
+            BusinessException ex = assertThrows(BusinessException.class, () -> orderService.createOrder(request));
+            assertTrue(ex.getMessage().contains("xác minh"));
+            verify(orderRepository, never()).save(any());
+        }
+    }
+
+    @Test
+    void batchCreateOrders_rejectsUnverifiedOrganization() {
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(ORGANIZATION_USER_ID));
+            when(userRepository.findById(ORGANIZATION_USER_ID)).thenReturn(Optional.of(organizationUser()));
+            when(businessProfileRepository.findByUserId(ORGANIZATION_USER_ID))
+                    .thenReturn(Optional.of(organizationBusinessProfile(com.datn.foodshare.util.constant.VerificationStatus.UNVERIFIED)));
+
+            com.datn.foodshare.domain.request.BatchCreateOrderRequest request = new com.datn.foodshare.domain.request.BatchCreateOrderRequest(List.of(
+                    new CreateOrderRequest(FOOD_POST_ID, 1, null)));
+            BusinessException ex = assertThrows(BusinessException.class, () -> orderService.batchCreateOrders(request));
+            assertTrue(ex.getMessage().contains("xác minh"));
+            verify(orderRepository, never()).save(any());
+        }
     }
 }

@@ -50,6 +50,12 @@ class ReportServiceTest {
     private UserRepository userRepository;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private com.datn.foodshare.repository.PaymentRepository paymentRepository;
+    @Mock
+    private com.datn.foodshare.service.payment.strategy.PaymentStrategyFactory paymentStrategyFactory;
+    @Mock
+    private SupplierEarningService supplierEarningService;
 
     private ReportService reportService;
 
@@ -58,7 +64,8 @@ class ReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        reportService = new ReportService(reportRepository, orderRepository, userRepository, eventPublisher);
+        reportService = new ReportService(reportRepository, orderRepository, userRepository,
+                eventPublisher, paymentRepository, paymentStrategyFactory, supplierEarningService);
     }
 
     @Test

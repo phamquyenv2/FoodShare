@@ -43,6 +43,9 @@ public class ReportService {
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.datn.foodshare.repository.PaymentRepository paymentRepository;
+    private final com.datn.foodshare.service.payment.strategy.PaymentStrategyFactory paymentStrategyFactory;
+    private final SupplierEarningService supplierEarningService;
 
     @Transactional
     public ReportResponse createReport(CreateReportRequest request) {
@@ -158,14 +161,36 @@ public class ReportService {
         }
 
         Report savedReport = reportRepository.save(report);
+
+        boolean refunded = false;
+        if (request.getReportStatus() == ReportStatus.RESOLVED && report.getReferenceType() == ReportReferenceType.ORDER) {
+            java.util.List<com.datn.foodshare.domain.entity.Payment> payments = paymentRepository.findByOrderId(report.getReferenceId());
+            for (com.datn.foodshare.domain.entity.Payment payment : payments) {
+                if (payment.getPaymentStatus() == com.datn.foodshare.util.constant.TransactionStatus.SUCCESS) {
+                    try {
+                        com.datn.foodshare.service.payment.strategy.PaymentStrategy strategy = paymentStrategyFactory.getStrategy(payment.getMethod());
+                        com.datn.foodshare.domain.entity.Payment refundedPayment = strategy.processRefund(payment);
+                        paymentRepository.save(refundedPayment);
+                        supplierEarningService.reverseForRefundedPayment(refundedPayment);
+                        refunded = true;
+                    } catch (Exception e) {
+                        log.error("Failed to refund payment ID {} on report resolution: {}", payment.getId(), e.getMessage(), e);
+                    }
+                }
+            }
+        }
         
         log.info("Admin đã cập nhật trạng thái report {} thành {}", savedReport.getId(), savedReport.getReportStatus());
+
+        String notificationContent = refunded
+                ? "Báo cáo của bạn (Mã: " + savedReport.getId() + ") đã được giải quyết thành công. Khoản thanh toán cho đơn hàng đã được hoàn lại."
+                : "Báo cáo của bạn (Mã: " + savedReport.getId() + ") đã được chuyển sang trạng thái: " + savedReport.getReportStatus();
 
         eventPublisher.publishEvent(NotificationEvent.builder()
                 .source(this)
                 .user(savedReport.getReporter())
                 .title("Cập nhật khiếu nại / báo cáo")
-                .content("Báo cáo của bạn (Mã: " + savedReport.getId() + ") đã được chuyển sang trạng thái: " + savedReport.getReportStatus())
+                .content(notificationContent)
                 .type(NotificationType.SYSTEM)
                 .referenceType(NotificationReferenceType.REPORT)
                 .referenceId(savedReport.getId())

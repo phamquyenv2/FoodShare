@@ -85,6 +85,12 @@ public class FoodPost extends BaseModel {
     @Column(nullable = false, length = 500)
     private String pickupAddress;
 
+    @Column(precision = 10, scale = 7)
+    private BigDecimal pickupLatitude;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal pickupLongitude;
+
     @Column(nullable = false)
     private Instant pickupStartAt;
 

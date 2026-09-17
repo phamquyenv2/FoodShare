@@ -54,7 +54,11 @@ public class NotificationEventListener {
 
                 for (UserDevice device : activeDevices) {
                     if (device.getFcmToken() != null && !device.getFcmToken().isBlank()) {
-                        fcmService.sendPushNotification(device.getFcmToken(), event.getTitle(), event.getContent(), data);
+                        try {
+                            fcmService.sendPushNotification(device.getFcmToken(), event.getTitle(), event.getContent(), data);
+                        } catch (RuntimeException exception) {
+                            log.error("Push delivery failed for user {}; continuing other channels", event.getUser().getId(), exception);
+                        }
                     }
                 }
             }

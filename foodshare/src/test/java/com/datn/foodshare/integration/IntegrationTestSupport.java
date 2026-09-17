@@ -29,8 +29,13 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,11 +48,16 @@ import java.util.UUID;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.jpa.open-in-view=false",
         "spring.flyway.enabled=false",
-        "firebase.credentials.path=",
-        "app.jwt.secret=dGhpc19pc19hX3Zlcnlfc2VjdXJlX2tleV9mb3JfZm9vZHNoYXJlX2ludGVncmF0aW9uX3Rlc3Rz"
+        "firebase.credentials.path="
 })
 @AutoConfigureMockMvc
 public abstract class IntegrationTestSupport {
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("app.jwt.secret", () -> Base64.getEncoder().encodeToString(
+                "foodshare-integration-test-key-32b!".getBytes(StandardCharsets.UTF_8)));
+    }
 
     protected final ObjectMapper objectMapper = new ObjectMapper();
 

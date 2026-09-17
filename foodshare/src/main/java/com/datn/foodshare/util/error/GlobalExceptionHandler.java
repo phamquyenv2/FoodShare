@@ -17,6 +17,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import jakarta.persistence.OptimisticLockException;
+
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -30,6 +33,19 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final String SYSTEM_ERROR_MESSAGE = "Lỗi hệ thống, xin lỗi vì sự bất tiện này.";
+
+    @ExceptionHandler(value = {
+            ObjectOptimisticLockingFailureException.class,
+            OptimisticLockException.class
+    })
+    public ResponseEntity<RestResponse<Object>> handleOptimisticLockingException(Exception ex) {
+        log.warn("Optimistic locking conflict: {}", ex.getMessage());
+        RestResponse<Object> res = new RestResponse<>();
+        res.setStatusCode(HttpStatus.CONFLICT.value());
+        res.setError("Conflict");
+        res.setMessage("Số lượng thực phẩm vừa được cập nhật bởi một yêu cầu khác. Vui lòng làm mới và thử lại.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(res);
+    }
 
     @ExceptionHandler(value = {
             IdInvalidException.class,

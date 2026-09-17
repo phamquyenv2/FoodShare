@@ -12,9 +12,18 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
+    @Query("""
+            SELECT p FROM Payment p JOIN FETCH p.order o
+            WHERE (:keyword IS NULL OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              OR LOWER(p.externalTransactionId) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:status IS NULL OR p.paymentStatus = :status)
+            """)
+    Page<Payment> adminSearch(@Param("keyword") String keyword, @Param("status") TransactionStatus status, Pageable pageable);
     List<Payment> findByOrderId(Long orderId);
     Optional<Payment> findByExternalTransactionId(String externalTransactionId);
 
