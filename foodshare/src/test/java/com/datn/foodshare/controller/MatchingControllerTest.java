@@ -16,16 +16,17 @@ class MatchingControllerTest {
     @Test
     void getRecommendations_delegatesToUserSpecificPipeline() throws Exception {
         MatchingPipelineService pipeline = mock(MatchingPipelineService.class);
-        MatchingController controller = new MatchingController(pipeline);
+        var synchronizer = mock(com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer.class);
+        MatchingController controller = new MatchingController(pipeline, synchronizer);
         FoodPostResponse recommendation = FoodPostResponse.builder()
                 .id(10L)
                 .matchScore(87.0)
                 .build();
-        when(pipeline.recommendForCurrentUser(6)).thenReturn(List.of(recommendation));
+        when(pipeline.recommendForCurrentUser(6, MatchingPipelineService.RecommendationMode.BEST_MATCH)).thenReturn(List.of(recommendation));
 
-        var response = controller.getRecommendations(6);
+        var response = controller.getRecommendations(6, MatchingPipelineService.RecommendationMode.BEST_MATCH);
 
         assertEquals(List.of(recommendation), response.getBody());
-        verify(pipeline).recommendForCurrentUser(6);
+        verify(pipeline).recommendForCurrentUser(6, MatchingPipelineService.RecommendationMode.BEST_MATCH);
     }
 }

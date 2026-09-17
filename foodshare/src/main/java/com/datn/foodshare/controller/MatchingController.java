@@ -20,12 +20,22 @@ import java.util.List;
 public class MatchingController {
 
     private final MatchingPipelineService matchingPipelineService;
+    private final com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer dynamicMatchingGraphSynchronizer;
 
     @GetMapping("/recommendations")
     @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
     @ApiMessage("Lấy danh sách gợi ý phù hợp thành công")
     public ResponseEntity<List<FoodPostResponse>> getRecommendations(
-            @RequestParam(name = "size", defaultValue = "6") int size) throws PermissionException {
-        return ResponseEntity.ok(matchingPipelineService.recommendForCurrentUser(size));
+            @RequestParam(name = "size", defaultValue = "6") int size,
+            @RequestParam(name = "mode", defaultValue = "BEST_MATCH")
+            MatchingPipelineService.RecommendationMode mode) throws PermissionException {
+        return ResponseEntity.ok(matchingPipelineService.recommendForCurrentUser(size, mode));
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/rebuild")
+    @ApiMessage("Đồng bộ Matching Graph từ cơ sở dữ liệu thành công")
+    public ResponseEntity<Void> rebuild() {
+        dynamicMatchingGraphSynchronizer.rebuildFromDatabase();
+        return ResponseEntity.ok().build();
     }
 }

@@ -147,6 +147,16 @@ public class MatchingCandidateFilter {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    Map<Long, Set<Long>> loadPreviouslyRequestedPosts(java.util.Collection<Long> ids) {
+        return receiverCapacityService.previouslyRequestedPosts(ids);
+    }
+
+    Map<Long, Long> loadActiveOrderCounts(java.util.Collection<Long> ids) { return receiverCapacityService.countActiveOrders(ids); }
+
+    long countFreeQuantityToday(Long receiverId) {
+        return receiverCapacityService.countFreeQuantityToday(receiverId);
+    }
+
     boolean isGloballyEligibleCandidate(User candidate) {
         return candidate != null
                 && candidate.getId() != null

@@ -1,32 +1,28 @@
 package com.datn.foodshare.service.matching;
 
-import com.datn.foodshare.domain.entity.FoodPost;
 import com.datn.foodshare.domain.entity.User;
 import com.datn.foodshare.repository.FoodPostRepository;
 import com.datn.foodshare.repository.UserRepository;
-import com.datn.foodshare.service.matching.DynamicMatchingGraph.CandidateEdge;
 import com.datn.foodshare.util.constant.PostStatus;
 import com.datn.foodshare.util.constant.Role;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class DynamicMatchingGraphSynchronizer {
-
     private final DynamicMatchingGraph graph;
     private final FoodPostRepository foodPostRepository;
     private final UserRepository userRepository;
@@ -35,124 +31,60 @@ public class DynamicMatchingGraphSynchronizer {
 
     @PostConstruct
     public void initialize() {
-        try {
-            rebuildFromDatabase();
-        } catch (RuntimeException exception) {
-            log.error("Không thể khởi tạo dynamic matching graph; nó vẫn có thể được xây dựng lại từ cơ sở dữ liệu", exception);
-        }
+        try { rebuildFromDatabase(); }
+        catch (RuntimeException e) { graph.markUnavailable(); log.error("Cannot initialize matching graph", e); }
     }
-
-    public void foodPostChangedAfterCommit(long foodPostId) {
-        eventPublisher.publishEvent(new FoodPostChanged(foodPostId));
-    }
-
-    public void userChangedAfterCommit(long userId) {
-        eventPublisher.publishEvent(new UserChanged(userId));
-    }
-
-    public void rebuildAfterCommit() {
-        eventPublisher.publishEvent(new RebuildRequested());
-    }
+    public void foodPostChangedAfterCommit(long id) { eventPublisher.publishEvent(new FoodPostChanged(id)); }
+    public void userChangedAfterCommit(long id) { eventPublisher.publishEvent(new UserChanged(id)); }
+    public void rebuildAfterCommit() { eventPublisher.publishEvent(new RebuildRequested()); }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public synchronized void onFoodPostChanged(FoodPostChanged event) {
         try {
-            synchronizeFoodPost(event.foodPostId());
-        } catch (RuntimeException exception) {
-            log.error("Không thể đồng bộ FoodPost {} với dynamic matching graph", event.foodPostId(), exception);
-        }
+            var post = foodPostRepository.findByIdForMatching(event.foodPostId()).orElse(null);
+            if (post == null) graph.removeFoodPost(event.foodPostId());
+            else graph.synchronizeFoodPost(post);
+        } catch (RuntimeException e) { graph.markUnavailable(); log.error("Cannot synchronize post {}", event.foodPostId(), e); }
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public synchronized void onUserChanged(UserChanged event) {
         try {
-            synchronizeUser(event.userId());
-        } catch (RuntimeException exception) {
-            log.error("Không thể đồng bộ user {} với dynamic matching graph", event.userId(), exception);
-        }
+            User user = userRepository.findById(event.userId()).orElse(null);
+            if (candidateFilter.isGloballyEligibleCandidate(user)) {
+                long count = candidateFilter.loadActiveOrderCounts(List.of(user.getId())).getOrDefault(user.getId(), 0L);
+                graph.synchronizeCandidate(user, count,
+                        candidateFilter.loadPreviouslyRequestedPosts(List.of(user.getId()))
+                                .getOrDefault(user.getId(), java.util.Set.of()));
+                graph.updateFreeQuantityToday(user.getId(), candidateFilter.countFreeQuantityToday(user.getId()));
+            } else graph.removeCandidate(event.userId());
+            if (user != null && user.getRole() == Role.SUPPLIER) graph.synchronizeSupplier(user);
+        } catch (RuntimeException e) { graph.markUnavailable(); log.error("Cannot synchronize user {}", event.userId(), e); }
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public synchronized void onRebuildRequested(RebuildRequested event) {
-        try {
-            rebuildFromDatabase();
-        } catch (RuntimeException exception) {
-            log.error("Không thể xây dựng lại dynamic matching graph", exception);
-        }
-    }
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public synchronized void onRebuildRequested(RebuildRequested event) { initialize(); }
 
-    public void rebuildFromDatabase() {
-        Instant now = Instant.now();
-        List<FoodPost> foodPosts = foodPostRepository
-                .findAllForMatchingGraph(PostStatus.AVAILABLE, now, 0);
-        List<User> globallyEligibleCandidates = candidateFilter.findGloballyEligibleCandidates();
-        Map<Long, List<User>> candidatesByPostId = candidateFilter
-                .filterCandidates(foodPosts, globallyEligibleCandidates);
+    /** Recovery and reconciliation for missed events/external SQL; requests never silently use a broken graph. */
+    @Scheduled(fixedDelay = 300_000, initialDelay = 300_000)
+    @Transactional(readOnly = true)
+    public synchronized void reconcile() { initialize(); }
 
-        Map<Long, User> candidateNodes = new LinkedHashMap<>();
-        globallyEligibleCandidates.forEach(candidate -> candidateNodes.put(candidate.getId(), candidate));
-        List<CandidateEdge> edges = new ArrayList<>();
-
-        for (FoodPost foodPost : foodPosts) {
-            for (User candidate : candidatesByPostId.getOrDefault(foodPost.getId(), List.of())) {
-                candidateNodes.put(candidate.getId(), candidate);
-                edges.add(new CandidateEdge(foodPost.getId(), candidate.getId()));
-            }
-        }
-
-        graph.replaceAll(foodPosts, candidateNodes.values(), edges);
-        log.info("Dynamic matching graph được xây dựng lại: {} FoodPost node(s), {} candidate node(s), {} edge(s)",
+    public synchronized void rebuildFromDatabase() {
+        var posts = foodPostRepository.findAllForMatchingGraph(PostStatus.AVAILABLE, Instant.now(), 0);
+        var candidates = candidateFilter.findGloballyEligibleCandidates();
+        var counts = candidateFilter.loadActiveOrderCounts(candidates.stream().map(User::getId).toList());
+        graph.rebuild(posts, candidates, counts,
+                candidateFilter.loadPreviouslyRequestedPosts(candidates.stream().map(User::getId).toList()));
+        candidates.forEach(user -> graph.updateFreeQuantityToday(user.getId(),
+                candidateFilter.countFreeQuantityToday(user.getId())));
+        log.info("Matching graph ready: {} posts, {} receivers, {} edges",
                 graph.foodPostCount(), graph.candidateCount(), graph.edgeCount());
     }
-
-    private void synchronizeFoodPost(long foodPostId) {
-        FoodPost foodPost = foodPostRepository.findByIdForMatching(foodPostId).orElse(null);
-        synchronizeFoodPost(foodPostId, foodPost);
-    }
-
-    private void synchronizeFoodPost(long foodPostId, FoodPost foodPost) {
-        if (!DynamicMatchingGraph.isEligible(foodPost, Instant.now())) {
-            graph.removeFoodPost(foodPostId);
-            return;
-        }
-        graph.addOrUpdateFoodPost(foodPost, candidateFilter.filterCandidates(foodPost));
-    }
-
-    private void synchronizeUser(long userId) {
-        User user = userRepository.findById(userId).orElse(null);
-
-        if (candidateFilter.isGloballyEligibleCandidate(user)) {
-            synchronizeCandidate(user);
-        } else {
-            graph.removeCandidate(userId);
-        }
-
-        if (user != null && user.getRole() == Role.SUPPLIER) {
-            foodPostRepository.findAllBySupplierUserIdForMatching(userId)
-                    .forEach(foodPost -> synchronizeFoodPost(foodPost.getId(), foodPost));
-        }
-    }
-
-    private void synchronizeCandidate(User candidate) {
-        graph.addOrUpdateCandidate(candidate);
-        List<FoodPost> foodPosts = foodPostRepository
-                .findAllForMatchingGraph(PostStatus.AVAILABLE, Instant.now(), 0);
-        Set<Long> eligibleFoodPostIds = candidateFilter.findEligibleFoodPostIds(foodPosts, candidate);
-        for (FoodPost foodPost : foodPosts) {
-            graph.updateCandidateRelation(
-                    foodPost.getId(),
-                    candidate,
-                    eligibleFoodPostIds.contains(foodPost.getId())
-            );
-        }
-    }
-
-    record FoodPostChanged(long foodPostId) {
-    }
-
-    record UserChanged(long userId) {
-    }
-
-    record RebuildRequested() {
-    }
+    public record FoodPostChanged(long foodPostId) {}
+    public record UserChanged(long userId) {}
+    public record RebuildRequested() {}
 }

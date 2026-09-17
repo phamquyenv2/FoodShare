@@ -121,3 +121,12 @@ tasks.register<JacocoReport>("jacocoUnitTestReport") {
 		html.outputLocation = layout.buildDirectory.dir("reports/jacoco/unitTest/html")
 	}
 }
+
+tasks.register<JavaExec>("matchingBenchmark") {
+    description = "Runs deterministic in-memory matching benchmarks and writes CSV/Markdown reports."
+    group = "verification"
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.datn.foodshare.service.matching.MatchingEngineBenchmark")
+    maxHeapSize = "1024m"
+}
