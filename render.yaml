@@ -2,6 +2,7 @@ services:
   - type: web
     name: foodshare-api
     runtime: docker
+    plan: free
     rootDir: foodshare
     dockerfilePath: ./Dockerfile
     dockerContext: .
