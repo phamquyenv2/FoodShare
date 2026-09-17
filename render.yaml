@@ -1,0 +1,75 @@
+services:
+  - type: web
+    name: foodshare-api
+    runtime: docker
+    rootDir: foodshare
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: OPENAPI_ENABLED
+        value: "false"
+      - key: HEALTH_SHOW_DETAILS
+        value: "never"
+      - key: REFRESH_COOKIE_SECURE
+        value: "true"
+      - key: REFRESH_COOKIE_SAME_SITE
+        value: "None"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRATION
+        value: "86400"
+      - key: JWT_REFRESH_EXPIRATION
+        value: "2592000"
+      - key: APP_FRONTEND_URL
+        sync: false
+
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JPA_DDL_AUTO
+        value: "update"
+      - key: FLYWAY_ENABLED
+        value: "true"
+
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+      - key: GEOAPIFY_API_KEY
+        sync: false
+
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+
+      - key: FIREBASE_CREDENTIALS_PATH
+        value: "classpath:foodshare-29e9a-firebase-adminsdk-fbsvc-3b9b8b5682.json"
+
+      - key: MOMO_PARTNER_CODE
+        sync: false
+      - key: MOMO_ACCESS_KEY
+        sync: false
+      - key: MOMO_SECRET_KEY
+        sync: false
+      - key: MOMO_REDIRECT_URL
+        sync: false
+      - key: MOMO_IPN_URL
+        sync: false
+
+      - key: ZALOPAY_APP_ID
+        sync: false
+      - key: ZALOPAY_KEY1
+        sync: false
+      - key: ZALOPAY_KEY2
+        sync: false
+      - key: ZALOPAY_REDIRECT_URL
+        sync: false
+      - key: ZALOPAY_CALLBACK_URL
+        sync: false
+

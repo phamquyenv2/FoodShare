@@ -31,6 +31,7 @@ foodshare/src/main/resources/foodshare-*.json
 
 # Environment variables (ch?a secret)
 foodshare/.env
+foodshare-ui/.env.production
 
 
 .agent

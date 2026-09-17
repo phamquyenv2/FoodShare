@@ -1,14 +1,22 @@
 {
+    "version": "0.2.0",
     "configurations": [
         {
             "type": "java",
             "name": "Spring Boot-FoodshareApplication<foodshare>",
             "request": "launch",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/foodshare",
             "mainClass": "com.datn.foodshare.FoodshareApplication",
             "projectName": "foodshare",
+            "classPaths": [
+                "${workspaceFolder}/foodshare/build/classes/java/main",
+                "${workspaceFolder}/foodshare/build/resources/main",
+                "$Auto"
+            ],
+            "preLaunchTask": "foodshare: classes",
             "args": "",
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/foodshare/.env",
+            "console": "integratedTerminal"
         }
     ]
 }
