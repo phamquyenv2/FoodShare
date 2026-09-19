@@ -4,6 +4,7 @@ import { ArrowLeft, Building, Eye, EyeOff, RotateCw, ShieldCheck, Store, User } 
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { apiFetch } from '../../services/api';
+import { getAuthenticatedHome } from '../../utils/roleHome';
 import type { UserRole } from '../../types';
 
 type RegisterStep = 'PHONE' | 'OTP' | 'ROLE' | 'ACCOUNT';
@@ -180,10 +181,7 @@ export default function RegisterPage() {
       });
 
       login(response.accessToken, response);
-      const home = response.role === 'SUPPLIER' ? '/supplier'
-        : response.role === 'ORGANIZATION' ? '/organization'
-          : '/recipient';
-      navigate(home);
+      navigate(getAuthenticatedHome(response));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Đăng ký thất bại';
       const normalized = message.toLocaleLowerCase('vi');

@@ -114,7 +114,7 @@ export default function ModerationPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
-                    {['Nhà cung cấp', 'Đại diện', 'Liên hệ', 'Loại hình', 'Mã số thuế', 'Hành động'].map(h => (
+                    {['Nhà cung cấp', 'Đại diện', 'Liên hệ', 'Loại hình', 'Mã số thuế', 'Trạng thái', 'Hành động'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -140,22 +140,60 @@ export default function ModerationPage() {
                         </td>
                         <td className="px-4 py-3.5 text-gray-600 text-xs">{bp.taxCode || '—'}</td>
                         <td className="px-4 py-3.5">
-                          {tab === 'UNVERIFIED' ? (
-                            <div className="flex gap-1.5">
+                          <div className="flex flex-col gap-1">
+                            {bp.verificationStatus === 'VERIFIED' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50 text-green-700 w-fit">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Đã duyệt
+                              </span>
+                            )}
+                            {bp.verificationStatus === 'REJECTED' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 w-fit">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Bị từ chối
+                              </span>
+                            )}
+                            {bp.verificationStatus === 'UNVERIFIED' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 w-fit">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Chờ duyệt
+                              </span>
+                            )}
+                            <span className="text-[11px] text-gray-400 whitespace-nowrap">{timeAgo(u.createdAt)}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-1.5">
+                            {bp.verificationStatus === 'UNVERIFIED' && (
+                              <>
+                                <button onClick={() => setConfirmAction({ id: u.id, action: 'VERIFIED' })}
+                                  title="Duyệt hồ sơ"
+                                  className="px-2 py-1.5 rounded-lg bg-green-50 text-green-600 text-xs font-medium cursor-pointer hover:bg-green-100 transition-colors flex items-center gap-1">
+                                  <CheckCircle size={13} /> Duyệt
+                                </button>
+                                <button onClick={() => setConfirmAction({ id: u.id, action: 'REJECTED' })}
+                                  title="Từ chối hồ sơ"
+                                  className="px-2 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium cursor-pointer hover:bg-red-100 transition-colors flex items-center gap-1">
+                                  <X size={13} /> Từ chối
+                                </button>
+                              </>
+                            )}
+                            {bp.verificationStatus === 'REJECTED' && (
                               <button onClick={() => setConfirmAction({ id: u.id, action: 'VERIFIED' })}
-                                className="px-2.5 py-1.5 rounded-lg bg-green-50 text-green-600 text-xs font-medium cursor-pointer hover:bg-green-100">
-                                <CheckCircle size={13} />
+                                title="Duyệt lại"
+                                className="px-2 py-1.5 rounded-lg bg-green-50 text-green-600 text-xs font-medium cursor-pointer hover:bg-green-100 transition-colors flex items-center gap-1">
+                                <CheckCircle size={13} /> Duyệt lại
                               </button>
+                            )}
+                            {bp.verificationStatus === 'VERIFIED' && (
                               <button onClick={() => setConfirmAction({ id: u.id, action: 'REJECTED' })}
-                                className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium cursor-pointer hover:bg-red-100">
-                                <X size={13} />
+                                title="Hủy duyệt"
+                                className="px-2 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium cursor-pointer hover:bg-red-100 transition-colors flex items-center gap-1">
+                                <X size={13} /> Hủy duyệt
                               </button>
-                              <button onClick={() => setDetailUser(u)} title="Xem chi tiết"
-                                className="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs cursor-pointer"><Eye size={13} /></button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400 whitespace-nowrap">{timeAgo(u.createdAt)}</span>
-                          )}
+                            )}
+                            <button onClick={() => setDetailUser(u)} title="Xem chi tiết & giấy phép"
+                              className="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs cursor-pointer hover:bg-blue-100 transition-colors">
+                              <Eye size={13} />
+                            </button>
+                          </div>
                         </td>
                       </motion.tr>
                     );
@@ -178,21 +216,36 @@ export default function ModerationPage() {
                       <p className="font-semibold text-gray-900 text-sm cursor-pointer hover:text-blue-600">{bp.name}</p>
                       <p className="text-xs text-gray-400 mt-0.5">Đại diện: {u.fullName} · {timeAgo(u.createdAt)}</p>
                     </div>
+                    {bp.verificationStatus === 'VERIFIED' && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700">Đã duyệt</span>
+                    )}
+                    {bp.verificationStatus === 'REJECTED' && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700">Từ chối</span>
+                    )}
+                    {bp.verificationStatus === 'UNVERIFIED' && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700">Chờ duyệt</span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 mb-3 line-clamp-2">{bp.description}</p>
                   
-                  {tab === 'UNVERIFIED' && (
-                    <div className="flex gap-2 mt-4 pt-3 border-t border-gray-50">
-                      <button onClick={() => setConfirmAction({ id: u.id, action: 'VERIFIED' })}
-                        className="flex-1 py-2 rounded-xl bg-green-50 text-green-600 text-xs font-medium flex justify-center items-center gap-1">
-                        <CheckCircle size={14} /> Duyệt
-                      </button>
-                      <button onClick={() => setConfirmAction({ id: u.id, action: 'REJECTED' })}
-                        className="flex-1 py-2 rounded-xl bg-red-50 text-red-600 text-xs font-medium flex justify-center items-center gap-1">
-                        <X size={14} /> Từ chối
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex gap-2 mt-4 pt-3 border-t border-gray-50">
+                    <button onClick={() => setDetailUser(u)}
+                      className="flex-1 py-2 rounded-xl bg-blue-50 text-blue-600 text-xs font-medium flex justify-center items-center gap-1">
+                      <Eye size={14} /> Chi tiết
+                    </button>
+                    {bp.verificationStatus === 'UNVERIFIED' && (
+                      <>
+                        <button onClick={() => setConfirmAction({ id: u.id, action: 'VERIFIED' })}
+                          className="flex-1 py-2 rounded-xl bg-green-50 text-green-600 text-xs font-medium flex justify-center items-center gap-1">
+                          <CheckCircle size={14} /> Duyệt
+                        </button>
+                        <button onClick={() => setConfirmAction({ id: u.id, action: 'REJECTED' })}
+                          className="flex-1 py-2 rounded-xl bg-red-50 text-red-600 text-xs font-medium flex justify-center items-center gap-1">
+                          <X size={14} /> Từ chối
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </motion.div>
               );
             })}
