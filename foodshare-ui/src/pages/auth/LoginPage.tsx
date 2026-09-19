@@ -4,7 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { getRoleHome } from '../../utils/roleHome';
+import { getAuthenticatedHome } from '../../utils/roleHome';
 import { apiFetch, clearAccessToken, setAccessToken } from '../../services/api';
 
 export default function LoginPage() {
@@ -19,13 +19,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      navigate(getRoleHome(user.role), { replace: true });
+      navigate(getAuthenticatedHome(user), { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
 
   const handleSuccess = (user: any) => {
-    // If profile is not completed, AuthGuard will redirect them
-    navigate(getRoleHome(user.role));
+    navigate(getAuthenticatedHome(user), { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

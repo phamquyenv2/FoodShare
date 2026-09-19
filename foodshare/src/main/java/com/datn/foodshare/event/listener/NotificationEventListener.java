@@ -63,9 +63,15 @@ public class NotificationEventListener {
                 }
             }
 
-            if (event.supports(NotificationChannel.EMAIL)
-                && event.getUser().getEmail() != null && !event.getUser().getEmail().isBlank()) {
-                emailService.sendEmail(event.getUser().getEmail(), event.getTitle(), event.getContent());
+            if (event.supports(NotificationChannel.EMAIL)) {
+                String recipientEmail = (event.getUser() != null) ? event.getUser().getEmail() : null;
+                Long userId = (event.getUser() != null) ? event.getUser().getId() : null;
+                if (recipientEmail != null && !recipientEmail.isBlank()) {
+                    log.info("Chuyển tiếp gửi email thông báo cho User ID: {} | Địa chỉ nhận: {} | Tiêu đề: {}", userId, recipientEmail, event.getTitle());
+                    emailService.sendEmail(recipientEmail, event.getTitle(), event.getContent());
+                } else {
+                    log.warn("Bỏ qua kênh EMAIL cho User ID: {} do không tìm thấy địa chỉ email.", userId);
+                }
             }
 
         } catch (Exception e) {
