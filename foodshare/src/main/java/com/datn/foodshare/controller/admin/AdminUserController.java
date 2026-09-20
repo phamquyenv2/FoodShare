@@ -35,8 +35,9 @@ public class AdminUserController {
             @RequestParam(name = "role", required = false) Role role,
             @RequestParam(name = "active", required = false) Boolean active,
             @RequestParam(name = "verificationStatus", required = false) com.datn.foodshare.util.constant.VerificationStatus verificationStatus,
+            @RequestParam(name = "hasBusinessProfile", required = false) Boolean hasBusinessProfile,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(userService.adminGetAllUsers(role, active, verificationStatus, pageable));
+        return ResponseEntity.ok(userService.adminGetAllUsers(role, active, verificationStatus, hasBusinessProfile, pageable));
     }
 
     @GetMapping("/{id}")
