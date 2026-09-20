@@ -29,6 +29,8 @@ interface OrderDetail {
   completedAt?: string;
   paymentStatus?: string | null;
   paymentMethod?: string;
+  hasRefundRequest?: boolean;
+  refundStatus?: string | null;
 }
 
 const STATUS_MAP: Record<string, { bg: string; text: string; label: string; icon: typeof Package }> = {
@@ -152,6 +154,7 @@ export default function OrderDetailPage() {
 
       setRefundSuccess(true);
       showSuccess('Đã gửi yêu cầu hoàn tiền thành công! Quản trị viên sẽ xử lý sớm nhất.');
+      setOrder(prev => prev ? ({ ...prev, hasRefundRequest: true, refundStatus: 'PENDING' }) : null);
       setTimeout(() => {
         setRefundModal(false);
         setRefundSuccess(false);
@@ -256,7 +259,13 @@ export default function OrderDetailPage() {
     && order.paymentStatus !== 'SUCCESS';
   const canReview = orderStatus === 'COMPLETED';
   const canReport = ['ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED', 'COMPLETED'].includes(orderStatus);
-  const canRequestRefund = order.paymentStatus === 'SUCCESS' && !['CANCELLED', 'REJECTED'].includes(orderStatus);
+  const isRefunded = order.paymentStatus === 'REFUNDED' || order.refundStatus === 'RESOLVED';
+  const isRefundPending = !!order.hasRefundRequest && (order.refundStatus === 'PENDING' || order.refundStatus === 'REVIEWING');
+  const isRefundRejected = !!order.hasRefundRequest && order.refundStatus === 'REJECTED';
+  const canRequestRefund = order.paymentStatus === 'SUCCESS'
+    && !['CANCELLED', 'REJECTED'].includes(orderStatus)
+    && !order.hasRefundRequest
+    && !isRefunded;
   const firstDetail = order.orderDetails?.[0];
   const foodName = firstDetail?.foodPost?.name || 'Món ăn';
   const foodImageUrl = firstDetail?.foodPost?.imageUrl;
@@ -479,6 +488,27 @@ export default function OrderDetailPage() {
               >
                 <Star size={16} className="shrink-0" /> <span>Đánh giá nhà cung cấp</span>
               </button>
+            )}
+
+            {isRefunded && (
+              <div className="w-full py-2.5 sm:py-3 px-3 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-xs">
+                <CheckCircle size={16} className="text-purple-600 shrink-0" />
+                <span>Đơn hàng đã được hoàn tiền</span>
+              </div>
+            )}
+
+            {isRefundPending && (
+              <div className="w-full py-2.5 sm:py-3 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-xs">
+                <Clock size={16} className="text-amber-600 animate-pulse shrink-0" />
+                <span>Đang xử lý yêu cầu hoàn tiền</span>
+              </div>
+            )}
+
+            {isRefundRejected && (
+              <div className="w-full py-2.5 sm:py-3 px-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm font-medium flex items-center justify-center gap-2 shadow-xs">
+                <XCircle size={16} className="text-red-600 shrink-0" />
+                <span>Yêu cầu hoàn tiền bị từ chối</span>
+              </div>
             )}
 
             {canRequestRefund && (

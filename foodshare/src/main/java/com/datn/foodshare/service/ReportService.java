@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.time.Duration;
 
@@ -97,6 +98,21 @@ public class ReportService {
             throw new BusinessException("Không thể gửi khiếu nại/hoàn tiền cho đơn đã hủy hoặc bị từ chối");
         }
         if (reportType == ReportType.REFUND) {
+            boolean isAlreadyRefunded = order.getPayments() != null && order.getPayments().stream()
+                    .anyMatch(p -> p.getPaymentStatus() == com.datn.foodshare.util.constant.TransactionStatus.REFUNDED);
+            if (isAlreadyRefunded) {
+                throw new BusinessException("Đơn hàng này đã được hoàn tiền thành công");
+            }
+
+            boolean hasActiveRefundReport = reportRepository.existsActiveRefundReport(
+                    ReportReferenceType.ORDER,
+                    orderId,
+                    List.of(ReportStatus.PENDING, ReportStatus.REVIEWING, ReportStatus.RESOLVED)
+            );
+            if (hasActiveRefundReport) {
+                throw new BusinessException("Đơn hàng này đã có yêu cầu hoàn tiền đang được xử lý hoặc đã hoàn tất");
+            }
+
             if (order.getOrderStatus() == OrderStatus.DELIVERED) {
                 if (order.getDeliveredAt() != null && now.isAfter(order.getDeliveredAt().plus(INSPECTION_WINDOW))) {
                     throw new BusinessException("Cửa sổ khiếu nại 24 giờ của đơn hàng đã kết thúc");
