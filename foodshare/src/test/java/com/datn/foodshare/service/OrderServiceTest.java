@@ -92,6 +92,10 @@ class OrderServiceTest {
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
     @Mock
     private com.datn.foodshare.repository.BusinessProfileRepository businessProfileRepository;
+    @Mock
+    private com.datn.foodshare.repository.ReportRepository reportRepository;
+    @Mock
+    private com.datn.foodshare.repository.ReviewRepository reviewRepository;
     private PermissionService permissionService;
 
     @BeforeEach
@@ -107,7 +111,9 @@ class OrderServiceTest {
                 supplierEarningService,
                 eventPublisher,
                 permissionService,
-                businessProfileRepository
+                businessProfileRepository,
+                reportRepository,
+                reviewRepository
         );
         lenient().when(businessProfileRepository.findByUserId(ORGANIZATION_USER_ID))
                 .thenReturn(Optional.of(organizationBusinessProfile(com.datn.foodshare.util.constant.VerificationStatus.VERIFIED)));

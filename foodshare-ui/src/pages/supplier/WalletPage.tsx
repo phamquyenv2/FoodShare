@@ -1,9 +1,51 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, ArrowDownCircle, ArrowUpCircle, CreditCard, Loader2, Plus, X } from 'lucide-react';
+import {
+  Wallet,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  CreditCard,
+  Loader2,
+  Plus,
+  X,
+  ChevronDown,
+  Check,
+} from 'lucide-react';
 import { apiFetch } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { formatVND } from '../../utils/format';
+
+const formatBankDisplay = (bankName?: string, bankCode?: string) => {
+  if (!bankName) return bankCode || 'Ngân hàng';
+  const match = bankName.match(/\(([^)]+)\)/);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return bankName
+    .replace(/^(Ngân hàng thương mại cổ phần|Ngân hàng TMCP|Ngân hàng)\s+/i, '')
+    .trim();
+};
+
+const POPULAR_BANKS = [
+  { code: 'VCB', name: 'Vietcombank' },
+  { code: 'ICB', name: 'VietinBank' },
+  { code: 'BIDV', name: 'BIDV' },
+  { code: 'MB', name: 'MBBank' },
+  { code: 'TCB', name: 'Techcombank' },
+  { code: 'ACB', name: 'ACB' },
+  { code: 'VPB', name: 'VPBank' },
+  { code: 'TPB', name: 'TPBank' },
+  { code: 'STB', name: 'Sacombank' },
+  { code: 'HDB', name: 'HDBank' },
+  { code: 'VBA', name: 'Agribank' },
+  { code: 'NAB', name: 'NamABank' },
+  { code: 'VIB', name: 'VIB' },
+  { code: 'SHB', name: 'SHB' },
+  { code: 'OCB', name: 'OCB' },
+  { code: 'MSB', name: 'MSB' },
+  { code: 'LPB', name: 'LPBank' },
+  { code: 'OTHER', name: 'Ngân hàng khác...' },
+];
 
 type PayoutStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
 
@@ -68,6 +110,18 @@ export default function WalletPage() {
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isAddingAccount, setIsAddingAccount] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
+  const accountDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(e.target as Node)) {
+        setIsAccountDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [invalidWithdrawalField, setInvalidWithdrawalField] = useState<'account' | 'amount' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -195,19 +249,20 @@ export default function WalletPage() {
     );
   }
 
-  const { 
-    totalEarned = 0, 
+  const {
+    totalEarned = 0,
     rawAvailableBalance = 0,
-    totalPending = 0, 
-    totalCompleted = 0, 
+    totalPending = 0,
+    totalCompleted = 0,
     pendingCount = 0,
     platformFeePercentage = 0,
     minPayoutAmount = 50000,
     maxPayoutAmount = 20000000,
-    transactions 
+    transactions
   } = walletData || {};
-  
+
   const totalElements = transactions?.totalElements || 0;
+  const selectedAccount = accounts.find(a => String(a.id) === selectedAccountId);
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto flex flex-col gap-5">
@@ -338,38 +393,164 @@ export default function WalletPage() {
             </div>
 
             {isAddingAccount ? (
-              <form noValidate onSubmit={submitAccount} className="space-y-3">
-                <input required maxLength={30} placeholder="Mã ngân hàng (VD: VCB)" value={accountForm.bankCode}
-                  onChange={e => setAccountForm({ ...accountForm, bankCode: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-green-500" />
-                <input required maxLength={150} placeholder="Tên ngân hàng" value={accountForm.bankName}
-                  onChange={e => setAccountForm({ ...accountForm, bankName: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-green-500" />
-                <input required maxLength={50} placeholder="Số tài khoản" value={accountForm.accountNumber}
-                  onChange={e => setAccountForm({ ...accountForm, accountNumber: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-green-500" />
-                <input required maxLength={150} placeholder="Tên chủ tài khoản" value={accountForm.accountHolderName}
-                  onChange={e => setAccountForm({ ...accountForm, accountHolderName: e.target.value.toUpperCase() })}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-green-500" />
+              <form noValidate onSubmit={submitAccount} className="space-y-3.5">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">Ngân hàng</label>
+                  <select
+                    required
+                    value={POPULAR_BANKS.some(b => b.code === accountForm.bankCode) ? accountForm.bankCode : (accountForm.bankCode ? 'OTHER' : '')}
+                    onChange={e => {
+                      const code = e.target.value;
+                      if (code === 'OTHER') {
+                        setAccountForm({ ...accountForm, bankCode: 'OTHER', bankName: '' });
+                      } else {
+                        const bank = POPULAR_BANKS.find(b => b.code === code);
+                        setAccountForm({ ...accountForm, bankCode: code, bankName: bank ? bank.name : '' });
+                      }
+                    }}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-green-500 bg-white"
+                  >
+                    <option value="">-- Chọn ngân hàng --</option>
+                    {POPULAR_BANKS.map(b => (
+                      <option key={b.code} value={b.code}>{b.name} ({b.code})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(!POPULAR_BANKS.some(b => b.code === accountForm.bankCode && b.code !== 'OTHER') || accountForm.bankCode === 'OTHER') && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      required
+                      maxLength={30}
+                      placeholder="Mã (VD: VCB)"
+                      value={accountForm.bankCode === 'OTHER' ? '' : accountForm.bankCode}
+                      onChange={e => setAccountForm({ ...accountForm, bankCode: e.target.value.toUpperCase() })}
+                      className="rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-green-500"
+                    />
+                    <input
+                      required
+                      maxLength={150}
+                      placeholder="Tên ngân hàng"
+                      value={accountForm.bankName}
+                      onChange={e => setAccountForm({ ...accountForm, bankName: e.target.value })}
+                      className="rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-green-500"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">Số tài khoản</label>
+                  <input
+                    required
+                    maxLength={50}
+                    placeholder="Nhập số tài khoản"
+                    value={accountForm.accountNumber}
+                    onChange={e => setAccountForm({ ...accountForm, accountNumber: e.target.value.replace(/\s+/g, '') })}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm font-mono outline-none focus:border-green-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">Tên chủ tài khoản</label>
+                  <input
+                    required
+                    maxLength={150}
+                    placeholder="VD: NGUYEN VAN A"
+                    value={accountForm.accountHolderName}
+                    onChange={e => setAccountForm({ ...accountForm, accountHolderName: e.target.value.toUpperCase() })}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm font-semibold uppercase outline-none focus:border-green-500"
+                  />
+                </div>
+
                 <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setIsAddingAccount(false)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium">Quay lại</button>
-                  <button disabled={isSubmitting} className="flex-1 rounded-xl bg-[#2db84c] py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                  <button type="button" onClick={() => setIsAddingAccount(false)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors">
+                    Quay lại
+                  </button>
+                  <button disabled={isSubmitting || !accountForm.bankCode || !accountForm.accountNumber || !accountForm.accountHolderName} className="flex-1 rounded-xl bg-[#2db84c] hover:bg-green-600 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50">
                     {isSubmitting ? 'Đang lưu...' : 'Lưu tài khoản'}
                   </button>
                 </div>
               </form>
             ) : (
               <form noValidate onSubmit={submitWithdrawal} className="space-y-4">
-                <div>
+                <div ref={accountDropdownRef} className="relative">
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">Tài khoản nhận tiền</label>
-                  <select required value={selectedAccountId} aria-invalid={invalidWithdrawalField === 'account'} onChange={e => { setSelectedAccountId(e.target.value); setInvalidWithdrawalField(null); }}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-green-500">
-                    <option value="">Chọn tài khoản</option>
-                    {accounts.map(account => (
-                      <option key={account.id} value={account.id}>{account.bankName} ••••{account.accountNumber.slice(-4)}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => setIsAddingAccount(true)} className="mt-2 flex items-center gap-1 text-xs font-medium text-green-600">
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountDropdownOpen(prev => !prev)}
+                    aria-invalid={invalidWithdrawalField === 'account'}
+                    className={`w-full flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm bg-white text-left transition-colors outline-none cursor-pointer ${
+                      invalidWithdrawalField === 'account'
+                        ? 'border-red-400 focus:border-red-500 ring-2 ring-red-100'
+                        : 'border-gray-200 hover:border-gray-300 focus:border-green-500'
+                    }`}
+                  >
+                    {selectedAccount ? (
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-green-50 text-green-700 flex items-center justify-center shrink-0">
+                          <CreditCard size={15} />
+                        </div>
+                        <div className="min-w-0 flex items-center gap-2 truncate">
+                          <span className="font-semibold text-gray-900">
+                            {formatBankDisplay(selectedAccount.bankName, selectedAccount.bankCode)}
+                          </span>
+                          <span className="font-mono text-gray-500 text-xs">
+                            ••••{selectedAccount.accountNumber?.slice(-4)}
+                          </span>
+                          {selectedAccount.accountHolderName && (
+                            <span className="text-gray-400 text-xs truncate uppercase hidden sm:inline">
+                              • {selectedAccount.accountHolderName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-sm">Chọn tài khoản nhận tiền</span>
+                    )}
+                    <ChevronDown size={16} className={`text-gray-400 shrink-0 transition-transform ${isAccountDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isAccountDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-56 overflow-y-auto rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                      {accounts.map(account => {
+                        const isSelected = String(account.id) === selectedAccountId;
+                        return (
+                          <button
+                            key={account.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAccountId(String(account.id));
+                              setInvalidWithdrawalField(null);
+                              setIsAccountDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-sm transition-colors cursor-pointer ${
+                              isSelected ? 'bg-green-50 text-green-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="font-bold text-gray-900 w-28 shrink-0 truncate">
+                                {formatBankDisplay(account.bankName, account.bankCode)}
+                              </span>
+                              <span className="font-mono text-gray-600 text-xs shrink-0">
+                                ••••{account.accountNumber?.slice(-4)}
+                              </span>
+                              {account.accountHolderName && (
+                                <span className="text-gray-400 text-xs truncate uppercase hidden sm:inline">
+                                  ({account.accountHolderName})
+                                </span>
+                              )}
+                            </div>
+                            {isSelected && <Check size={16} className="text-green-600 shrink-0 ml-2" />}
+                          </button>
+                        );
+                      })}
+                      {accounts.length === 0 && (
+                        <div className="py-3 text-center text-xs text-gray-400">Chưa có tài khoản nào</div>
+                      )}
+                    </div>
+                  )}
+
+                  <button type="button" onClick={() => setIsAddingAccount(true)} className="mt-2 flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-700 transition-colors cursor-pointer">
                     <Plus size={14} /> Thêm tài khoản mới
                   </button>
                 </div>

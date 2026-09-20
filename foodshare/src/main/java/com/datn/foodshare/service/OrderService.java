@@ -72,6 +72,7 @@ public class OrderService {
     private final PermissionService permissionService;
     private final BusinessProfileRepository businessProfileRepository;
     private final com.datn.foodshare.repository.ReportRepository reportRepository;
+    private final com.datn.foodshare.repository.ReviewRepository reviewRepository;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) throws PermissionException {
@@ -253,7 +254,9 @@ public class OrderService {
                 com.datn.foodshare.util.constant.ReportReferenceType.ORDER, orderId
         ).stream().findFirst().orElse(null);
 
-        return OrderResponse.from(order, refundReport);
+        com.datn.foodshare.domain.entity.Review review = reviewRepository.findByOrderId(orderId).orElse(null);
+
+        return OrderResponse.from(order, refundReport, review);
     }
 
     @Transactional

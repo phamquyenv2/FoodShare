@@ -337,10 +337,13 @@ public class UserService {
         return value != null && !value.isBlank();
     }
 
-    // ── Admin User Management ──────────────────────────────────────────
-
     @Transactional(readOnly = true)
     public Page<AdminUserResponse> adminGetAllUsers(Role role, Boolean active, com.datn.foodshare.util.constant.VerificationStatus verificationStatus, Pageable pageable) {
+        return adminGetAllUsers(role, active, verificationStatus, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponse> adminGetAllUsers(Role role, Boolean active, com.datn.foodshare.util.constant.VerificationStatus verificationStatus, Boolean hasBusinessProfile, Pageable pageable) {
         Specification<User> spec = (root, query, cb) -> cb.conjunction();
 
         if (role != null) {
@@ -348,6 +351,9 @@ public class UserService {
         }
         if (active != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("active"), active));
+        }
+        if (Boolean.TRUE.equals(hasBusinessProfile)) {
+            spec = spec.and((root, query, cb) -> cb.isNotNull(root.get("businessProfile")));
         }
         if (verificationStatus != null) {
             spec = spec.and((root, query, cb) -> {
