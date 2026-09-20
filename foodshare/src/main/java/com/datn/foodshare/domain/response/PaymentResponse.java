@@ -24,8 +24,13 @@ public class PaymentResponse {
     private Instant paidAt;
     private Instant refundedAt;
     private String paymentUrl;
+    private String supplierName;
 
     public static PaymentResponse from(Payment payment) {
+        String supplierName = null;
+        if (payment.getOrder() != null && payment.getOrder().getBusinessProfile() != null) {
+            supplierName = payment.getOrder().getBusinessProfile().getName();
+        }
         return PaymentResponse.builder()
                 .id(payment.getId())
                 .orderId(payment.getOrder() != null ? payment.getOrder().getId() : null)
@@ -39,6 +44,7 @@ public class PaymentResponse {
                 .paidAt(payment.getPaidAt())
                 .refundedAt(payment.getRefundedAt())
                 .paymentUrl(payment.getPaymentUrl())
+                .supplierName(supplierName)
                 .build();
     }
 }

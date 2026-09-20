@@ -1,5 +1,6 @@
 {
   "projects": {
+    "default": "foodshare-29e9a",
     "y": "foodshare-29e9a"
   },
   "targets": {},

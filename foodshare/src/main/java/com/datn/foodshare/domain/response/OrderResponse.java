@@ -3,15 +3,16 @@ package com.datn.foodshare.domain.response;
 import com.datn.foodshare.domain.entity.Order;
 import com.datn.foodshare.domain.entity.OrderDetail;
 import com.datn.foodshare.domain.entity.Payment;
-import com.datn.foodshare.util.constant.TransactionStatus;
 import com.datn.foodshare.util.constant.OrderStatus;
+import com.datn.foodshare.util.constant.PaymentMethod;
+import com.datn.foodshare.util.constant.TransactionStatus;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.List;
 import java.util.Comparator;
+import java.util.List;
 
 @Getter
 @Builder
@@ -21,6 +22,7 @@ public class OrderResponse {
     private String orderCode;
     private OrderStatus orderStatus;
     private TransactionStatus paymentStatus;
+    private PaymentMethod paymentMethod;
     private BigDecimal totalAmount;
     private String receiverNote;
     private Instant readyAt;
@@ -73,15 +75,16 @@ public class OrderResponse {
     }
 
     public static OrderResponse from(Order order) {
-        List<OrderDetailInfo> details = order.getOrderDetails().stream()
-                .map(OrderResponse::mapDetail)
-                .toList();
+        List<OrderDetailInfo> details = order.getOrderDetails() != null
+                ? order.getOrderDetails().stream().map(OrderResponse::mapDetail).toList()
+                : List.of();
 
         return OrderResponse.builder()
                 .id(order.getId())
                 .orderCode(order.getOrderCode())
                 .orderStatus(order.getOrderStatus())
                 .paymentStatus(mapPaymentStatus(order))
+                .paymentMethod(mapPaymentMethod(order))
                 .totalAmount(order.getTotalAmount())
                 .receiverNote(order.getReceiverNote())
                 .readyAt(order.getReadyAt())
@@ -92,30 +95,39 @@ public class OrderResponse {
                 .rejectedAt(order.getRejectedAt())
                 .rejectionReason(order.getRejectionReason())
                 .orderDetails(details)
-                .receiver(ReceiverInfo.builder()
+                .receiver(order.getReceiver() != null ? ReceiverInfo.builder()
                         .id(order.getReceiver().getId())
                         .fullName(order.getReceiver().getFullName())
                         .phone(order.getReceiver().getPhone())
-                        .build())
-                .supplier(SupplierInfo.builder()
+                        .build() : null)
+                .supplier(order.getBusinessProfile() != null ? SupplierInfo.builder()
                         .businessProfileId(order.getBusinessProfile().getId())
                         .name(order.getBusinessProfile().getName())
                         .avatarUrl(order.getBusinessProfile().getUser() != null ? order.getBusinessProfile().getUser().getAvatarUrl() : null)
                         .phone(order.getBusinessProfile().getUser() != null ? order.getBusinessProfile().getUser().getPhone() : null)
-                        .build())
+                        .build() : null)
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .build();
     }
 
     private static TransactionStatus mapPaymentStatus(Order order) {
-        // A successful payment still settles the order even if another attempt failed.
-        // Otherwise expose the newest persisted attempt; collection order is unspecified.
+        if (order.getPayments() == null) return null;
         return order.getPayments().stream()
                 .max(Comparator.comparing((Payment payment) ->
                                 payment.getPaymentStatus() == TransactionStatus.SUCCESS)
                         .thenComparing(Payment::getId, Comparator.nullsFirst(Comparator.naturalOrder())))
                 .map(Payment::getPaymentStatus)
+                .orElse(null);
+    }
+
+    private static PaymentMethod mapPaymentMethod(Order order) {
+        if (order.getPayments() == null) return null;
+        return order.getPayments().stream()
+                .max(Comparator.comparing((Payment payment) ->
+                                payment.getPaymentStatus() == TransactionStatus.SUCCESS)
+                        .thenComparing(Payment::getId, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .map(Payment::getMethod)
                 .orElse(null);
     }
 

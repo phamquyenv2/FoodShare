@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 
 const ALL_REPORT_TYPES = {
   ORDER: [
+    { key: 'REFUND', label: 'Yêu cầu hoàn tiền', desc: 'Yêu cầu hoàn lại tiền đã thanh toán cho đơn hàng' },
     { key: 'FOOD_QUALITY', label: 'Chất lượng thực phẩm', desc: 'Món ăn không đúng mô tả, hư hỏng...' },
     { key: 'FRAUD', label: 'Gian lận / Lừa đảo', desc: 'Hành vi gian lận, không giao hàng...' },
     { key: 'HYGIENE', label: 'Vệ sinh an toàn', desc: 'Thực phẩm mất vệ sinh, hết hạn...' },

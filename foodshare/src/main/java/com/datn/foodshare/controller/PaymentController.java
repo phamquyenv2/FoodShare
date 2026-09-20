@@ -2,11 +2,18 @@ package com.datn.foodshare.controller;
 
 import com.datn.foodshare.domain.request.CreatePaymentRequest;
 import com.datn.foodshare.domain.response.PaymentResponse;
+import com.datn.foodshare.domain.response.UserPaymentSummaryResponse;
 import com.datn.foodshare.service.payment.PaymentService;
 import com.datn.foodshare.util.annotation.ApiMessage;
+import com.datn.foodshare.util.constant.PaymentMethod;
+import com.datn.foodshare.util.constant.TransactionStatus;
 import com.datn.foodshare.util.error.PermissionException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;
@@ -104,5 +111,42 @@ public class PaymentController {
     @ApiMessage("Hoàn tiền thành công")
     public ResponseEntity<PaymentResponse> refundPayment(@PathVariable("paymentId") Long paymentId) throws PermissionException {
         return ResponseEntity.ok(paymentService.refundPayment(paymentId));
+    }
+
+    @GetMapping("/my-history")
+    @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
+    @ApiMessage("Lấy lịch sử giao dịch thành công")
+    public ResponseEntity<Page<PaymentResponse>> getMyPaymentHistory(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String method,
+            @PageableDefault(size = 15, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) throws PermissionException {
+        TransactionStatus parsedStatus = null;
+        if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
+            try {
+                parsedStatus = TransactionStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException ignored) {}
+        }
+        PaymentMethod parsedMethod = null;
+        if (method != null && !method.isBlank() && !"all".equalsIgnoreCase(method)) {
+            try {
+                parsedMethod = PaymentMethod.valueOf(method.toUpperCase());
+            } catch (IllegalArgumentException ignored) {}
+        }
+        return ResponseEntity.ok(paymentService.getMyPaymentHistory(keyword, parsedStatus, parsedMethod, pageable));
+    }
+
+    @GetMapping("/my-summary")
+    @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
+    @ApiMessage("Lấy thống kê giao dịch thành công")
+    public ResponseEntity<UserPaymentSummaryResponse> getMyPaymentSummary() throws PermissionException {
+        return ResponseEntity.ok(paymentService.getMyPaymentSummary());
+    }
+
+    @GetMapping("/my-history/{paymentId}")
+    @Secured({"ROLE_RECIPIENT", "ROLE_ORGANIZATION"})
+    @ApiMessage("Lấy chi tiết giao dịch thành công")
+    public ResponseEntity<PaymentResponse> getMyPaymentDetail(@PathVariable("paymentId") Long paymentId) throws PermissionException {
+        return ResponseEntity.ok(paymentService.getMyPaymentDetail(paymentId));
     }
 }

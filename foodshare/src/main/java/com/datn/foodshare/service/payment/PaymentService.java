@@ -4,6 +4,10 @@ import com.datn.foodshare.domain.entity.Order;
 import com.datn.foodshare.domain.entity.Payment;
 import com.datn.foodshare.domain.request.CreatePaymentRequest;
 import com.datn.foodshare.domain.response.PaymentResponse;
+import com.datn.foodshare.domain.response.UserPaymentSummaryResponse;
+import com.datn.foodshare.util.constant.PaymentMethod;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.datn.foodshare.event.NotificationEvent;
 import com.datn.foodshare.repository.OrderRepository;
@@ -233,7 +237,9 @@ public class PaymentService {
             throw new BusinessException("Số tiền không khớp");
         }
 
-        markSuccessful(payment);
+        if (payment.getPaymentStatus() != TransactionStatus.SUCCESS) {
+            markSuccessful(payment);
+        }
 
         return PaymentResponse.from(payment);
     }
@@ -265,7 +271,9 @@ public class PaymentService {
             throw new BusinessException("Số tiền không khớp");
         }
 
-        markSuccessful(payment);
+        if (payment.getPaymentStatus() != TransactionStatus.SUCCESS) {
+            markSuccessful(payment);
+        }
 
         return PaymentResponse.from(payment);
     }
@@ -391,5 +399,38 @@ public class PaymentService {
                 .referenceId(payment.getId())
                 .channels(channels)
                 .build());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PaymentResponse> getMyPaymentHistory(String keyword, TransactionStatus status, PaymentMethod method, Pageable pageable) throws PermissionException {
+        Long currentUserId = SecurityUtil.getCurrentUserId()
+                .orElseThrow(() -> new PermissionException("Chưa đăng nhập"));
+        String normalizedKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+        return paymentRepository.findByReceiverId(currentUserId, normalizedKeyword, status, method, pageable)
+                .map(PaymentResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public UserPaymentSummaryResponse getMyPaymentSummary() throws PermissionException {
+        Long currentUserId = SecurityUtil.getCurrentUserId()
+                .orElseThrow(() -> new PermissionException("Chưa đăng nhập"));
+        return UserPaymentSummaryResponse.builder()
+                .totalSpent(paymentRepository.sumSpentByReceiverId(currentUserId))
+                .totalRefunded(paymentRepository.sumRefundedByReceiverId(currentUserId))
+                .totalTransactions(paymentRepository.countByReceiverId(currentUserId))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentResponse getMyPaymentDetail(Long paymentId) throws PermissionException {
+        Long currentUserId = SecurityUtil.getCurrentUserId()
+                .orElseThrow(() -> new PermissionException("Chưa đăng nhập"));
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new BusinessException("Giao dịch không tồn tại: " + paymentId));
+        if (payment.getOrder() == null || payment.getOrder().getReceiver() == null
+                || !payment.getOrder().getReceiver().getId().equals(currentUserId)) {
+            throw new PermissionException("Bạn không có quyền xem giao dịch này");
+        }
+        return PaymentResponse.from(payment);
     }
 }

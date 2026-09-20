@@ -5,7 +5,6 @@ import { setupIonicReact, IonApp } from '@ionic/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { listenForForegroundMessages } from './services/deviceService';
-import { apiFetch } from './services/api';
 import { router } from './routes';
 
 import '@ionic/react/css/core.css';
@@ -33,49 +32,23 @@ function PushNotificationBridge() {
   return null;
 }
 
-function MomoRedirectBridge() {
-  const { isAuthenticated } = useAuth();
-  const { showInfo } = useToast();
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const params = new URLSearchParams(window.location.search);
-    const orderId = params.get('orderId');
-    const resultCode = params.get('resultCode');
-    if (!orderId || !resultCode) return;
-    const amountValue = params.get('amount');
-    void apiFetch(`/payments/momo/result?orderId=${encodeURIComponent(orderId)}&resultCode=${encodeURIComponent(resultCode)}${amountValue ? `&amount=${amountValue}` : ''}`, { method: 'POST' })
-      .then(() => showInfo('Thanh toán MoMo thành công'))
-      .catch(() => showInfo('Thanh toán MoMo chưa thành công'))
-      .finally(() => window.history.replaceState({}, document.title, window.location.pathname));
-  }, [isAuthenticated, showInfo]);
+function PaymentRedirectInterceptor() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const transactionToken = params.get('zptranstoken');
-    const returnCode = params.get('returncode');
-    if (transactionToken && returnCode) {
-      const returnMessage = params.get('returnmessage');
-      void apiFetch(`/payments/zalopay/callback?zptranstoken=${encodeURIComponent(transactionToken)}&returncode=${encodeURIComponent(returnCode)}${returnMessage ? `&returnmessage=${encodeURIComponent(returnMessage)}` : ''}`, { method: 'GET' })
-        .then(() => showInfo(
-          returnCode === '1'
-            ? 'Thanh toán ZaloPay thành công'
-            : returnCode === '3'
-              ? 'Thanh toán ZaloPay đang được xử lý'
-              : 'Thanh toán ZaloPay chưa thành công',
-        ))
-        .catch(() => showInfo('Không thể xác nhận kết quả thanh toán ZaloPay'))
-        .finally(() => window.history.replaceState({}, document.title, window.location.pathname));
-      return;
+    const isPaymentResult = window.location.pathname.startsWith('/payment/result')
+      || window.location.pathname.startsWith('/payment/callback')
+      || window.location.pathname.startsWith('/recipient/payment/result');
+
+    if (isPaymentResult) return;
+
+    const hasZalo = (params.get('apptransid') && params.get('status')) || (params.get('zptranstoken') && params.get('returncode'));
+    const hasMomo = params.get('orderId') && params.get('resultCode');
+
+    if (hasZalo || hasMomo) {
+      window.location.replace(`/payment/result${window.location.search}`);
     }
-    if (!isAuthenticated) return;
-    const appTransId = params.get('apptransid');
-    const status = params.get('status');
-    if (!appTransId || !status) return;
-    const amount = params.get('amount');
-    void apiFetch(`/payments/zalopay/result?apptransid=${encodeURIComponent(appTransId)}&status=${encodeURIComponent(status)}${amount ? `&amount=${amount}` : ''}`, { method: 'POST' })
-      .then(() => showInfo('Thanh toán ZaloPay thành công'))
-      .catch(() => showInfo('Thanh toán ZaloPay chưa thành công'))
-      .finally(() => window.history.replaceState({}, document.title, window.location.pathname));
-  }, [isAuthenticated, showInfo]);
+  }, []);
+
   return null;
 }
 
@@ -86,7 +59,7 @@ export default function App() {
         <ToastProvider>
           <AuthProvider>
             <PushNotificationBridge />
-            <MomoRedirectBridge />
+            <PaymentRedirectInterceptor />
             <RouterProvider router={router} />
           </AuthProvider>
         </ToastProvider>
