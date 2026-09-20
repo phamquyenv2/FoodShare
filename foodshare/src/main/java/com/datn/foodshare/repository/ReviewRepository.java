@@ -10,11 +10,14 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     boolean existsByOrderId(Long orderId);
+
+    Optional<Review> findByOrderId(Long orderId);
 
     @Query(value = "SELECT r FROM Review r JOIN FETCH r.reviewer JOIN FETCH r.order WHERE r.businessProfile.id = :businessProfileId",
            countQuery = "SELECT COUNT(r) FROM Review r WHERE r.businessProfile.id = :businessProfileId")

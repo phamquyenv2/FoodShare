@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Star, Loader2, CheckCircle } from 'lucide-react';
@@ -15,6 +15,18 @@ export default function WriteReviewPage() {
   const [comment, setComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    apiFetch<any>(`/orders/${id}`)
+      .then(orderData => {
+        if (orderData.hasReviewed) {
+          showError('Đơn hàng này đã được đánh giá rồi');
+          navigate(`/recipient/orders/${id}`, { replace: true });
+        }
+      })
+      .catch(() => {});
+  }, [id, navigate, showError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,10 +73,10 @@ export default function WriteReviewPage() {
             ))}
           </div>
           <button
-            onClick={() => navigate('/recipient/orders')}
+            onClick={() => navigate(`/recipient/orders/${id}`)}
             className="w-full py-3 rounded-xl bg-[#2db84c] text-white font-semibold text-sm cursor-pointer hover:bg-[#259e40] transition-all shadow-md shadow-green-500/20"
           >
-            Quay lại đơn hàng
+            Quay lại chi tiết đơn hàng
           </button>
         </motion.div>
       </div>
@@ -111,11 +123,11 @@ export default function WriteReviewPage() {
             </div>
             <p className="text-center text-sm text-gray-500 mt-2">
               {rating === 0 && 'Chọn số sao'}
-              {rating === 1 && 'Rất tệ 😞'}
-              {rating === 2 && 'Tệ 😕'}
-              {rating === 3 && 'Bình thường 😐'}
-              {rating === 4 && 'Tốt 😊'}
-              {rating === 5 && 'Tuyệt vời! 🤩'}
+              {rating === 1 && 'Rất tệ'}
+              {rating === 2 && 'Tệ'}
+              {rating === 3 && 'Bình thường'}
+              {rating === 4 && 'Tốt'}
+              {rating === 5 && 'Tuyệt vời!'}
             </p>
           </div>
 

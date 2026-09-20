@@ -31,6 +31,13 @@ interface OrderDetail {
   paymentMethod?: string;
   hasRefundRequest?: boolean;
   refundStatus?: string | null;
+  hasReviewed?: boolean;
+  review?: {
+    id: number;
+    rating: number;
+    comment?: string;
+    createdAt?: string;
+  } | null;
 }
 
 const STATUS_MAP: Record<string, { bg: string; text: string; label: string; icon: typeof Package }> = {
@@ -257,7 +264,8 @@ export default function OrderDetailPage() {
   const canPay = ['ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED'].includes(orderStatus)
     && order.totalAmount > 0
     && order.paymentStatus !== 'SUCCESS';
-  const canReview = orderStatus === 'COMPLETED';
+  const canReview = orderStatus === 'COMPLETED' && !order.hasReviewed;
+  const isReviewed = orderStatus === 'COMPLETED' && !!order.hasReviewed;
   const canReport = ['ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED', 'COMPLETED'].includes(orderStatus);
   const isRefunded = order.paymentStatus === 'REFUNDED' || order.refundStatus === 'RESOLVED';
   const isRefundPending = !!order.hasRefundRequest && (order.refundStatus === 'PENDING' || order.refundStatus === 'REVIEWING');
@@ -478,6 +486,28 @@ export default function OrderDetailPage() {
                 {actionLoading === 'complete' ? <Loader2 size={16} className="animate-spin shrink-0" /> : <CheckCircle size={16} className="shrink-0" />}
                 <span>Xác nhận đã nhận hàng</span>
               </button>
+            )}
+
+            {isReviewed && (
+              <div className="w-full p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 text-xs sm:text-sm shadow-xs flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={16} className="text-amber-600 shrink-0" />
+                    <span className="font-semibold text-amber-800">Đã đánh giá</span>
+                  </div>
+                  {order.review?.rating ? (
+                    <div className="flex items-center gap-1 bg-amber-100/90 px-2 py-0.5 rounded-md text-amber-800 font-bold text-xs">
+                      <span>{order.review.rating}</span>
+                      <Star size={13} className="fill-amber-400 text-amber-400 shrink-0 inline-block -mt-0.5" />
+                    </div>
+                  ) : null}
+                </div>
+                {order.review?.comment && (
+                  <p className="text-xs text-gray-600 italic line-clamp-2 pl-6">
+                    "{order.review.comment}"
+                  </p>
+                )}
+              </div>
             )}
 
             {canReview && (
