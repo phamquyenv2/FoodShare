@@ -552,6 +552,75 @@ class PaymentServiceTest {
         verify(paymentRepository).save(payment);
     }
 
+    @Test
+    void getMyPaymentHistory_Success() throws PermissionException {
+        Order order = mockOrder(new BigDecimal("50000"));
+        Payment payment = payment(order, TransactionStatus.SUCCESS);
+        org.springframework.data.domain.Page<Payment> page = new org.springframework.data.domain.PageImpl<>(java.util.List.of(payment));
+
+        when(paymentRepository.findByReceiverId(eq(USER_ID), eq("test"), eq(TransactionStatus.SUCCESS), eq(PaymentMethod.CASH), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(page);
+
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(USER_ID));
+            org.springframework.data.domain.Page<PaymentResponse> result = paymentService.getMyPaymentHistory(
+                    "test", TransactionStatus.SUCCESS, PaymentMethod.CASH, org.springframework.data.domain.PageRequest.of(0, 10));
+
+            assertNotNull(result);
+            assertEquals(1, result.getTotalElements());
+            assertEquals(payment.getId(), result.getContent().get(0).getId());
+        }
+    }
+
+    @Test
+    void getMyPaymentSummary_Success() throws PermissionException {
+        when(paymentRepository.sumSpentByReceiverId(USER_ID)).thenReturn(new BigDecimal("120000"));
+        when(paymentRepository.sumRefundedByReceiverId(USER_ID)).thenReturn(new BigDecimal("40000"));
+        when(paymentRepository.countByReceiverId(USER_ID)).thenReturn(5L);
+
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(USER_ID));
+            com.datn.foodshare.domain.response.UserPaymentSummaryResponse summary = paymentService.getMyPaymentSummary();
+
+            assertNotNull(summary);
+            assertEquals(new BigDecimal("120000"), summary.getTotalSpent());
+            assertEquals(new BigDecimal("40000"), summary.getTotalRefunded());
+            assertEquals(5L, summary.getTotalTransactions());
+        }
+    }
+
+    @Test
+    void getMyPaymentDetail_Success() throws PermissionException {
+        Order order = mockOrder(new BigDecimal("60000"));
+        Payment payment = payment(order, TransactionStatus.SUCCESS);
+
+        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
+
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(USER_ID));
+            PaymentResponse response = paymentService.getMyPaymentDetail(PAYMENT_ID);
+
+            assertNotNull(response);
+            assertEquals(PAYMENT_ID, response.getId());
+        }
+    }
+
+    @Test
+    void getMyPaymentDetail_ForbiddenWhenNotOwner() {
+        User otherUser = new User();
+        otherUser.setId(999L);
+        Order order = mockOrder(new BigDecimal("60000"));
+        order.setReceiver(otherUser);
+        Payment payment = payment(order, TransactionStatus.SUCCESS);
+
+        when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
+
+        try (MockedStatic<SecurityUtil> su = mockStatic(SecurityUtil.class)) {
+            su.when(SecurityUtil::getCurrentUserId).thenReturn(Optional.of(USER_ID));
+            assertThrows(PermissionException.class, () -> paymentService.getMyPaymentDetail(PAYMENT_ID));
+        }
+    }
+
     private Payment payment(Order order, TransactionStatus status) {
         Payment payment = new Payment();
         payment.setId(PAYMENT_ID);

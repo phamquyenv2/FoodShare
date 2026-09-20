@@ -27,7 +27,7 @@ public class ZaloPayPaymentStrategy implements PaymentStrategy {
     @Value("${zalopay.refund-endpoint:https://sb-openapi.zalopay.vn/v2/refund}") private String refundEndpoint;
     @Value("${zalopay.app-id:}") private String appId;
     @Value("${zalopay.key1:}") private String key1;
-    @Value("${zalopay.redirect-url:http://localhost:5173/recipient/orders}") private String redirectUrl;
+    @Value("${zalopay.redirect-url:http://localhost:5173/payment/result}") private String redirectUrl;
     @Value("${zalopay.callback-url:http://localhost:8080/api/payments/zalopay/callback}") private String callbackUrl;
 
     public ZaloPayPaymentStrategy() {
@@ -71,7 +71,7 @@ public class ZaloPayPaymentStrategy implements PaymentStrategy {
     @Override
     public Payment processRefund(Payment payment) {
         String date = LocalDate.now(ZoneOffset.ofHours(7)).format(DateTimeFormatter.ofPattern("yyMMdd"));
-        String mRefundId = date + "_" + appId + "_" + payment.getId() + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String mRefundId = date + "_" + appId + "_" + payment.getId() + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         long now = System.currentTimeMillis();
 
         if (appId != null && !appId.isBlank() && key1 != null && !key1.isBlank()) {

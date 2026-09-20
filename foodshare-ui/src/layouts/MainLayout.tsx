@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, UtensilsCrossed, ShoppingBag, Wallet,
   Users, ShieldAlert, BarChart3, Bell, X,
-  User, Star, Compass, Flag, ShoppingCart } from 'lucide-react';
+  User, Star, Compass, Flag, ShoppingCart, ReceiptText } from 'lucide-react';
 import Logo from '../components/shared/Logo';
 import { useAuth } from '../contexts/AuthContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
@@ -60,17 +60,20 @@ const ADMIN_NAV = [
   { key: 'orders', icon: ShoppingBag, label: 'Đơn hàng', path: '/admin/orders' },
   { key: 'payments', icon: Wallet, label: 'Thanh toán', path: '/admin/payments' },
   { key: 'payouts', icon: Wallet, label: 'Duyệt rút tiền', path: '/admin/payouts' },
+  { key: 'reports', icon: Flag, label: 'Khiếu nại & Hoàn tiền', path: '/admin/reports' },
 ];
 
 const RECIPIENT_NAV = [
   { key: 'explore', icon: Compass, label: 'Khám phá', path: '/recipient' },
   { key: 'orders', icon: ShoppingBag, label: 'Đơn tiếp nhận', path: '/recipient/orders' },
+  { key: 'transactions', icon: ReceiptText, label: 'Giao dịch', path: '/recipient/transactions' },
 ];
 
 const ORGANIZATION_NAV = [
   { key: 'explore', icon: Compass, label: 'Khám phá', path: '/organization' },
   { key: 'cart', icon: ShoppingCart, label: 'Giỏ hàng', path: '/organization/cart' },
   { key: 'orders', icon: ShoppingBag, label: 'Đơn tiếp nhận', path: '/organization/orders' },
+  { key: 'transactions', icon: ReceiptText, label: 'Giao dịch', path: '/organization/transactions' },
 ];
 
 function getNavForRole(role: UserRole) {
@@ -89,7 +92,7 @@ function Sidebar() {
   const cartCount = useCartCount();
 
   return (
-    <aside className="hidden md:flex w-[260px] flex-shrink-0 h-screen sticky top-0 flex-col bg-white border-r border-gray-200">
+    <aside className="hidden md:flex w-[285px] flex-shrink-0 h-screen sticky top-0 flex-col bg-white border-r border-gray-200">
       <div className="h-16 flex items-center px-6 border-b border-gray-200">
         <Logo size="md" layout="row" />
       </div>
@@ -108,15 +111,15 @@ function Sidebar() {
             <button
               key={item.key}
               onClick={() => navigate(item.path)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 text-left
                 ${active
                   ? 'bg-[#2db84c] text-white shadow-md shadow-green-500/20'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
             >
-              <div className="flex items-center gap-3">
-                <item.icon size={18} />
-                <span>{item.label}</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <item.icon size={18} className="shrink-0" />
+                <span className="whitespace-nowrap">{item.label}</span>
               </div>
               {item.key === 'cart' && cartCount > 0 && (
                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -256,6 +259,14 @@ function MobileHeader() {
             </div>
             <div className="flex flex-col gap-2">
               <div className="px-3 py-2.5"><NotificationPermissionButton /></div>
+              {(role === 'RECIPIENT' || role === 'ORGANIZATION') && (
+                <button
+                  onClick={() => { setMenuOpen(false); navigate(`/${role.toLowerCase()}/transactions`); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <ReceiptText size={18} className="text-gray-400" /> Lịch sử giao dịch
+                </button>
+              )}
               <button
                 onClick={() => { setMenuOpen(false); navigate(`/${role.toLowerCase()}/profile`); }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"

@@ -24,7 +24,7 @@ public class MomoPaymentStrategy implements PaymentStrategy {
     @Value("${momo.partner-code:}") private String partnerCode;
     @Value("${momo.access-key:}") private String accessKey;
     @Value("${momo.secret-key:}") private String secretKey;
-    @Value("${momo.redirect-url:http://localhost:5173/recipient/orders}") private String redirectUrl;
+    @Value("${momo.redirect-url:http://localhost:5173/payment/result}") private String redirectUrl;
     @Value("${momo.ipn-url:http://localhost:8080/api/payments/momo/callback}") private String ipnUrl;
 
     public MomoPaymentStrategy() {

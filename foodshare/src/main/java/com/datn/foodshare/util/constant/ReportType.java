@@ -8,5 +8,6 @@ public enum ReportType {
     FRAUD,
     HYGIENE,
     INAPPROPRIATE,
+    REFUND,
     OTHER
 }

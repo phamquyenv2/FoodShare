@@ -7,6 +7,7 @@ import com.datn.foodshare.util.constant.ReportType;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Getter
@@ -26,6 +27,9 @@ public class ReportResponse {
     private Long targetBusinessProfileId;
     private String targetBusinessName;
     private String targetName;
+    private String orderCode;
+    private BigDecimal amount;
+    private String paymentMethod;
     private Instant createdAt;
     private Instant updatedAt;
     private Instant resolvedAt;
@@ -40,22 +44,27 @@ public class ReportResponse {
     }
 
     public static ReportResponse from(Report report) {
-        return from(report, null, null);
+        return from(report, null, null, null, null, null, null);
     }
 
     public static ReportResponse from(Report report, Long targetBusinessProfileId, String targetBusinessName) {
-        return from(report, targetBusinessProfileId, targetBusinessName, null);
+        return from(report, targetBusinessProfileId, targetBusinessName, null, null, null, null);
     }
 
     public static ReportResponse from(Report report, Long targetBusinessProfileId, String targetBusinessName, String targetName) {
+        return from(report, targetBusinessProfileId, targetBusinessName, targetName, null, null, null);
+    }
+
+    public static ReportResponse from(Report report, Long targetBusinessProfileId, String targetBusinessName, String targetName,
+                                      String orderCode, BigDecimal amount, String paymentMethod) {
         return ReportResponse.builder()
                 .id(report.getId())
-                .reporter(ReporterInfo.builder()
+                .reporter(report.getReporter() != null ? ReporterInfo.builder()
                         .id(report.getReporter().getId())
                         .fullName(report.getReporter().getFullName())
                         .email(report.getReporter().getEmail())
                         .phone(report.getReporter().getPhone())
-                        .build())
+                        .build() : null)
                 .title(report.getTitle())
                 .content(report.getContent())
                 .reportType(report.getReportType())
@@ -67,6 +76,9 @@ public class ReportResponse {
                 .targetBusinessProfileId(targetBusinessProfileId)
                 .targetBusinessName(targetBusinessName)
                 .targetName(targetName)
+                .orderCode(orderCode)
+                .amount(amount)
+                .paymentMethod(paymentMethod)
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .resolvedAt(report.getResolvedAt())

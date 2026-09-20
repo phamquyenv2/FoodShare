@@ -16,6 +16,7 @@ import com.datn.foodshare.util.constant.NotificationChannel;
 import com.datn.foodshare.util.constant.NotificationType;
 import com.datn.foodshare.util.constant.ReportStatus;
 import com.datn.foodshare.util.constant.ReportReferenceType;
+import com.datn.foodshare.util.constant.ReportType;
 import com.datn.foodshare.util.constant.OrderStatus;
 import com.datn.foodshare.util.error.BusinessException;
 import com.datn.foodshare.util.error.PermissionException;
@@ -51,7 +52,7 @@ public class ReportService {
     public ReportResponse createReport(CreateReportRequest request) {
         User currentUser = getAuthenticatedUser();
         if (request.getReferenceType() == ReportReferenceType.ORDER) {
-            validateOrderDispute(request.getReferenceId(), currentUser, Instant.now());
+            validateOrderDispute(request.getReferenceId(), currentUser, request.getReportType(), Instant.now());
         }
 
         Report report = Report.builder()
@@ -75,8 +76,8 @@ public class ReportService {
             eventPublisher.publishEvent(NotificationEvent.builder()
                     .source(this)
                     .user(admin)
-                    .title("Báo cáo mới")
-                    .content("Người dùng " + currentUser.getFullName() + " vừa gửi một báo cáo/khiếu nại. Vui lòng kiểm tra.")
+                    .title(request.getReportType() == ReportType.REFUND ? "Yêu cầu hoàn tiền mới" : "Báo cáo mới")
+                    .content("Người dùng " + currentUser.getFullName() + (request.getReportType() == ReportType.REFUND ? " vừa gửi yêu cầu hoàn tiền đơn hàng #" + request.getReferenceId() : " vừa gửi một báo cáo/khiếu nại. Vui lòng kiểm tra."))
                     .type(NotificationType.REPORT)
                     .referenceType(NotificationReferenceType.REPORT)
                     .referenceId(savedReport.getId())
@@ -86,17 +87,35 @@ public class ReportService {
         return ReportResponse.from(savedReport);
     }
 
-    private void validateOrderDispute(Long orderId, User reporter, Instant now) {
+    private void validateOrderDispute(Long orderId, User reporter, ReportType reportType, Instant now) {
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException("Đơn tiếp nhận không tồn tại: " + orderId));
         if (!order.getReceiver().getId().equals(reporter.getId())) {
             throw new BusinessException("Chỉ người nhận của đơn hàng mới có thể gửi khiếu nại");
         }
-        if (order.getOrderStatus() != OrderStatus.DELIVERED || order.getDeliveredAt() == null) {
-            throw new BusinessException("Chỉ có thể khiếu nại đơn đang ở trạng thái đã giao (DELIVERED)");
+        if (order.getOrderStatus() == OrderStatus.CANCELLED || order.getOrderStatus() == OrderStatus.REJECTED) {
+            throw new BusinessException("Không thể gửi khiếu nại/hoàn tiền cho đơn đã hủy hoặc bị từ chối");
         }
-        if (now.isAfter(order.getDeliveredAt().plus(INSPECTION_WINDOW))) {
-            throw new BusinessException("Cửa sổ khiếu nại 24 giờ của đơn hàng đã kết thúc");
+        if (reportType == ReportType.REFUND) {
+            if (order.getOrderStatus() == OrderStatus.DELIVERED) {
+                if (order.getDeliveredAt() != null && now.isAfter(order.getDeliveredAt().plus(INSPECTION_WINDOW))) {
+                    throw new BusinessException("Cửa sổ khiếu nại 24 giờ của đơn hàng đã kết thúc");
+                }
+            } else if (order.getOrderStatus() == OrderStatus.COMPLETED) {
+                Instant refTime = order.getCompletedAt() != null ? order.getCompletedAt() : order.getDeliveredAt();
+                if (refTime != null && now.isAfter(refTime.plus(INSPECTION_WINDOW))) {
+                    throw new BusinessException("Cửa sổ khiếu nại 24 giờ của đơn hàng đã kết thúc");
+                }
+            } else if (order.getOrderStatus() != OrderStatus.ACCEPTED && order.getOrderStatus() != OrderStatus.READY_FOR_PICKUP) {
+                throw new BusinessException("Chỉ có thể yêu cầu hoàn tiền cho đơn hàng đang thực hiện hoặc đã hoàn tất");
+            }
+        } else {
+            if (order.getOrderStatus() != OrderStatus.DELIVERED || order.getDeliveredAt() == null) {
+                throw new BusinessException("Chỉ có thể khiếu nại đơn đang ở trạng thái đã giao (DELIVERED)");
+            }
+            if (now.isAfter(order.getDeliveredAt().plus(INSPECTION_WINDOW))) {
+                throw new BusinessException("Cửa sổ khiếu nại 24 giờ của đơn hàng đã kết thúc");
+            }
         }
     }
 
@@ -104,7 +123,7 @@ public class ReportService {
     public Page<ReportResponse> getMyReports(Pageable pageable) {
         User currentUser = getAuthenticatedUser();
         return reportRepository.findByReporterId(currentUser.getId(), pageable)
-                .map(ReportResponse::from);
+                .map(this::mapReportResponse);
     }
 
     @Transactional(readOnly = true)
@@ -117,17 +136,17 @@ public class ReportService {
             throw new PermissionException("Bạn không có quyền xem report này");
         }
 
-        return ReportResponse.from(report);
+        return mapReportResponse(report);
     }
 
     @Transactional(readOnly = true)
     public Page<ReportResponse> adminGetAllReports(ReportStatus status, Pageable pageable) {
         if (status != null) {
             return reportRepository.findByReportStatus(status, pageable)
-                    .map(ReportResponse::from);
+                    .map(this::mapReportResponse);
         }
         return reportRepository.findAllWithReporter(pageable)
-                .map(ReportResponse::from);
+                .map(this::mapReportResponse);
     }
 
     @Transactional
@@ -141,7 +160,42 @@ public class ReportService {
             log.info("Admin đã xem report {}, chuyển trạng thái sang REVIEWING", report.getId());
         }
 
-        return ReportResponse.from(report);
+        return mapReportResponse(report);
+    }
+
+    private ReportResponse mapReportResponse(Report report) {
+        Long targetBusinessProfileId = null;
+        String targetBusinessName = null;
+        String targetName = null;
+        String orderCode = null;
+        java.math.BigDecimal amount = null;
+        String paymentMethod = null;
+
+        if (report.getReferenceType() == ReportReferenceType.ORDER && report.getReferenceId() != null) {
+            Order order = orderRepository.findById(report.getReferenceId()).orElse(null);
+            if (order != null) {
+                orderCode = order.getOrderCode();
+                amount = order.getTotalAmount();
+                targetName = "Đơn hàng #" + order.getId() + (order.getOrderCode() != null ? " (" + order.getOrderCode() + ")" : "");
+                if (order.getBusinessProfile() != null) {
+                    targetBusinessProfileId = order.getBusinessProfile().getId();
+                    targetBusinessName = order.getBusinessProfile().getName();
+                }
+                java.util.List<com.datn.foodshare.domain.entity.Payment> payments = paymentRepository.findByOrderId(order.getId());
+                com.datn.foodshare.domain.entity.Payment successPayment = payments.stream()
+                        .filter(p -> p.getPaymentStatus() == com.datn.foodshare.util.constant.TransactionStatus.SUCCESS)
+                        .findFirst()
+                        .orElse(null);
+                if (successPayment != null) {
+                    paymentMethod = successPayment.getMethod() != null ? successPayment.getMethod().name() : null;
+                    if (successPayment.getAmount() != null) {
+                        amount = successPayment.getAmount();
+                    }
+                }
+            }
+        }
+
+        return ReportResponse.from(report, targetBusinessProfileId, targetBusinessName, targetName, orderCode, amount, paymentMethod);
     }
 
     @Transactional
@@ -197,7 +251,7 @@ public class ReportService {
                 .channels(Set.of(NotificationChannel.IN_APP, NotificationChannel.PUSH))
                 .build());
 
-        return ReportResponse.from(savedReport);
+        return mapReportResponse(savedReport);
     }
 
     private User getAuthenticatedUser() {

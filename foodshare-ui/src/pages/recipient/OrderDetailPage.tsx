@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Loader2, AlertTriangle, MapPin, Clock, XCircle, CheckCircle, CreditCard, Star, Flag, Package,
-  Truck, ShoppingBag, Banknote
+  Truck, ShoppingBag, Banknote, RotateCcw, ImagePlus, X
 } from 'lucide-react';
 import { apiFetch } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -51,6 +51,20 @@ const PAYMENT_LABELS: Record<string, string> = {
   REFUNDED: 'Đã hoàn tiền',
 };
 
+const METHOD_NAMES: Record<string, string> = {
+  MOMO: 'Ví MoMo',
+  ZALOPAY: 'Ví ZaloPay',
+  CASH: 'Tiền mặt',
+};
+
+const REFUND_REASONS = [
+  { key: 'NOT_RECEIVED', label: 'Không nhận được món ăn / Quán không giao', desc: 'Đã thanh toán nhưng không nhận được món ăn' },
+  { key: 'DAMAGED_FOOD', label: 'Món ăn bị hư hỏng / ôi thiu / mất vệ sinh', desc: 'Thực phẩm không đảm bảo chất lượng, hỏng hóc' },
+  { key: 'WRONG_FOOD', label: 'Giao sai món / thiếu số lượng', desc: 'Món ăn nhận được khác hoặc thiếu so với bài đăng' },
+  { key: 'STORE_CLOSED', label: 'Quán đóng cửa / Không liên hệ được', desc: 'Đến nơi quán đóng cửa hoặc gọi không nghe máy' },
+  { key: 'OTHER', label: 'Lý do khác', desc: 'Vấn đề phát sinh khác cần được hoàn trả tiền' },
+];
+
 const STEPS = ['PENDING', 'ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED', 'COMPLETED'];
 
 function formatDate(iso: string) {
@@ -61,7 +75,7 @@ function formatDate(iso: string) {
 }
 
 export default function OrderDetailPage() {
-  const { showError } = useToast();
+  const { showError, showSuccess } = useToast();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -71,6 +85,87 @@ export default function OrderDetailPage() {
   const [cancelModal, setCancelModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [refundModal, setRefundModal] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundAccountInfo, setRefundAccountInfo] = useState('');
+  const [refundDescription, setRefundDescription] = useState('');
+  const [refundEvidence, setRefundEvidence] = useState<{ file: File; preview: string }[]>([]);
+  const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
+  const [refundSuccess, setRefundSuccess] = useState(false);
+
+  const handleRefundImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const newImages = Array.from(files).map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+    setRefundEvidence(prev => [...prev, ...newImages]);
+  };
+
+  const removeRefundImage = (index: number) => {
+    setRefundEvidence(prev => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleRefundSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!refundReason) {
+      showError('Vui lòng chọn lý do hoàn tiền');
+      return;
+    }
+    if (!refundDescription.trim()) {
+      showError('Vui lòng nhập mô tả chi tiết sự cố');
+      return;
+    }
+    setIsSubmittingRefund(true);
+    try {
+      let finalEvidenceUrl = null;
+      if (refundEvidence.length > 0) {
+        const formData = new FormData();
+        formData.append('file', refundEvidence[0].file);
+        const uploadRes = await apiFetch<{ url: string }>('/media/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        finalEvidenceUrl = uploadRes.url;
+      }
+
+      const selectedReason = REFUND_REASONS.find(r => r.key === refundReason);
+      const formattedContent = `[LÝ DO HOÀN TIỀN: ${selectedReason?.label || refundReason}]\n`
+        + (refundAccountInfo.trim() ? `[THÔNG TIN TÀI KHOẢN/VÍ NHẬN HOÀN: ${refundAccountInfo.trim()}]\n` : '')
+        + `[MÔ TẢ CHI TIẾT]:\n${refundDescription.trim()}`;
+
+      await apiFetch('/reports', {
+        method: 'POST',
+        body: JSON.stringify({
+          referenceId: Number(order!.id),
+          referenceType: 'ORDER',
+          reportType: 'REFUND',
+          title: `Yêu cầu hoàn tiền đơn hàng #${order!.orderCode}`,
+          content: formattedContent,
+          evidenceUrl: finalEvidenceUrl,
+        }),
+      });
+
+      setRefundSuccess(true);
+      showSuccess('Đã gửi yêu cầu hoàn tiền thành công! Quản trị viên sẽ xử lý sớm nhất.');
+      setTimeout(() => {
+        setRefundModal(false);
+        setRefundSuccess(false);
+        setRefundReason('');
+        setRefundAccountInfo('');
+        setRefundDescription('');
+        setRefundEvidence([]);
+      }, 2000);
+    } catch (err: any) {
+      showError(err.message || 'Gửi yêu cầu hoàn tiền thất bại');
+    } finally {
+      setIsSubmittingRefund(false);
+    }
+  };
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -156,9 +251,12 @@ export default function OrderDetailPage() {
   const isCancelled = orderStatus === 'CANCELLED' || orderStatus === 'REJECTED';
   const canCancel = orderStatus === 'PENDING';
   const canConfirm = orderStatus === 'DELIVERED';
-  const canPay = orderStatus === 'ACCEPTED' && order.totalAmount > 0 && order.paymentStatus !== 'SUCCESS';
+  const canPay = ['ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED'].includes(orderStatus)
+    && order.totalAmount > 0
+    && order.paymentStatus !== 'SUCCESS';
   const canReview = orderStatus === 'COMPLETED';
   const canReport = ['ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED', 'COMPLETED'].includes(orderStatus);
+  const canRequestRefund = order.paymentStatus === 'SUCCESS' && !['CANCELLED', 'REJECTED'].includes(orderStatus);
   const firstDetail = order.orderDetails?.[0];
   const foodName = firstDetail?.foodPost?.name || 'Món ăn';
   const foodImageUrl = firstDetail?.foodPost?.imageUrl;
@@ -225,18 +323,16 @@ export default function OrderDetailPage() {
                 return (
                   <div key={step} className="flex flex-col items-center">
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all border-2 border-white shadow-xs ${
-                        done
-                          ? 'bg-[#2db84c] text-white'
-                          : 'bg-gray-100 text-gray-400'
-                      } ${active ? 'ring-4 ring-[#2db84c]/20' : ''}`}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all border-2 border-white shadow-xs ${done
+                        ? 'bg-[#2db84c] text-white'
+                        : 'bg-gray-100 text-gray-400'
+                        } ${active ? 'ring-4 ring-[#2db84c]/20' : ''}`}
                     >
                       {done ? '✓' : i + 1}
                     </div>
                     <p
-                      className={`text-xs mt-2 text-center leading-tight max-w-[90px] font-medium ${
-                        done ? 'text-[#2db84c] font-semibold' : 'text-gray-400'
-                      }`}
+                      className={`text-xs mt-2 text-center leading-tight max-w-[90px] font-medium ${done ? 'text-[#2db84c] font-semibold' : 'text-gray-400'
+                        }`}
                     >
                       {stepStatus.label}
                     </p>
@@ -385,6 +481,17 @@ export default function OrderDetailPage() {
               </button>
             )}
 
+            {canRequestRefund && (
+              <button
+                onClick={() => setRefundModal(true)}
+                disabled={!!actionLoading || isSubmittingRefund}
+                className="w-full py-2.5 sm:py-3 rounded-xl border border-purple-200 bg-purple-50/70 text-purple-700 font-semibold text-sm cursor-pointer hover:bg-purple-100 hover:border-purple-300 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none flex items-center justify-center gap-2 px-3 text-center shadow-xs"
+              >
+                <RotateCcw size={15} className="shrink-0 text-purple-600" />
+                <span>Yêu cầu hoàn tiền</span>
+              </button>
+            )}
+
             {canReport && (
               <button
                 onClick={() => navigate(`/recipient/orders/${order.id}/report?type=ORDER`)}
@@ -486,22 +593,20 @@ export default function OrderDetailPage() {
                   key={m.key}
                   type="button"
                   onClick={() => setPaymentMethod(m.key)}
-                  className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all flex items-center gap-3 ${
-                    paymentMethod === m.key
-                      ? 'border-[#2db84c] bg-[#2db84c]/5 shadow-xs'
-                      : 'border-gray-100 hover:border-gray-200 bg-white'
-                  }`}
+                  className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all flex items-center gap-3 ${paymentMethod === m.key
+                    ? 'border-[#2db84c] bg-[#2db84c]/5 shadow-xs'
+                    : 'border-gray-100 hover:border-gray-200 bg-white'
+                    }`}
                 >
                   {m.icon}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900">{m.label}</p>
                     <p className="text-xs text-gray-500 truncate">{m.desc}</p>
                   </div>
-                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
-                    paymentMethod === m.key
-                      ? 'border-[#2db84c] bg-[#2db84c]'
-                      : 'border-gray-300'
-                  }`}>
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${paymentMethod === m.key
+                    ? 'border-[#2db84c] bg-[#2db84c]'
+                    : 'border-gray-300'
+                    }`}>
                     {paymentMethod === m.key && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                   </div>
                 </button>
@@ -524,6 +629,186 @@ export default function OrderDetailPage() {
                 Xác nhận
               </button>
             </div>
+          </motion.div>
+        </div>
+      )}
+      {/* Refund Request Modal */}
+      {refundModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => !isSubmittingRefund && setRefundModal(false)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center border border-purple-100 shrink-0">
+                  <RotateCcw size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">Yêu cầu hoàn tiền</h3>
+                  <p className="text-xs text-gray-500">Đơn hàng #{order.orderCode}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRefundModal(false)}
+                disabled={isSubmittingRefund}
+                className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {refundSuccess ? (
+              <div className="py-8 text-center">
+                <div className="w-16 h-16 rounded-full bg-green-50 text-green-600 flex items-center justify-center mx-auto mb-3 border border-green-200">
+                  <CheckCircle size={32} />
+                </div>
+                <h4 className="text-lg font-bold text-gray-900 mb-1">Đã gửi yêu cầu hoàn tiền!</h4>
+                <p className="text-sm text-gray-600 max-w-sm mx-auto">
+                  Yêu cầu của bạn đang được quản trị viên tiếp nhận và xử lý. Bạn có thể theo dõi trong mục thông báo hoặc lịch sử giao dịch.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleRefundSubmit} className="flex flex-col gap-4 text-sm">
+                {/* Amount Banner */}
+                <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-purple-700 font-medium block">Số tiền yêu cầu hoàn lại:</span>
+                    <span className="text-lg font-extrabold text-purple-900">{formatVND(order.totalAmount)}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] text-gray-500 block">Thanh toán qua:</span>
+                    <span className="text-xs font-semibold text-gray-700">
+                      {order.paymentMethod ? (METHOD_NAMES[order.paymentMethod] || order.paymentMethod) : 'Ví điện tử'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Refund Reason Selection */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    Lý do hoàn tiền <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    {REFUND_REASONS.map(r => (
+                      <button
+                        key={r.key}
+                        type="button"
+                        onClick={() => setRefundReason(r.key)}
+                        className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all flex items-start gap-2.5 ${
+                          refundReason === r.key
+                            ? 'border-purple-500 bg-purple-50/40 shadow-xs'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex items-center justify-center shrink-0 transition-all ${
+                          refundReason === r.key ? 'border-purple-600 bg-purple-600' : 'border-gray-300'
+                        }`}>
+                          {refundReason === r.key && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs font-semibold ${refundReason === r.key ? 'text-purple-900' : 'text-gray-800'}`}>
+                            {r.label}
+                          </p>
+                          <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{r.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Optional Account Info */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Số ví / STK nhận tiền <span className="text-gray-400 font-normal">(không bắt buộc)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={refundAccountInfo}
+                    onChange={e => setRefundAccountInfo(e.target.value)}
+                    placeholder="VD: 0987654321 (MoMo/ZaloPay) hoặc STK + Ngân hàng"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40 transition-all"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Hệ thống sẽ ưu tiên hoàn trả trực tiếp về tài khoản/ví điện tử ban đầu bạn đã dùng để thanh toán.
+                  </p>
+                </div>
+
+                {/* Incident Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Mô tả chi tiết sự cố <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={refundDescription}
+                    onChange={e => setRefundDescription(e.target.value)}
+                    placeholder="Vui lòng mô tả chi tiết sự cố bạn gặp phải để Admin có căn cứ xử lý..."
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-400/40 resize-none transition-all"
+                    required
+                  />
+                </div>
+
+                {/* Upload Evidence */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Bằng chứng hình ảnh <span className="text-gray-400 font-normal">(nếu có)</span>
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <label className="cursor-pointer border border-dashed border-gray-300 hover:border-purple-400 bg-gray-50/60 hover:bg-purple-50/30 px-3 py-2 rounded-xl flex items-center gap-2 text-xs text-gray-600 transition-colors">
+                      <ImagePlus size={15} className="text-purple-600" />
+                      <span>Chọn ảnh</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleRefundImageUpload}
+                      />
+                    </label>
+                    {refundEvidence.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        {refundEvidence.map((img, idx) => (
+                          <div key={idx} className="relative w-12 h-12 rounded-lg border overflow-hidden group">
+                            <img src={img.preview} alt="evidence" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeRefundImage(idx)}
+                              className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setRefundModal(false)}
+                    disabled={isSubmittingRefund}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingRefund || !refundReason || !refundDescription.trim()}
+                    className="flex-1 py-2.5 rounded-xl bg-purple-600 text-white text-xs font-semibold cursor-pointer hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm transition-all"
+                  >
+                    {isSubmittingRefund && <Loader2 size={13} className="animate-spin" />}
+                    <span>Gửi yêu cầu hoàn tiền</span>
+                  </button>
+                </div>
+              </form>
+            )}
           </motion.div>
         </div>
       )}
