@@ -71,6 +71,7 @@ public class OrderService {
     private final ApplicationEventPublisher eventPublisher;
     private final PermissionService permissionService;
     private final BusinessProfileRepository businessProfileRepository;
+    private final com.datn.foodshare.repository.ReportRepository reportRepository;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) throws PermissionException {
@@ -248,7 +249,11 @@ public class OrderService {
             throw new PermissionException("Bạn không có quyền xem đơn tiếp nhận này");
         }
 
-        return OrderResponse.from(order);
+        com.datn.foodshare.domain.entity.Report refundReport = reportRepository.findRefundReportsByOrder(
+                com.datn.foodshare.util.constant.ReportReferenceType.ORDER, orderId
+        ).stream().findFirst().orElse(null);
+
+        return OrderResponse.from(order, refundReport);
     }
 
     @Transactional

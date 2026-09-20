@@ -35,6 +35,8 @@ public class OrderResponse {
     private List<OrderDetailInfo> orderDetails;
     private ReceiverInfo receiver;
     private SupplierInfo supplier;
+    private Boolean hasRefundRequest;
+    private com.datn.foodshare.util.constant.ReportStatus refundStatus;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -75,6 +77,10 @@ public class OrderResponse {
     }
 
     public static OrderResponse from(Order order) {
+        return from(order, null);
+    }
+
+    public static OrderResponse from(Order order, com.datn.foodshare.domain.entity.Report refundReport) {
         List<OrderDetailInfo> details = order.getOrderDetails() != null
                 ? order.getOrderDetails().stream().map(OrderResponse::mapDetail).toList()
                 : List.of();
@@ -106,6 +112,8 @@ public class OrderResponse {
                         .avatarUrl(order.getBusinessProfile().getUser() != null ? order.getBusinessProfile().getUser().getAvatarUrl() : null)
                         .phone(order.getBusinessProfile().getUser() != null ? order.getBusinessProfile().getUser().getPhone() : null)
                         .build() : null)
+                .hasRefundRequest(refundReport != null)
+                .refundStatus(refundReport != null ? refundReport.getReportStatus() : null)
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .build();
