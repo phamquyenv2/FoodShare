@@ -63,7 +63,6 @@ const TOAST_CONFIG = {
   },
 } as const;
 
-/* Inject the keyframe once into the document head */
 const KEYFRAME_ID = 'toast-shrink-kf';
 if (typeof document !== 'undefined' && !document.getElementById(KEYFRAME_ID)) {
   const style = document.createElement('style');
@@ -87,7 +86,6 @@ function ToastCard({ item, onClose }: { item: ToastItem; onClose: (id: string) =
   const config = TOAST_CONFIG[item.type];
   const Icon = config.icon;
 
-  /* Schedule auto-close that respects remaining time */
   const scheduleClose = useCallback((remaining: number) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => onClose(item.id), remaining);
@@ -112,7 +110,6 @@ function ToastCard({ item, onClose }: { item: ToastItem; onClose: (id: string) =
     scheduleClose(remaining);
   };
 
-  /* CSS animation style for the progress bar */
   const barStyle: CSSProperties = {
     transformOrigin: 'left center',
     animation: `toast-shrink ${item.duration}ms linear forwards`,
@@ -155,7 +152,6 @@ function ToastCard({ item, onClose }: { item: ToastItem; onClose: (id: string) =
         </button>
       </div>
 
-      {/* Pure-CSS animated progress bar — GPU scaleX, zero JS per frame */}
       <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gray-100">
         <div ref={barRef} className="h-full w-full" style={barStyle} />
       </div>

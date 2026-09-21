@@ -70,7 +70,6 @@ export default function MyOrdersPage() {
     <div className="p-4 md:p-6 max-w-4xl mx-auto flex flex-col gap-5">
       <h1 className="text-xl md:text-2xl font-bold text-gray-900">Đơn hàng của tôi</h1>
 
-      {/* Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {TABS.map(t => (
           <button
@@ -92,7 +91,6 @@ export default function MyOrdersPage() {
         ))}
       </div>
 
-      {/* Loading / Empty / Orders */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-[#2db84c]" />
@@ -157,7 +155,6 @@ export default function MyOrdersPage() {
         </motion.div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-2">
           {Array.from({ length: totalPages }, (_, i) => (

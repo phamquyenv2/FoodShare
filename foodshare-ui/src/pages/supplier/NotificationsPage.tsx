@@ -55,7 +55,6 @@ export default function NotificationsPage() {
         setNotifications(newItems);
       } else {
         setNotifications(prev => {
-          // Prevent duplicates on double-fetch
           const existingIds = new Set(prev.map(n => n.id));
           return [...prev, ...newItems.filter((n: any) => !existingIds.has(n.id))];
         });
@@ -98,7 +97,6 @@ export default function NotificationsPage() {
   }, [hasMore, isLoading, isFetchingNextPage, fetchNotifications]);
 
   const markAsRead = async (id: number) => {
-    // Optimistic UI update
     const previousNotifications = notifications;
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     try {
@@ -110,7 +108,6 @@ export default function NotificationsPage() {
   };
 
   const markAllRead = async () => {
-    // Optimistic UI update
     const previousNotifications = notifications;
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     try {
@@ -126,7 +123,6 @@ export default function NotificationsPage() {
       markAsRead(notif.id);
     }
     
-    // Redirect based on reference type
     if (notif.referenceType === 'ORDER') {
       navigate(`/supplier/orders?id=${notif.referenceId}`);
     } else if (notif.referenceType === 'FOOD_POST') {
@@ -148,7 +144,6 @@ export default function NotificationsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-5">
-      {/* Sticky Header & Filter Bar */}
       <div className="sticky top-0 z-20 bg-[#f5f7f5]/95 backdrop-blur-md -mt-4 md:-mt-6 -mx-4 md:-mx-6 px-4 md:px-6 pt-4 md:pt-6 pb-3 flex flex-col gap-4 border-b border-gray-200/60 shadow-xs">
         <div className="flex items-center justify-between">
           <div>

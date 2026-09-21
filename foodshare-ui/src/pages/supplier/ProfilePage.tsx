@@ -64,7 +64,6 @@ export default function SupplierProfilePage() {
     <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-5">
       <h1 className="text-xl md:text-2xl font-bold text-gray-900">Hồ sơ cá nhân</h1>
 
-      {/* Avatar & Role */}
       <motion.div
         variants={fadeUp} initial="hidden" animate="show"
         className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col items-center gap-4"
@@ -89,7 +88,6 @@ export default function SupplierProfilePage() {
         </div>
       </motion.div>
 
-      {/* Info Form */}
       <motion.div
         variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.1 }}
         className="bg-white rounded-2xl border border-gray-100 p-6"
@@ -179,7 +177,6 @@ export default function SupplierProfilePage() {
         )}
       </motion.div>
 
-      {/* Settings / Links */}
       <motion.div variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.15 }} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div 
           onClick={() => navigate(`/${user?.role?.toLowerCase() || 'recipient'}/reports`)} 
@@ -193,7 +190,6 @@ export default function SupplierProfilePage() {
         </div>
       </motion.div>
 
-      {/* Logout Button */}
       <motion.div
         variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.2 }}
       >

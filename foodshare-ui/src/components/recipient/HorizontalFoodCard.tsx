@@ -27,7 +27,6 @@ export default function HorizontalFoodCard({ post, onClick, fullWidth }: Horizon
         fullWidth ? 'w-full' : 'w-[260px] sm:w-[280px] shrink-0'
       }`}
     >
-      {/* Image & Badge */}
       <div className="relative w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
         {post.images && post.images.length > 0 ? (
           <img
@@ -41,7 +40,6 @@ export default function HorizontalFoodCard({ post, onClick, fullWidth }: Horizon
           </div>
         )}
 
-        {/* Free Badge */}
         {isFree ? (
           <div className="absolute top-1.5 left-1.5 bg-[#2db84c] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-xs">
             Miễn phí
@@ -53,7 +51,6 @@ export default function HorizontalFoodCard({ post, onClick, fullWidth }: Horizon
         ) : null}
       </div>
 
-      {/* Content */}
       <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5">
         <div>
           <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate leading-snug group-hover:text-[#2db84c] transition-colors">
@@ -69,7 +66,6 @@ export default function HorizontalFoodCard({ post, onClick, fullWidth }: Horizon
           </div>
         </div>
 
-        {/* Price Row */}
         <div className="flex items-center justify-between mt-auto pt-1">
           {isFree ? (
             <span className="font-bold text-[#2db84c] text-base whitespace-nowrap">Miễn phí</span>
@@ -84,7 +80,6 @@ export default function HorizontalFoodCard({ post, onClick, fullWidth }: Horizon
           <ChevronRight size={16} className="text-gray-300 group-hover:text-[#2db84c] group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
         </div>
 
-        {/* Match Score (Optional) */}
         {post.matchScore != null && post.matchScore > 0 && (
           <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold text-[#2db84c] bg-[#2db84c]/10 px-2 py-0.5 rounded-md self-start border border-[#2db84c]/20">
             <Sparkles size={10} /> Phù hợp {Math.round(post.matchScore)}%

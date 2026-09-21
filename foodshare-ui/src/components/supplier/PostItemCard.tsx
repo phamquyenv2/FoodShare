@@ -47,7 +47,6 @@ export default function PostItemCard({ post, variants, actionLoading, onToggleVi
       variants={variants}
       className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow p-3 flex gap-3"
     >
-      {/* Image & Badge */}
       <div className="relative w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
         {post.images && post.images.length > 0 ? (
           <img src={post.images[0]} alt={post.name} className="w-full h-full object-cover" />
@@ -63,7 +62,6 @@ export default function PostItemCard({ post, variants, actionLoading, onToggleVi
         )}
       </div>
 
-      {/* Content & Actions */}
       <div className="flex-1 flex flex-col justify-between min-w-0">
         <div>
           <div className="flex items-start justify-between gap-2 mb-1">
@@ -95,7 +93,6 @@ export default function PostItemCard({ post, variants, actionLoading, onToggleVi
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2 mt-auto">
           <button
             onClick={() => navigate(`/supplier/posts/${post.id}/edit`)}

@@ -52,7 +52,6 @@ export default function AdminPaymentsPage() {
   const [selected, setSelected] = useState<PaymentItem | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => {
       setDq(q.trim());
@@ -61,7 +60,6 @@ export default function AdminPaymentsPage() {
     return () => clearTimeout(t);
   }, [q]);
 
-  // Fetch payments
   useEffect(() => {
     setLoading(true);
     apiFetch<any>(`/admin/payments?page=${page}&size=20&keyword=${encodeURIComponent(dq)}&status=${status}`)
@@ -106,7 +104,6 @@ export default function AdminPaymentsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
-      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Quản lý giao dịch thanh toán</h1>
@@ -114,7 +111,6 @@ export default function AdminPaymentsPage() {
         </div>
       </div>
 
-      {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <form
           onSubmit={(e) => {
@@ -164,7 +160,6 @@ export default function AdminPaymentsPage() {
         </div>
       </div>
 
-      {/* Loading state */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-[#2db84c]" />
@@ -176,7 +171,6 @@ export default function AdminPaymentsPage() {
         </div>
       ) : (
         <>
-          {/* Desktop Table */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -204,43 +198,36 @@ export default function AdminPaymentsPage() {
                         transition={{ delay: i * 0.02 }}
                         className="hover:bg-gray-50/50 transition-colors"
                       >
-                        {/* ID */}
                         <td className="px-4 py-3.5 text-xs text-gray-500 font-mono">
                           #{p.id}
                         </td>
 
-                        {/* Order ID */}
                         <td className="px-4 py-3.5">
                           <span className="font-semibold text-gray-900 text-xs font-mono">
                             #{p.orderId}
                           </span>
                         </td>
 
-                        {/* Amount */}
                         <td className="px-4 py-3.5 text-sm font-bold text-gray-900">
                           {formatCurrency(p.amount)}
                         </td>
 
-                        {/* Method */}
                         <td className="px-4 py-3.5">
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 ${meth.cls}`}>
                             {meth.label}
                           </span>
                         </td>
 
-                        {/* Status */}
                         <td className="px-4 py-3.5">
                           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-block ${st.badgeCls}`}>
                             {st.label}
                           </span>
                         </td>
 
-                        {/* Paid at */}
                         <td className="px-4 py-3.5 text-xs text-gray-500">
                           {formatDateTime(p.paidAt)}
                         </td>
 
-                        {/* Actions */}
                         <td className="px-4 py-3.5 text-center">
                           <button
                             onClick={() => {
@@ -262,7 +249,6 @@ export default function AdminPaymentsPage() {
             </div>
           </div>
 
-          {/* Mobile Card View */}
           <div className="md:hidden flex flex-col gap-3">
             {items.map((p, i) => {
               const st = STATUS_CONFIG[p.status] || { label: p.status, badgeCls: 'bg-gray-100 text-gray-600', icon: Clock };
@@ -317,7 +303,6 @@ export default function AdminPaymentsPage() {
             })}
           </div>
 
-          {/* Pagination */}
           {meta.totalPages > 1 && (
             <div className="flex justify-center gap-2 mt-2">
               {Array.from({ length: Math.min(meta.totalPages, 10) }, (_, i) => (
@@ -338,7 +323,6 @@ export default function AdminPaymentsPage() {
         </>
       )}
 
-      {/* Payment Detail Modal */}
       <AnimatePresence>
         {selected && (
           <div
@@ -352,7 +336,6 @@ export default function AdminPaymentsPage() {
               className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Modal Header */}
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center text-[#2db84c]">
@@ -371,7 +354,6 @@ export default function AdminPaymentsPage() {
                 </button>
               </div>
 
-              {/* Status banner */}
               <div className="my-4 p-3 rounded-xl bg-gray-50/80 flex items-center justify-between">
                 <span className="text-xs text-gray-500 font-medium">Trạng thái giao dịch</span>
                 {(() => {
@@ -384,7 +366,6 @@ export default function AdminPaymentsPage() {
                 })()}
               </div>
 
-              {/* Details List */}
               <div className="space-y-3 text-sm">
                 <div className="flex items-center justify-between py-1 border-b border-gray-50">
                   <span className="text-gray-500 text-xs">Mã đơn hàng:</span>
@@ -448,7 +429,6 @@ export default function AdminPaymentsPage() {
                 </button>
               )}
 
-              {/* Close button */}
               <div className="mt-6">
                 <button
                   onClick={() => setSelected(null)}

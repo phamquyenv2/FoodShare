@@ -118,9 +118,7 @@ export default function ModerationPage() {
         <p className="text-sm text-gray-500 mt-0.5">{totalElements} hồ sơ đăng ký kinh doanh & hoạt động</p>
       </div>
 
-      {/* Role & Status Filter Tabs */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        {/* Role Tabs */}
         <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit">
           {ROLE_TABS.map(r => {
             const Icon = r.icon;
@@ -142,7 +140,6 @@ export default function ModerationPage() {
           })}
         </div>
 
-        {/* Status Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {STATUS_TABS.map(t => (
             <button
@@ -169,7 +166,6 @@ export default function ModerationPage() {
         </div>
       ) : (
         <>
-          {/* Desktop Table */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[880px]">
@@ -293,7 +289,6 @@ export default function ModerationPage() {
             </div>
           </div>
 
-          {/* Mobile Cards */}
           <div className="md:hidden flex flex-col gap-3">
             {users.map((u, i) => {
               const bp = u.businessProfile;
@@ -361,7 +356,6 @@ export default function ModerationPage() {
         </>
       )}
 
-      {/* Action Confirm Modal */}
       <AnimatePresence>
         {confirmAction && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -392,7 +386,6 @@ export default function ModerationPage() {
         )}
       </AnimatePresence>
 
-      {/* Detail Modal */}
       {detailUser && detailUser.businessProfile && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setDetailUser(null)}>
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}

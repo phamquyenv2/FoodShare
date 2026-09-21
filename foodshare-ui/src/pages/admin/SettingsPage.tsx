@@ -104,7 +104,6 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      {/* Financial */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center gap-2 mb-4">
@@ -134,7 +133,6 @@ export default function SettingsPage() {
         </div>
       </motion.div>
 
-      {/* System */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
         className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center gap-2 mb-4">
@@ -153,7 +151,6 @@ export default function SettingsPage() {
         </div>
       </motion.div>
 
-      {/* Contact */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
         className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center gap-2 mb-4">

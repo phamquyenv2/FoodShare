@@ -277,7 +277,6 @@ export default function WalletPage() {
         </div>
       )}
 
-      {/* Balance card */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         className="bg-gradient-to-br from-[#2db84c] to-[#1a8f38] rounded-2xl p-6 text-white shadow-lg shadow-green-500/20"
@@ -310,7 +309,6 @@ export default function WalletPage() {
         </p>
       </motion.div>
 
-      {/* Quick stats */}
       <motion.div
         className="grid grid-cols-3 gap-3"
         variants={stagger} initial="hidden" animate="show"
@@ -332,7 +330,6 @@ export default function WalletPage() {
         </motion.div>
       </motion.div>
 
-      {/* Transactions */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="p-4 md:px-6 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900 text-sm md:text-base">Lịch sử giao dịch</h2>

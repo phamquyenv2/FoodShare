@@ -54,10 +54,8 @@ export default function StoreDetailPage() {
   const location = useLocation();
   const { showError } = useToast();
 
-  // Route role prefix
   const rolePath = location.pathname.startsWith('/organization') ? 'organization' : 'recipient';
 
-  // Initial supplier info from router state (if navigated from ExplorePage)
   const stateSupplier = location.state?.supplier;
   const initialPosts: FoodPostItem[] = location.state?.posts || [];
 
@@ -70,13 +68,11 @@ export default function StoreDetailPage() {
   const [page, setPage] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
 
-  // Filter panel state
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [maxPrice, setMaxPrice] = useState<number>(200000);
   const [sortOption, setSortOption] = useState<string>('newest');
   const [expiryFilter, setExpiryFilter] = useState<string>('all');
 
-  // Supplier info state (real data from API)
   const [supplierInfo, setSupplierInfo] = useState<{
     name: string;
     avatar: string;
@@ -95,15 +91,12 @@ export default function StoreDetailPage() {
     reviewCount: stateSupplier?.reviewCount ?? 0,
   });
 
-  // Customer reviews state
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState<boolean>(false);
 
-  // Fetch real review rating summary & review list for this store
   useEffect(() => {
     if (!id || isNaN(Number(id))) return;
 
-    // 1. Fetch real summary
     apiFetch<{ averageRating: number | null; totalReviews: number }>(`/reviews/business/${id}/summary`)
       .then(res => {
         if (res) {
@@ -116,7 +109,6 @@ export default function StoreDetailPage() {
       })
       .catch(() => { });
 
-    // 2. Fetch actual reviews
     setIsLoadingReviews(true);
     apiFetch<any>(`/reviews/business/${id}?size=10`)
       .then(res => {
@@ -130,7 +122,6 @@ export default function StoreDetailPage() {
       });
   }, [id]);
 
-  // Fetch categories
   useEffect(() => {
     getCategories().then(cats => {
       if (cats && cats.length > 0) {
@@ -139,11 +130,9 @@ export default function StoreDetailPage() {
     });
   }, []);
 
-  // Fetch supplier posts
   const fetchStorePosts = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Query parameters
       let query = `/food-posts?page=${page}&size=12`;
       if (id && !isNaN(Number(id))) {
         query += `&businessProfileId=${id}`;
@@ -158,7 +147,6 @@ export default function StoreDetailPage() {
         query += `&postType=${selectedType}`;
       }
 
-      // Additional filters
       if (selectedType !== 'FREE' && maxPrice < 200000) {
         query += `&maxPrice=${maxPrice}`;
       }
@@ -182,7 +170,6 @@ export default function StoreDetailPage() {
       setPosts(fetchedPosts);
       setTotalPages(res.totalPages || 1);
 
-      // Derive supplier info from first post if not available
       if (fetchedPosts.length > 0 && !stateSupplier) {
         const first = fetchedPosts[0];
         setSupplierInfo(prev => ({
@@ -194,7 +181,6 @@ export default function StoreDetailPage() {
         }));
       }
     } catch (err: any) {
-      // If backend filtering by businessProfileId is not yet cached, fallback to client filter
       if (initialPosts.length > 0) {
         let filtered = [...initialPosts];
         if (searchKeyword.trim()) {
@@ -220,7 +206,6 @@ export default function StoreDetailPage() {
     fetchStorePosts();
   }, [fetchStorePosts]);
 
-  // Count active filters (excluding default values)
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (selectedCategory > 0) count++;
@@ -241,7 +226,6 @@ export default function StoreDetailPage() {
     setPage(0);
   };
 
-  // Client-side filtering and sorting for instant responsiveness
   const displayedPosts = useMemo(() => {
     const result = posts.filter(post => {
       if (searchKeyword.trim()) {
@@ -284,7 +268,6 @@ export default function StoreDetailPage() {
     return result;
   }, [posts, searchKeyword, selectedCategory, selectedType, maxPrice, expiryFilter, sortOption]);
 
-  // Atmospheric food hero banner from store's first available food photo
   const heroFoodImage = useMemo(() => {
     for (const post of posts) {
       if (post.images && post.images.length > 0 && post.images[0]) {
@@ -296,7 +279,6 @@ export default function StoreDetailPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-6 min-h-[calc(100vh-80px)]">
-      {/* Top row: Back button */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
@@ -306,13 +288,11 @@ export default function StoreDetailPage() {
         </button>
       </div>
 
-      {/* 1. Store Header Card */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden"
       >
-        {/* Foodie Ambient Hero Banner (Phương án 1: Dùng ảnh món ăn thật của quán) */}
         <div className="h-44 sm:h-56 md:h-64 relative overflow-hidden bg-gray-900">
           {heroFoodImage ? (
             <>
@@ -321,7 +301,6 @@ export default function StoreDetailPage() {
                 alt={supplierInfo.name}
                 className="w-full h-full object-cover object-center brightness-[0.88] transition-transform duration-500"
               />
-              {/* Gradient overlay: Dark at bottom to highlight avatar & text, clear at top */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/10" />
             </>
           ) : (
@@ -331,9 +310,7 @@ export default function StoreDetailPage() {
           )}
         </div>
 
-        {/* Store Profile Info */}
         <div className="p-5 sm:p-6 pt-0 relative flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
-          {/* Avatar (Overlapping banner with clean white border) */}
           <div className="-mt-12 sm:-mt-14 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white p-1 shadow-lg shrink-0 border-2 border-white relative z-10">
             <div className="w-full h-full rounded-xl bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-2xl font-bold overflow-hidden shadow-inner">
               {supplierInfo.avatar ? (
@@ -344,7 +321,6 @@ export default function StoreDetailPage() {
             </div>
           </div>
 
-          {/* Store Details */}
           <div className="flex-1 min-w-0 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
@@ -358,14 +334,12 @@ export default function StoreDetailPage() {
                 )}
               </div>
 
-              {/* Status Pill */}
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-[#2db84c] text-xs font-semibold border border-green-200/60 shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-[#2db84c] animate-pulse" />
                 Đang phục vụ
               </div>
             </div>
 
-            {/* Badges & Address */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-gray-600 mt-1">
               <span className="inline-flex items-center gap-1.5 font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/60 shadow-2xs">
                 <Star size={12} className="fill-amber-400 text-amber-400" />
@@ -400,10 +374,8 @@ export default function StoreDetailPage() {
         </div>
       </motion.div>
 
-      {/* 2. Search & Controls */}
       <div className="flex flex-col gap-3">
         <div className="flex gap-2.5 items-center">
-          {/* Search Input */}
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -424,7 +396,6 @@ export default function StoreDetailPage() {
             )}
           </div>
 
-          {/* Filter Button (Image replica) */}
           <button
             type="button"
             onClick={() => setShowFilters(!showFilters)}
@@ -441,7 +412,6 @@ export default function StoreDetailPage() {
           </button>
         </div>
 
-        {/* Expandable Filter Panel */}
         {showFilters && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -450,9 +420,7 @@ export default function StoreDetailPage() {
             className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm overflow-hidden"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left Column: Sắp xếp & Loại hình */}
               <div className="flex flex-col gap-5">
-                {/* Sắp xếp */}
                 <div>
                   <p className="text-xs font-bold text-gray-500 mb-2.5 uppercase tracking-wide">
                     Sắp xếp theo
@@ -478,7 +446,6 @@ export default function StoreDetailPage() {
                   </div>
                 </div>
 
-                {/* Loại hình */}
                 <div>
                   <p className="text-xs font-bold text-gray-500 mb-2.5 uppercase tracking-wide">
                     Loại hình món
@@ -504,9 +471,7 @@ export default function StoreDetailPage() {
                 </div>
               </div>
 
-              {/* Right Column: Giá & Hạn sử dụng */}
               <div className="flex flex-col gap-5">
-                {/* Mức giá tối đa */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
@@ -533,7 +498,6 @@ export default function StoreDetailPage() {
                   </div>
                 </div>
 
-                {/* Thời hạn sử dụng */}
                 <div>
                   <p className="text-xs font-bold text-gray-500 mb-2.5 uppercase tracking-wide">
                     Thời hạn nhận món
@@ -560,7 +524,6 @@ export default function StoreDetailPage() {
               </div>
             </div>
 
-            {/* Bottom row: Reset and Count */}
             <div className="flex items-center justify-between pt-4 mt-5 border-t border-gray-100">
               <span className="text-xs text-gray-500">
                 Hiển thị <strong className="text-gray-900">{displayedPosts.length}</strong> món ăn
@@ -588,7 +551,6 @@ export default function StoreDetailPage() {
           </motion.div>
         )}
 
-        {/* Category Pills (Horizontal scroll) */}
         {categories.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <button
@@ -616,7 +578,6 @@ export default function StoreDetailPage() {
         )}
       </div>
 
-      {/* 3. Menu Grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={26} className="animate-spin text-[#2db84c]" />
@@ -654,7 +615,6 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-      {/* 4. Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 pt-2 pb-6">
           {Array.from({ length: totalPages }, (_, i) => (
@@ -672,7 +632,6 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-      {/* 5. Customer Reviews Section (Real Data) */}
       <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4 mt-2">
         <div className="flex items-center justify-between border-b border-gray-100 pb-4">
           <div className="flex items-center gap-3">

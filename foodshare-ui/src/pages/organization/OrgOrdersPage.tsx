@@ -60,7 +60,6 @@ export default function OrgOrdersPage() {
 
   const filtered = tab === 'all' ? orders : orders.filter(o => o.status === tab);
 
-  // Group by supplier for overview
   const supplierGroups = filtered.reduce<Record<string, OrderItem[]>>((acc, o) => {
     const key = o.supplierName || 'Khác';
     if (!acc[key]) acc[key] = [];
@@ -72,7 +71,6 @@ export default function OrgOrdersPage() {
     <div className="p-4 md:p-6 max-w-4xl mx-auto flex flex-col gap-5">
       <h1 className="text-xl md:text-2xl font-bold text-gray-900">Quản lý đơn tiếp nhận</h1>
 
-      {/* Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {TABS.map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); setPage(0); }}
@@ -96,7 +94,6 @@ export default function OrgOrdersPage() {
           {Object.entries(supplierGroups).map(([supplier, items]) => (
             <motion.div key={supplier} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              {/* Supplier header */}
               <div className="px-4 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-[10px] font-bold">{supplier.charAt(0).toUpperCase()}</div>
                 <p className="text-sm font-semibold text-gray-900">{supplier}</p>
@@ -124,7 +121,6 @@ export default function OrgOrdersPage() {
                           <ChevronRight size={16} className="text-gray-300" />
                         </div>
                       </div>
-                      {/* Quick actions */}
                       {order.status === 'DELIVERED' && (
                         <div className="mt-2 flex gap-2">
                           <button onClick={(e) => { e.stopPropagation(); handleAction(order.id, 'complete'); }}

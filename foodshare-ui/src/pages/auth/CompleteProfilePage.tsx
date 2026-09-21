@@ -201,7 +201,6 @@ export default function CompleteProfilePage() {
         }),
       });
 
-      // Update auth context
       await checkAuth();
       const fallback = getRoleHome(selectedRole);
       navigate(fallback);
@@ -297,7 +296,6 @@ export default function CompleteProfilePage() {
         </div>
       </div>
 
-      {/* Step indicator */}
       <div className="flex gap-2 mb-4">
         {[1, 2].map(s => (
           <div
@@ -307,8 +305,6 @@ export default function CompleteProfilePage() {
           />
         ))}
       </div>
-
-
 
       {step === 1 && (
         <div className="flex flex-col gap-3">
@@ -366,7 +362,6 @@ export default function CompleteProfilePage() {
 
       {step === 2 && (
         <form noValidate onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-x-5 gap-y-3">
-          {/* Show selected role */}
           <div className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 rounded-xl lg:col-span-2">
             <span className="text-sm text-gray-600">Vai trò:</span>
             <span className="text-sm font-semibold text-[#2db84c]">

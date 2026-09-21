@@ -46,7 +46,6 @@ export default function ReviewsPage() {
     <div className="p-4 md:p-6 max-w-4xl mx-auto flex flex-col gap-5">
       <h1 className="text-xl md:text-2xl font-bold text-gray-900">Đánh giá nhận được</h1>
 
-      {/* Summary */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-2xl border border-gray-100 p-6 flex items-center gap-6"
@@ -78,7 +77,6 @@ export default function ReviewsPage() {
         </div>
       </motion.div>
 
-      {/* Reviews list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-[#2db84c]" />
@@ -123,7 +121,6 @@ export default function ReviewsPage() {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-2">
           {Array.from({ length: totalPages }, (_, i) => (

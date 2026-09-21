@@ -35,7 +35,6 @@ export default function PostsPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Debounce logic for mobile
   useEffect(() => {
     if (!isDesktop) {
       const timer = setTimeout(() => {
@@ -126,7 +125,6 @@ export default function PostsPage() {
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Bài đăng của tôi</h1>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* Search Bar */}
           <div className="relative w-full md:w-64">
             <input
               type="text"
@@ -148,7 +146,6 @@ export default function PostsPage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {TABS.map(t => (
           <button
@@ -165,7 +162,6 @@ export default function PostsPage() {
         ))}
       </div>
 
-      {/* Loading */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-[#2db84c]" />
@@ -189,7 +185,6 @@ export default function PostsPage() {
         </motion.div>
       )}
 
-      {/* Infinite Scroll Target (Mobile Only) */}
       {!isDesktop && page < totalPages - 1 && (
         <div ref={observerTarget} className="flex justify-center py-6 w-full">
           <Loader2 size={24} className="animate-spin text-[#2db84c]" />
@@ -202,7 +197,6 @@ export default function PostsPage() {
         </div>
       )}
 
-      {/* Pagination (Desktop Only) - Fixed at bottom */}
       {isDesktop && totalPages > 1 && filtered.length > 0 && (
         <div className="hidden md:flex sticky bottom-0 -mx-4 md:-mx-6 px-4 md:px-6 py-4 justify-center gap-2 mt-auto z-40">
           {Array.from({ length: totalPages }, (_, i) => (

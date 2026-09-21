@@ -1,10 +1,8 @@
-/** Format number as Vietnamese currency: 45000 → "45.000₫" */
 export function formatVND(amount: number): string {
   if (amount === 0) return 'Miễn phí';
   return amount.toLocaleString('vi-VN') + '₫';
 }
 
-/** Short relative date: "2 giờ trước", "Hôm qua" */
 export function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -17,19 +15,16 @@ export function timeAgo(dateStr: string): string {
   return `${days} ngày trước`;
 }
 
-/** Compact number: 1284 → "1.284" */
 export function formatNumber(n: number): string {
   return n.toLocaleString('vi-VN');
 }
 
-/** Format display name without role/parenthetical suffix like "(Nhà cung cấp)" */
 export function formatDisplayName(fullName?: string | null, fallback = 'bạn'): string {
   if (!fullName) return fallback;
   const cleaned = fullName.replace(/\s*\([^)]*\)/g, '').trim();
   return cleaned || fallback;
 }
 
-/** Remaining time until expiration: "Còn 45 phút", "Còn 2 giờ", "Hết hạn" */
 export function formatTimeRemaining(dateStr?: string | null): { text: string; isUrgent: boolean } {
   if (!dateStr) return { text: '', isUrgent: false };
   const diff = new Date(dateStr).getTime() - Date.now();

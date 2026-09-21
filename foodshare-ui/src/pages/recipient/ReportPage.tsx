@@ -144,7 +144,6 @@ export default function ReportPage() {
         <p className="text-sm text-gray-500 mb-6">Cho chúng tôi biết vấn đề bạn gặp phải</p>
 
         <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {/* Report Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Phân loại <span className="text-red-500">*</span></label>
             <div className="flex flex-col gap-2">
@@ -168,7 +167,6 @@ export default function ReportPage() {
             </div>
           </div>
 
-          {/* Reason */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Chi tiết <span className="text-red-500">*</span></label>
             <textarea
@@ -181,7 +179,6 @@ export default function ReportPage() {
             />
           </div>
 
-          {/* Evidence Images */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Bằng chứng (ảnh)</label>
             <div className="flex flex-wrap gap-3">
@@ -205,7 +202,6 @@ export default function ReportPage() {
             </div>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={isLoading}

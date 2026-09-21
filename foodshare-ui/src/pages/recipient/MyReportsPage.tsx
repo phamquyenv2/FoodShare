@@ -49,7 +49,6 @@ export default function MyReportsPage() {
       const res = await apiFetch<any>('/reports?size=50');
       let data = res.content || [];
       
-      // Filter out non-system reports for supplier
       if (user?.role === 'SUPPLIER') {
         data = data.filter((r: ReportItem) => r.referenceType === 'SYSTEM' || r.reportType === 'SYSTEM_ERROR');
       }
@@ -64,7 +63,6 @@ export default function MyReportsPage() {
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
 
-  // Handle reportId from URL query param to open detail modal
   useEffect(() => {
     if (!reportIdParam) return;
     const targetId = Number(reportIdParam);
@@ -135,7 +133,6 @@ export default function MyReportsPage() {
         </div>
       )}
 
-      {/* Detail Modal */}
       <AnimatePresence>
         {detailReport && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

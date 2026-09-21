@@ -32,8 +32,6 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // The backend uses phone for login, but UI shows email right now.
-      // Let's assume the field is either phone or email, but map it to phone for API
       const res = await apiFetch<any>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ identifier: email, password }),

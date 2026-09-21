@@ -63,7 +63,6 @@ export default function OrdersPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Debounce logic for mobile
   useEffect(() => {
     if (!isDesktop) {
       const timer = setTimeout(() => {
@@ -334,14 +333,12 @@ function OrderCard({
             )}
           </div>
 
-          {/* Rejection Reason */}
           {order.orderStatus === 'REJECTED' && order.rejectionReason && (
             <div className="p-3 bg-red-50 text-red-600 text-xs rounded-xl mb-4 border border-red-100">
               <span className="font-semibold">Lý do từ chối:</span> {order.rejectionReason}
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
             {order.orderStatus === 'PENDING' && (
               <>

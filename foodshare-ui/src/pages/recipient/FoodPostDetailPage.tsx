@@ -142,7 +142,6 @@ export default function FoodPostDetailPage() {
   const isAvailable = (post.postStatus === 'ACTIVE' || post.postStatus === 'AVAILABLE') && post.availableQuantity > 0 && !timeLeft.text.includes('hết hạn');
   const totalPrice = post.postType === 'FREE' ? 0 : post.unitPrice * quantity;
 
-  // Order success overlay
   if (orderSuccess) {
     return (
       <div className="p-4 md:p-6 max-w-3xl mx-auto">
@@ -185,9 +184,7 @@ export default function FoodPostDetailPage() {
       </div>
 
       <div className="grid md:grid-cols-[1fr_360px] gap-5">
-        {/* Left: Image + Details */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4">
-          {/* Image Gallery */}
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="h-64 md:h-80 bg-gray-100 relative">
               {allImages.length > 0 ? (
@@ -197,7 +194,6 @@ export default function FoodPostDetailPage() {
                   <UtensilsCrossed size={48} className="text-gray-300" />
                 </div>
               )}
-              {/* Expiry */}
               <div className="absolute top-3 right-3">
                 <span className={`px-2.5 py-1 rounded-lg text-xs font-bold backdrop-blur-md flex items-center gap-1 ${timeLeft.urgent ? 'bg-red-500/90 text-white' : 'bg-black/50 text-white'
                   }`}>
@@ -221,7 +217,6 @@ export default function FoodPostDetailPage() {
             )}
           </div>
 
-          {/* Description */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <h1 className="text-lg md:text-xl font-bold text-gray-900 mb-1">{post.name}</h1>
             <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
@@ -273,7 +268,6 @@ export default function FoodPostDetailPage() {
             </div>
           </div>
 
-          {/* Supplier Info */}
           <div className="bg-white rounded-2xl border border-gray-100 p-4">
             <h3 className="text-xs font-semibold text-gray-700 mb-2.5">Nhà cung cấp</h3>
             <div className="flex items-center gap-3">
@@ -299,7 +293,6 @@ export default function FoodPostDetailPage() {
           </div>
         </motion.div>
 
-        {/* Right: Order Panel */}
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="md:sticky md:top-20 h-fit"
@@ -325,7 +318,6 @@ export default function FoodPostDetailPage() {
               </div>
             ) : (
               <>
-                {/* Quantity selector */}
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm text-gray-600 font-medium">Số lượng</p>
@@ -370,7 +362,6 @@ export default function FoodPostDetailPage() {
                   </div>
                 </div>
 
-                {/* Price breakdown */}
                 <div className="p-4 rounded-xl bg-gray-50 mb-4">
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-gray-500">Đơn giá</span>

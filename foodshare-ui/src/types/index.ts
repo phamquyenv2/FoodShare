@@ -1,4 +1,3 @@
-// ─── User ────────────────────────────────────────────────────────────────────
 export type UserRole = 'SUPPLIER' | 'RECIPIENT' | 'ORGANIZATION' | 'ADMIN';
 
 export interface User {
@@ -29,7 +28,6 @@ export interface User {
   } | null;
 }
 
-// ─── Food Post ───────────────────────────────────────────────────────────────
 export type PostStatus = 'AVAILABLE' | 'HIDDEN' | 'OUT_OF_STOCK' | 'EXPIRED';
 export type PostType = 'FREE' | 'PAID';
 
@@ -56,7 +54,6 @@ export interface FoodPost {
   reportCount: number;
 }
 
-// ─── Order ───────────────────────────────────────────────────────────────────
 export type OrderStatus =
   | 'PENDING'
   | 'ACCEPTED'
@@ -80,7 +77,6 @@ export interface Order {
   rejectionReason?: string;
 }
 
-// ─── Payout ──────────────────────────────────────────────────────────────────
 export type PayoutStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
 
 export interface PayoutTransaction {
@@ -98,7 +94,6 @@ export interface PayoutTransaction {
   createdAt: string;
 }
 
-// ─── Admin Report ────────────────────────────────────────────────────────────
 export type ReportStatus = 'PENDING' | 'REVIEWING' | 'RESOLVED';
 export type ReportTargetType = 'FOODPOST' | 'USER' | 'ORDER';
 
@@ -114,7 +109,6 @@ export interface AdminReport {
   reportCount: number;
 }
 
-// ─── Navigation ──────────────────────────────────────────────────────────────
 export interface NavItem {
   key: string;
   label: string;

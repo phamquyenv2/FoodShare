@@ -127,7 +127,6 @@ export default function SupplierDashboard() {
         <p className="text-sm text-gray-500 mt-1">Tổng quan hoạt động</p>
       </div>
 
-      {/* Stat Cards */}
       <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" variants={stagger} initial="hidden" animate="show">
         {STATS.map(s => (
           <motion.div key={s.label} variants={fadeUp}
@@ -141,7 +140,6 @@ export default function SupplierDashboard() {
         ))}
       </motion.div>
 
-      {/* Pending Orders */}
       {pendingOrders.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
           className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -185,7 +183,6 @@ export default function SupplierDashboard() {
         </motion.div>
       )}
 
-      {/* Recent Orders */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
         className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="flex items-center justify-between p-4 md:px-6 border-b border-gray-100">

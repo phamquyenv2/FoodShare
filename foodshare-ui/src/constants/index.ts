@@ -1,12 +1,11 @@
 export const APP_NAME = 'FoodShare';
 export const APP_TAGLINE = 'Chia sẻ thực phẩm – Kết nối yêu thương';
 
-/** Primary green palette — inspired by Bách Hóa Xanh */
 export const COLORS = {
   primary:     '#2db84c',
   primaryDark: '#1a8f38',
   primaryLight:'#e6f7eb',
-  accent:      '#f59e0b', // amber for badges
+  accent:      '#f59e0b',
   white:       '#ffffff',
   bg:          '#f5f7f5',
   textPrimary: '#1a1a1a',

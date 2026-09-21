@@ -104,7 +104,6 @@ export default function OrgExplorePage() {
     return () => controller.abort();
   }, [fetchRecommendations]);
 
-  // Fetch real review ratings for stores on page
   useEffect(() => {
     if (posts.length === 0) return;
     const bpIds = Array.from(new Set(
@@ -153,7 +152,6 @@ export default function OrgExplorePage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
-      {/* Header */}
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">
           Khám phá món ăn cho tổ chức
@@ -163,7 +161,6 @@ export default function OrgExplorePage() {
         </p>
       </div>
 
-      {/* Search Bar */}
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="flex-1 relative">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -201,7 +198,6 @@ export default function OrgExplorePage() {
         </button>
       </form>
 
-      {/* Filters Panel */}
       {showFilters && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
@@ -209,9 +205,7 @@ export default function OrgExplorePage() {
           className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm overflow-hidden"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Left Column */}
             <div className="flex flex-col gap-6">
-              {/* Category */}
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide flex items-center justify-between">
                   Danh mục
@@ -236,7 +230,6 @@ export default function OrgExplorePage() {
                 </div>
               </div>
 
-              {/* Type */}
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Loại hình</p>
                 <div className="flex gap-2">
@@ -256,7 +249,6 @@ export default function OrgExplorePage() {
                 </div>
               </div>
 
-              {/* Price Range */}
               {typeFilter !== 'FREE' && (
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -280,9 +272,7 @@ export default function OrgExplorePage() {
               )}
             </div>
 
-            {/* Right Column */}
             <div className="flex flex-col gap-6">
-              {/* Distance */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Khoảng cách</p>
@@ -305,7 +295,6 @@ export default function OrgExplorePage() {
                 </div>
               </div>
 
-              {/* Expiration Time */}
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Thời hạn sử dụng</p>
                 <div className="flex flex-wrap gap-2">
@@ -332,7 +321,6 @@ export default function OrgExplorePage() {
             </div>
           </div>
 
-          {/* Action Footer */}
           <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
             <button
               onClick={() => {
@@ -352,7 +340,6 @@ export default function OrgExplorePage() {
         </motion.div>
       )}
 
-      {/* Recommendations Section */}
       {recommendations.length > 0 && !search && categoryId === 0 && typeFilter === 'all' && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
@@ -421,7 +408,6 @@ export default function OrgExplorePage() {
                       </div>
                     )}
 
-                    {/* Top Left: Distance */}
                     {post.distanceKm != null && (
                       <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-lg bg-black/65 backdrop-blur-sm text-white text-[10px] font-bold flex items-center gap-1 shadow-xs">
                         <MapPin size={10} className="text-emerald-400 shrink-0" />
@@ -429,7 +415,6 @@ export default function OrgExplorePage() {
                       </span>
                     )}
 
-                    {/* Top Right Badge */}
                     {recommendationMode === "URGENT" ? (
                       <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-lg text-white text-[10px] font-bold flex items-center gap-1 shadow-xs ${
                         timeInfo.isUrgent ? 'bg-amber-500/95' : 'bg-gray-800/85'
@@ -469,7 +454,6 @@ export default function OrgExplorePage() {
         </motion.div>
       )}
 
-      {/* Results: Clean Store Cards identical to Recipient */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-[#2db84c]" />
@@ -499,7 +483,6 @@ export default function OrgExplorePage() {
         </motion.div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-2">
           {Array.from({ length: totalPages }, (_, i) => (
@@ -518,7 +501,6 @@ export default function OrgExplorePage() {
         </div>
       )}
 
-      {/* Floating Cart Button */}
       <FloatingCartButton />
     </div>
   );
