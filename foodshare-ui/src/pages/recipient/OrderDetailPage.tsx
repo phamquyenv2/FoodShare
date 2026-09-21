@@ -31,6 +31,7 @@ interface OrderDetail {
   paymentMethod?: string;
   hasRefundRequest?: boolean;
   refundStatus?: string | null;
+  hasActiveReport?: boolean;
   hasReviewed?: boolean;
   review?: {
     id: number;
@@ -198,7 +199,6 @@ export default function OrderDetailPage() {
         method: 'PATCH',
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
-      // Refresh data
       const data = await apiFetch<OrderDetail>(`/orders/${id}`);
       setOrder(data);
     } catch (err: any) {
@@ -259,21 +259,24 @@ export default function OrderDetailPage() {
   const StatusIcon = status.icon;
   const currentStep = STEPS.indexOf(orderStatus);
   const isCancelled = orderStatus === 'CANCELLED' || orderStatus === 'REJECTED';
-  const canCancel = orderStatus === 'PENDING';
-  const canConfirm = orderStatus === 'DELIVERED';
-  const canPay = ['ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED'].includes(orderStatus)
-    && order.totalAmount > 0
-    && order.paymentStatus !== 'SUCCESS';
-  const canReview = orderStatus === 'COMPLETED' && !order.hasReviewed;
-  const isReviewed = orderStatus === 'COMPLETED' && !!order.hasReviewed;
-  const canReport = ['ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED', 'COMPLETED'].includes(orderStatus);
   const isRefunded = order.paymentStatus === 'REFUNDED' || order.refundStatus === 'RESOLVED';
   const isRefundPending = !!order.hasRefundRequest && (order.refundStatus === 'PENDING' || order.refundStatus === 'REVIEWING');
   const isRefundRejected = !!order.hasRefundRequest && order.refundStatus === 'REJECTED';
+  const isDisputed = !!order.hasActiveReport || isRefundPending;
+  const canCancel = orderStatus === 'PENDING' && !isDisputed;
+  const canConfirm = orderStatus === 'DELIVERED' && !isDisputed;
+  const canPay = ['ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED'].includes(orderStatus)
+    && order.totalAmount > 0
+    && order.paymentStatus !== 'SUCCESS'
+    && !isDisputed;
+  const canReview = orderStatus === 'COMPLETED' && !order.hasReviewed;
+  const isReviewed = orderStatus === 'COMPLETED' && !!order.hasReviewed;
+  const canReport = ['ACCEPTED', 'READY_FOR_PICKUP', 'DELIVERED', 'COMPLETED'].includes(orderStatus) && !isDisputed;
   const canRequestRefund = order.paymentStatus === 'SUCCESS'
     && !['CANCELLED', 'REJECTED'].includes(orderStatus)
     && !order.hasRefundRequest
-    && !isRefunded;
+    && !isRefunded
+    && !isDisputed;
   const firstDetail = order.orderDetails?.[0];
   const foodName = firstDetail?.foodPost?.name || 'Món ăn';
   const foodImageUrl = firstDetail?.foodPost?.imageUrl;
@@ -290,7 +293,6 @@ export default function OrderDetailPage() {
         <ArrowLeft size={16} /> Quay lại
       </button>
 
-      {/* 1. Status Header Card */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         className={`w-full rounded-2xl p-5 ${status.bg} border border-transparent`}
@@ -313,17 +315,14 @@ export default function OrderDetailPage() {
         )}
       </motion.div>
 
-      {/* 2. Progress Steps Card */}
       {!isCancelled && currentStep >= 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           className="w-full bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 shadow-xs"
         >
           <div className="relative">
-            {/* Background connecting track */}
             <div className="absolute top-4 left-[10%] right-[10%] -translate-y-1/2 h-0.5 bg-gray-200 z-0 pointer-events-none" />
 
-            {/* Active completed track */}
             <div
               className="absolute top-4 left-[10%] -translate-y-1/2 h-0.5 bg-[#2db84c] z-0 transition-all duration-300 pointer-events-none"
               style={{
@@ -331,7 +330,6 @@ export default function OrderDetailPage() {
               }}
             />
 
-            {/* 5 Step Nodes */}
             <div className="grid grid-cols-5 relative z-10">
               {STEPS.map((step, i) => {
                 const stepStatus = STATUS_MAP[step];
@@ -361,16 +359,13 @@ export default function OrderDetailPage() {
         </motion.div>
       )}
 
-      {/* 3. Two-Column Layout: Left (Chi tiết đơn hàng), Right (Nhà cung cấp & Hủy đơn hàng / Action buttons) */}
       <div className="w-full grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-4 sm:gap-5 items-start">
-        {/* Left Column: Chi tiết đơn hàng */}
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="w-full min-w-0 bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-xs flex flex-col gap-3.5"
         >
           <h3 className="font-semibold text-gray-900 text-base">Chi tiết đơn hàng</h3>
 
-          {/* Food item row */}
           <div className="p-3.5 rounded-xl bg-gray-50 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-16 h-16 rounded-xl bg-gray-200 overflow-hidden shrink-0 border border-gray-200/50">
@@ -397,7 +392,6 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {/* Info cards: Ngày đặt, Ngày giao, Hoàn thành, Thanh toán */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div className="p-3 rounded-xl bg-gray-50">
               <p className="text-xs text-gray-400 mb-0.5">Ngày đặt</p>
@@ -425,7 +419,6 @@ export default function OrderDetailPage() {
             )}
           </div>
 
-          {/* Pickup Address */}
           {pickupAddress && (
             <div className="p-3.5 rounded-xl bg-gray-50 flex items-start gap-2">
               <MapPin size={16} className="text-gray-400 mt-0.5 shrink-0" />
@@ -437,9 +430,7 @@ export default function OrderDetailPage() {
           )}
         </motion.div>
 
-        {/* Right Column: Nhà cung cấp & Action buttons */}
         <div className="w-full min-w-0 flex flex-col gap-4">
-          {/* Nhà cung cấp */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
             className="w-full bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 shadow-xs"
@@ -462,11 +453,31 @@ export default function OrderDetailPage() {
             </div>
           </motion.div>
 
-          {/* Action Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
             className="w-full flex flex-col gap-2.5"
           >
+            {isDisputed && (
+              <div className="w-full p-3.5 sm:p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm flex flex-col gap-2 shadow-xs">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-amber-900">Đơn hàng đang có khiếu nại chờ đối soát</p>
+                    <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                      Các thao tác thanh toán và xác nhận hoàn tất đơn đã được tạm dừng để Ban quản trị kiểm tra và xử lý.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/recipient/reports')}
+                  className="self-end text-xs font-semibold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                >
+                  Xem khiếu nại của tôi &rarr;
+                </button>
+              </div>
+            )}
+
             {canPay && (
               <button
                 onClick={() => setPaymentModal(true)}
@@ -575,7 +586,6 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Cancel Modal */}
       {cancelModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setCancelModal(false)}>
           <motion.div
@@ -604,7 +614,6 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Payment Modal */}
       {paymentModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setPaymentModal(false)}>
           <motion.div
@@ -692,7 +701,6 @@ export default function OrderDetailPage() {
           </motion.div>
         </div>
       )}
-      {/* Refund Request Modal */}
       {refundModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => !isSubmittingRefund && setRefundModal(false)}>
           <motion.div
@@ -701,7 +709,6 @@ export default function OrderDetailPage() {
             className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center border border-purple-100 shrink-0">
@@ -734,7 +741,6 @@ export default function OrderDetailPage() {
               </div>
             ) : (
               <form onSubmit={handleRefundSubmit} className="flex flex-col gap-4 text-sm">
-                {/* Amount Banner */}
                 <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-100 flex items-center justify-between">
                   <div>
                     <span className="text-xs text-purple-700 font-medium block">Số tiền yêu cầu hoàn lại:</span>
@@ -748,7 +754,6 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
 
-                {/* Refund Reason Selection */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                     Lý do hoàn tiền <span className="text-red-500">*</span>
@@ -781,7 +786,6 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
 
-                {/* Optional Account Info */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Số ví / STK nhận tiền <span className="text-gray-400 font-normal">(không bắt buộc)</span>
@@ -798,7 +802,6 @@ export default function OrderDetailPage() {
                   </p>
                 </div>
 
-                {/* Incident Description */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Mô tả chi tiết sự cố <span className="text-red-500">*</span>
@@ -813,7 +816,6 @@ export default function OrderDetailPage() {
                   />
                 </div>
 
-                {/* Upload Evidence */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
                     Bằng chứng hình ảnh <span className="text-gray-400 font-normal">(nếu có)</span>
@@ -848,7 +850,6 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button
                     type="button"
