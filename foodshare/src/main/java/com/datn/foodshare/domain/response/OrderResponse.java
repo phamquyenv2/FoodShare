@@ -37,6 +37,7 @@ public class OrderResponse {
     private SupplierInfo supplier;
     private Boolean hasRefundRequest;
     private com.datn.foodshare.util.constant.ReportStatus refundStatus;
+    private Boolean hasActiveReport;
     private Boolean hasReviewed;
     private ReviewInfo review;
     private Instant createdAt;
@@ -88,14 +89,18 @@ public class OrderResponse {
     }
 
     public static OrderResponse from(Order order) {
-        return from(order, null, null);
+        return from(order, null, null, false);
     }
 
     public static OrderResponse from(Order order, com.datn.foodshare.domain.entity.Report refundReport) {
-        return from(order, refundReport, null);
+        return from(order, refundReport, null, false);
     }
 
     public static OrderResponse from(Order order, com.datn.foodshare.domain.entity.Report refundReport, com.datn.foodshare.domain.entity.Review review) {
+        return from(order, refundReport, review, false);
+    }
+
+    public static OrderResponse from(Order order, com.datn.foodshare.domain.entity.Report refundReport, com.datn.foodshare.domain.entity.Review review, boolean hasActiveReport) {
         List<OrderDetailInfo> details = order.getOrderDetails() != null
                 ? order.getOrderDetails().stream().map(OrderResponse::mapDetail).toList()
                 : List.of();
@@ -129,6 +134,7 @@ public class OrderResponse {
                         .build() : null)
                 .hasRefundRequest(refundReport != null)
                 .refundStatus(refundReport != null ? refundReport.getReportStatus() : null)
+                .hasActiveReport(hasActiveReport)
                 .hasReviewed(review != null)
                 .review(review != null ? ReviewInfo.builder()
                         .id(review.getId())
