@@ -65,6 +65,13 @@ public class PaymentService {
             throw new BusinessException("Không thể tạo thanh toán cho đơn hàng đã hủy hoặc bị từ chối");
         }
 
+        if (orderRepository.hasActiveReport(
+                orderId,
+                com.datn.foodshare.util.constant.ReportReferenceType.ORDER,
+                List.of(com.datn.foodshare.util.constant.ReportStatus.PENDING, com.datn.foodshare.util.constant.ReportStatus.REVIEWING))) {
+            throw new BusinessException("Đơn hàng đang có khiếu nại cần đối soát, không thể thực hiện thanh toán");
+        }
+
         if (order.getTotalAmount() == null || order.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("Đơn hàng miễn phí không yêu cầu thanh toán");
         }
@@ -112,6 +119,13 @@ public class PaymentService {
         if (payment.getOrder().getOrderStatus() == OrderStatus.CANCELLED
                 || payment.getOrder().getOrderStatus() == OrderStatus.REJECTED) {
             throw new BusinessException("Không thể xác nhận thanh toán cho đơn hàng đã kết thúc");
+        }
+
+        if (orderRepository.hasActiveReport(
+                payment.getOrder().getId(),
+                com.datn.foodshare.util.constant.ReportReferenceType.ORDER,
+                List.of(com.datn.foodshare.util.constant.ReportStatus.PENDING, com.datn.foodshare.util.constant.ReportStatus.REVIEWING))) {
+            throw new BusinessException("Đơn hàng đang có khiếu nại cần đối soát, không thể hoàn tất thanh toán");
         }
 
         requireTransitionFromActive(payment, TransactionStatus.SUCCESS);
