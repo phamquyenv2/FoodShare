@@ -79,8 +79,8 @@ public class ReviewService {
                 .title("Bạn có đánh giá " + request.getRating() + " sao mới!")
                 .content("Khách hàng " + currentUser.getFullName() + " vừa đánh giá " + request.getRating() + " sao cho đơn hàng " + order.getOrderCode() + (request.getComment() != null ? " với lời nhắn: " + request.getComment() : "."))
                 .type(NotificationType.REVIEW)
-                .referenceType(NotificationReferenceType.REPORT) // Review is mapped to REPORT/REVIEW in frontend UI, actually the referenceType enum is just for the link. Does NotificationReferenceType have REVIEW? Let's check NotificationReferenceType.
-                .referenceId(order.getId()) // link to order for now
+                .referenceType(NotificationReferenceType.REPORT)
+                .referenceId(order.getId())
                 .build());
 
         return ReviewResponse.from(savedReview);

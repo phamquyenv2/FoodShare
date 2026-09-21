@@ -35,10 +35,6 @@ public class EmailService {
         validateAddress(from, "MAIL_FROM");
     }
 
-    /**
-     * SMTP errors propagate to the notification listener; SMTP acceptance is not inbox delivery.
-     * Sending is asynchronous at NotificationEventListener, after the business transaction commits.
-     */
     public void sendEmail(String to, String subject, String body) {
         if (!enabled) {
             log.info("Bỏ qua gửi email vì cấu hình email đang tắt (app.mail.enabled=false). Người nhận dự kiến: {}", to);

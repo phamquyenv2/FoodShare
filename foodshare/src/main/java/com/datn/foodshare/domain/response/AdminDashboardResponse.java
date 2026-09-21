@@ -42,7 +42,7 @@ public class AdminDashboardResponse {
     @Data
     @Builder
     public static class DailyMetric {
-        private String date; // Format: YYYY-MM-DD
+        private String date;
         private Number value;
     }
 }

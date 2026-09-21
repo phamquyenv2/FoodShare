@@ -68,7 +68,6 @@ public class DynamicMatchingGraphSynchronizer {
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public synchronized void onRebuildRequested(RebuildRequested event) { initialize(); }
 
-    /** Recovery and reconciliation for missed events/external SQL; requests never silently use a broken graph. */
     @Scheduled(fixedDelay = 300_000, initialDelay = 300_000)
     @Transactional(readOnly = true)
     public synchronized void reconcile() { initialize(); }

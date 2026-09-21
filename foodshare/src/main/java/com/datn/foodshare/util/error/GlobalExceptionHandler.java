@@ -111,7 +111,6 @@ public class GlobalExceptionHandler {
             if (errorsForField.isEmpty()) {
                 continue;
             }
-            // Prioritize NotBlank / NotEmpty / NotNull when a field is empty/missing
             FieldError selected = errorsForField.stream()
                     .filter(err -> {
                         String code = err.getCode();

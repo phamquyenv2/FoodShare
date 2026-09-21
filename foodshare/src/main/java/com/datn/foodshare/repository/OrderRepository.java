@@ -54,7 +54,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             GROUP BY o.receiver.id
             """)
     List<Object[]> countActiveOrdersByReceiverIds(@Param("receiverIds") Collection<Long> receiverIds, @Param("statuses") Collection<OrderStatus> statuses);
-    // Match OrderService's duplicate-request rule: history includes cancelled/rejected orders.
     @Query("""
             SELECT DISTINCT o.receiver.id, od.foodPost.id
             FROM Order o JOIN o.orderDetails od

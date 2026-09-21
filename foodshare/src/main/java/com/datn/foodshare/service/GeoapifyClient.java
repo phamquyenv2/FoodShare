@@ -74,7 +74,6 @@ public class GeoapifyClient {
                     .retrieve()
                     .body(GeoapifyResponse.class);
         } catch (RestClientException ex) {
-            // Do not log the request URL because it contains the Geoapify API key.
             log.warn("Geoapify request failed: {}", ex.getClass().getSimpleName());
             throw new ExternalServiceException("Không thể tra cứu vị trí lúc này");
         }

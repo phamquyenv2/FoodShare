@@ -32,7 +32,6 @@ public class DynamicMatchingGraph {
 
     void replaceAll(Collection<FoodPost> foodPosts, Collection<User> users,
                     Collection<CandidateEdge> edges, Instant now) {
-        // Convert first: a failed snapshot must never destroy the previous graph.
         Map<Long, FoodPostNode> nextPosts = new HashMap<>();
         Map<Long, CandidateNode> nextCandidates = new HashMap<>();
         foodPosts.stream().filter(p -> isEligible(p, now)).map(FoodPostNode::from)
@@ -49,7 +48,6 @@ public class DynamicMatchingGraph {
         } finally { lock.writeLock().unlock(); }
     }
 
-    /** Production bootstrap: topology includes receivers currently at capacity, so they can recover. */
     public void rebuild(Collection<FoodPost> foodPosts, Collection<User> users, Map<Long, Long> counts) {
         rebuild(foodPosts, users, counts, Map.of());
     }
@@ -65,7 +63,6 @@ public class DynamicMatchingGraph {
                 if (related(node, CandidateNode.from(u))) edges.add(new CandidateEdge(p.getId(), u.getId()));
             }
         }
-        // One write transaction publishes topology and capacity together.
         lock.writeLock().lock();
         try {
             replaceAll(foodPosts, users, edges, now);
@@ -133,7 +130,6 @@ public class DynamicMatchingGraph {
         } finally { lock.writeLock().unlock(); }
     }
 
-    // Compatibility operations for explicit topology manipulation.
     public void addOrUpdateFoodPost(FoodPost post, Collection<User> users) {
         addOrUpdateFoodPost(post, users, Instant.now());
     }
@@ -202,7 +198,6 @@ public class DynamicMatchingGraph {
         byCandidate.computeIfAbsent(candidateId, ignored -> new HashSet<>()).add(postId);
     }
 
-    /** Atomic immutable snapshot. All weights in a request use the same evaluation time. */
     public Snapshot snapshot(Instant now) { return snapshot(now, null); }
     public Snapshot snapshotForCandidate(long candidateId, Instant now) { return snapshot(now, candidateId); }
     private Snapshot snapshot(Instant now, Long onlyCandidate) {
@@ -311,7 +306,6 @@ public class DynamicMatchingGraph {
             return postStatus == PostStatus.AVAILABLE && availableQuantity > 0 && expiresAt.isAfter(now)
                     && (pickupEndAt == null || pickupEndAt.isAfter(now));
         }
-        // Detached adapter for the existing MCMF API; never store managed JPA entities in the graph.
         FoodPost toFoodPost() {
             return FoodPost.builder().id(id).availableQuantity(availableQuantity).postStatus(postStatus)
                     .postType(postType).expiresAt(expiresAt).pickupEndAt(pickupEndAt).createdAt(createdAt).build();
