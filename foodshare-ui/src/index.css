@@ -27,7 +27,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -36,7 +35,6 @@ body {
   }
 }
 
-/* Custom scrollbar — light theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -52,14 +50,12 @@ body {
   background: rgba(0, 0, 0, 0.2);
 }
 
-/* Focus visible */
 :focus-visible {
   outline: 2px solid #2db84c;
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* Native form validation: show the field itself, while details are reported by Toast. */
 :is(input, textarea, select):user-invalid,
 :is(input, textarea, select)[aria-invalid='true'] {
   border-color: #ef4444 !important;
@@ -71,7 +67,6 @@ body {
   outline-color: #ef4444;
 }
 
-/* Line clamp utility */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;

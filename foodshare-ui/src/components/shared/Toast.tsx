@@ -7,7 +7,7 @@ export type ToastType = 'error' | 'success' | 'warning' | 'info';
 export interface ToastProps {
   message: string;
   type?: ToastType;
-  duration?: number; // ms, default 4000
+  duration?: number;
   onClose: () => void;
   title?: string;
 }
@@ -68,7 +68,6 @@ export default function Toast({
   const IconComponent = config.icon;
   const displayTitle = title ?? config.defaultTitle;
 
-  // Reset when message changes
   useEffect(() => {
     setProgress(100);
     remainingTimeRef.current = duration;
@@ -121,7 +120,6 @@ export default function Toast({
           onMouseLeave={() => setIsPaused(false)}
           className={`fixed top-5 left-4 right-4 sm:left-auto sm:right-6 sm:w-full sm:max-w-md z-50 overflow-hidden rounded-2xl bg-white/95 backdrop-blur-md border ${config.border} ${config.shadow} transition-shadow`}
         >
-          {/* Main content */}
           <div className="flex items-start gap-3.5 p-4">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${config.iconBg}`}>
               <IconComponent size={18} className="stroke-[2.2]" />
@@ -146,7 +144,6 @@ export default function Toast({
             </button>
           </div>
 
-          {/* Running progress bar at the bottom */}
           <div className={`h-1 w-full ${config.barBg} overflow-hidden`}>
             <div
               className={`h-full ${config.barFill} transition-[width] ease-linear duration-75`}

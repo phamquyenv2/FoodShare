@@ -82,7 +82,7 @@ export default function AdminReportsPage() {
   const fetchReports = useCallback(async () => {
     setIsLoading(true);
     try {
-      let url = `/admin/reports?page=${page}&size=50`; // Increase size to handle local search better
+      let url = `/admin/reports?page=${page}&size=50`;
       if (tab !== 'all') url += `&status=${tab}`;
       const res = await apiFetch<any>(url);
       setReports(res.content || []);
@@ -173,7 +173,6 @@ export default function AdminReportsPage() {
         </div>
       </div>
 
-      {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <form onSubmit={(e) => { e.preventDefault(); setPage(0); }} className="flex-1 flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5">
           <Search size={16} className="text-gray-400" />
@@ -208,7 +207,6 @@ export default function AdminReportsPage() {
         </div>
       ) : (
         <>
-          {/* Desktop Table */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -308,7 +306,6 @@ export default function AdminReportsPage() {
             </div>
           </div>
 
-          {/* Mobile Cards */}
           <div className="md:hidden flex flex-col gap-3">
             {filtered.map((r, i) => {
               const st = STATUS_CONFIG[r.reportStatus] || STATUS_CONFIG.PENDING;
@@ -381,7 +378,6 @@ export default function AdminReportsPage() {
         </>
       )}
 
-      {/* Action Confirm Modal */}
       <AnimatePresence>
         {confirmModal && (() => {
           const selectedReport = reports.find(r => r.id === confirmModal.id);
@@ -453,7 +449,6 @@ export default function AdminReportsPage() {
         })()}
       </AnimatePresence>
 
-      {/* Detail Modal */}
       {detailReport && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setDetailReport(null)}>
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}

@@ -41,8 +41,6 @@ const TYPE_FILTERS = [
   { key: 'PAID', label: 'Có phí' },
 ];
 
-
-
 export default function ExplorePage() {
   const { showError } = useToast();
   const { user } = useAuth();
@@ -79,9 +77,6 @@ export default function ExplorePage() {
       if (search.trim()) url += `&keyword=${encodeURIComponent(search.trim())}`;
       if (categoryId > 0) url += `&categoryId=${categoryId}`;
       if (typeFilter !== 'all') url += `&postType=${typeFilter}`;
-      // In a real scenario, we'd also append distance, price, time left here
-      // if (distance < 20) url += `&distance=${distance}`;
-      // if (typeFilter === 'PAID') url += `&maxPrice=${maxPrice}`;
 
       const res = await apiFetch<any>(url);
       setPosts(res.content || []);
@@ -109,7 +104,6 @@ export default function ExplorePage() {
     return () => controller.abort();
   }, [fetchRecommendations]);
 
-  // Fetch real review ratings for stores on page
   useEffect(() => {
     if (posts.length === 0) return;
     const bpIds = Array.from(new Set(
@@ -163,13 +157,11 @@ export default function ExplorePage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
-      {/* Header */}
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Xin chào, {formatDisplayName(user?.fullName)}</h1>
         <p className="text-sm text-gray-500 mt-0.5">Tìm kiếm thực phẩm được chia sẻ gần bạn</p>
       </div>
 
-      {/* Search Bar */}
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="flex-1 relative">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -204,16 +196,13 @@ export default function ExplorePage() {
         </button>
       </form>
 
-      {/* Filters Panel */}
       {showFilters && (
         <motion.div
           initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
           className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm overflow-hidden"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Left Column */}
             <div className="flex flex-col gap-6">
-              {/* Category */}
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide flex items-center justify-between">
                   Danh mục
@@ -236,7 +225,6 @@ export default function ExplorePage() {
                 </div>
               </div>
 
-              {/* Type */}
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Loại hình</p>
                 <div className="flex gap-2">
@@ -256,7 +244,6 @@ export default function ExplorePage() {
                 </div>
               </div>
 
-              {/* Price Range (Only show if Type is PAID or ALL) */}
               {typeFilter !== 'FREE' && (
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -276,9 +263,7 @@ export default function ExplorePage() {
               )}
             </div>
 
-            {/* Right Column */}
             <div className="flex flex-col gap-6">
-              {/* Distance */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Khoảng cách</p>
@@ -295,7 +280,6 @@ export default function ExplorePage() {
                 </div>
               </div>
 
-              {/* Expiration Time */}
               <div>
                 <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Thời hạn sử dụng</p>
                 <div className="flex flex-wrap gap-2">
@@ -322,7 +306,6 @@ export default function ExplorePage() {
             </div>
           </div>
 
-          {/* Action Footer */}
           <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
             <button
               onClick={() => { 
@@ -342,7 +325,6 @@ export default function ExplorePage() {
         </motion.div>
       )}
 
-      {/* Recommendations Section */}
       {recommendations.length > 0 && !search && categoryId === 0 && typeFilter === 'all' && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
@@ -410,7 +392,6 @@ export default function ExplorePage() {
                       </div>
                     )}
 
-                    {/* Top Left: Distance */}
                     {post.distanceKm != null && (
                       <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-lg bg-black/65 backdrop-blur-sm text-white text-[10px] font-bold flex items-center gap-1 shadow-xs">
                         <MapPin size={10} className="text-emerald-400 shrink-0" />
@@ -418,7 +399,6 @@ export default function ExplorePage() {
                       </span>
                     )}
 
-                    {/* Top Right: Mode-Specific Badge */}
                     {recommendationMode === "URGENT" ? (
                       <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-lg text-white text-[10px] font-bold flex items-center gap-1 shadow-xs ${
                         timeInfo.isUrgent ? 'bg-amber-500/95' : 'bg-gray-800/85'
@@ -457,7 +437,6 @@ export default function ExplorePage() {
         </motion.div>
       )}
 
-      {/* Results */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-[#2db84c]" />
@@ -482,7 +461,6 @@ export default function ExplorePage() {
         </motion.div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-2">
           {Array.from({ length: totalPages }, (_, i) => (

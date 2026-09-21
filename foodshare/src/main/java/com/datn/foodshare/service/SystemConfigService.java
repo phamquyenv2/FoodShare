@@ -31,7 +31,6 @@ public class SystemConfigService {
         SystemConfig config = systemConfigRepository.findByConfigKey(configKey)
                 .orElseThrow(() -> new BusinessException("Không tìm thấy cấu hình với mã: " + configKey));
 
-        // TODO: Validate configValue based on config.getDataType()
         config.setConfigValue(request.getConfigValue());
         
         return SystemConfigResponse.from(systemConfigRepository.save(config));

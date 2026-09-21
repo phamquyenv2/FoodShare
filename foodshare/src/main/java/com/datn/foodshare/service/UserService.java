@@ -139,7 +139,6 @@ public class UserService {
         User savedUser = userRepository.save(user);
 
         if (isFirstTimeCompleted && (user.getRole() == Role.SUPPLIER || user.getRole() == Role.ORGANIZATION)) {
-            // Notify admins about new supplier/org
             List<User> admins = userRepository.findByRole(Role.ADMIN);
             for (User admin : admins) {
                 notificationRepository.save(Notification.builder()

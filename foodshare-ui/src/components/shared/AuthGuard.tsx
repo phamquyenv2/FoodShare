@@ -19,7 +19,6 @@ export default function AuthGuard({ children, allowedRoles, requireProfileComple
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role as UserRole)) {
-    // Redirect to correct dashboard or a 403 page
     const fallback = getRoleHome(user.role);
     return <Navigate to={fallback} replace />;
   }
@@ -29,7 +28,6 @@ export default function AuthGuard({ children, allowedRoles, requireProfileComple
     && user.profileCompleted === true
     && (user.profile?.licenseUrls?.length ?? 0) === 0;
 
-  // New and legacy business accounts must complete their profile and documents.
   if (requireProfileCompleted
       && (user.profileCompleted === false || businessProfileMissingDocuments)
       && user.role !== 'ADMIN'
@@ -37,7 +35,6 @@ export default function AuthGuard({ children, allowedRoles, requireProfileComple
     return <Navigate to="/auth/complete-profile" replace />;
   }
 
-  // Check verification status for SUPPLIER and ORGANIZATION
   if (requireProfileCompleted
       && (user.role === 'SUPPLIER' || user.role === 'ORGANIZATION')
       && user.profile?.verificationStatus !== 'VERIFIED'

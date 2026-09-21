@@ -71,7 +71,6 @@ public class ReportService {
 
         log.info("User {} đã tạo report mới: {}", currentUser.getId(), savedReport.getId());
         
-        // Notify all Admins
         java.util.List<User> admins = userRepository.findByRole(com.datn.foodshare.util.constant.Role.ADMIN);
         for (User admin : admins) {
             eventPublisher.publishEvent(NotificationEvent.builder()
@@ -126,8 +125,9 @@ public class ReportService {
                 throw new BusinessException("Chỉ có thể yêu cầu hoàn tiền cho đơn hàng đang thực hiện hoặc đã hoàn tất");
             }
         } else {
-            if (order.getOrderStatus() != OrderStatus.DELIVERED || order.getDeliveredAt() == null) {
-                throw new BusinessException("Chỉ có thể khiếu nại đơn đang ở trạng thái đã giao (DELIVERED)");
+            if ((order.getOrderStatus() != OrderStatus.DELIVERED && order.getOrderStatus() != OrderStatus.COMPLETED)
+                    || order.getDeliveredAt() == null) {
+                throw new BusinessException("Chỉ có thể khiếu nại đơn đã giao hoặc đã hoàn thành trong vòng 24 giờ");
             }
             if (now.isAfter(order.getDeliveredAt().plus(INSPECTION_WINDOW))) {
                 throw new BusinessException("Cửa sổ khiếu nại 24 giờ của đơn hàng đã kết thúc");

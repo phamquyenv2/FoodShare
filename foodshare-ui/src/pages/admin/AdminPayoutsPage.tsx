@@ -65,7 +65,6 @@ export default function AdminPayoutsPage() {
   const [meta, setMeta] = useState<any>({});
   const [search, setSearch] = useState('');
 
-  // Modals & Action States
   const [selectedPayout, setSelectedPayout] = useState<PayoutItem | null>(null);
   const [approveConfirmPayout, setApproveConfirmPayout] = useState<PayoutItem | null>(null);
   const [rejectModalPayout, setRejectModalPayout] = useState<PayoutItem | null>(null);
@@ -88,7 +87,6 @@ export default function AdminPayoutsPage() {
     loadData();
   }, [loadData]);
 
-  // Client-side search filtering by keyword
   const filteredItems = useMemo(() => {
     if (!search.trim()) return items;
     const term = search.trim().toLowerCase();
@@ -164,7 +162,6 @@ export default function AdminPayoutsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
-      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Duyệt yêu cầu rút tiền</h1>
@@ -174,7 +171,6 @@ export default function AdminPayoutsPage() {
         </div>
       </div>
 
-      {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <form
           onSubmit={(e) => {
@@ -220,7 +216,6 @@ export default function AdminPayoutsPage() {
         </div>
       </div>
 
-      {/* Loading state */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-[#2db84c]" />
@@ -232,7 +227,6 @@ export default function AdminPayoutsPage() {
         </div>
       ) : (
         <>
-          {/* Desktop Table: subtle clean border matching other admin pages */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -278,17 +272,14 @@ export default function AdminPayoutsPage() {
                         transition={{ delay: i * 0.02 }}
                         className="hover:bg-gray-50/50 transition-colors"
                       >
-                        {/* Payout Code */}
                         <td className="px-4 py-3.5 text-xs font-semibold text-gray-900 font-mono">
                           {p.payoutCode || `#PO-${p.id}`}
                         </td>
 
-                        {/* Supplier */}
                         <td className="px-4 py-3.5 text-xs text-gray-800 font-medium max-w-[200px] truncate">
                           {p.supplierName}
                         </td>
 
-                        {/* Amount */}
                         <td className="px-4 py-3.5">
                           <div className="text-sm font-bold text-gray-900">
                             {formatVND(netAmount)}
@@ -300,7 +291,6 @@ export default function AdminPayoutsPage() {
                           ) : null}
                         </td>
 
-                        {/* Bank info */}
                         <td className="px-4 py-3.5 text-xs">
                           <div className="font-medium text-gray-900">
                             {p.bankName || p.bankCode || '—'}
@@ -315,12 +305,10 @@ export default function AdminPayoutsPage() {
                           )}
                         </td>
 
-                        {/* Time */}
                         <td className="px-4 py-3.5 text-xs text-gray-500 whitespace-nowrap">
                           {formatDateTime(p.createdAt)}
                         </td>
 
-                        {/* Status */}
                         <td className="px-4 py-3.5">
                           <span
                             className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-block ${st.badgeCls}`}
@@ -329,7 +317,6 @@ export default function AdminPayoutsPage() {
                           </span>
                         </td>
 
-                        {/* Actions */}
                         <td className="px-4 py-3.5 text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             {p.status === 'PENDING' && (
@@ -372,7 +359,6 @@ export default function AdminPayoutsPage() {
             </div>
           </div>
 
-          {/* Mobile Card View */}
           <div className="md:hidden flex flex-col gap-3">
             {filteredItems.map((p, i) => {
               const st = STATUS_CONFIG[p.status] || {
@@ -457,7 +443,6 @@ export default function AdminPayoutsPage() {
             })}
           </div>
 
-          {/* Pagination */}
           {meta.totalPages > 1 && (
             <div className="flex justify-center gap-2 mt-2">
               {Array.from({ length: Math.min(meta.totalPages, 10) }, (_, i) => (
@@ -478,7 +463,6 @@ export default function AdminPayoutsPage() {
         </>
       )}
 
-      {/* Payout Detail Modal */}
       <AnimatePresence>
         {selectedPayout && (
           <div
@@ -492,7 +476,6 @@ export default function AdminPayoutsPage() {
               className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Modal Header */}
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div className="flex items-center gap-2.5">
                   <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-[#2db84c]">
@@ -513,7 +496,6 @@ export default function AdminPayoutsPage() {
                 </button>
               </div>
 
-              {/* Status Banner */}
               <div className="my-4 p-3 rounded-xl bg-gray-50/80 flex items-center justify-between">
                 <span className="text-xs text-gray-500 font-medium">Trạng thái</span>
                 {(() => {
@@ -529,7 +511,6 @@ export default function AdminPayoutsPage() {
                 })()}
               </div>
 
-              {/* Details List */}
               <div className="space-y-3 text-sm">
                 <div className="flex items-center justify-between py-1 border-b border-gray-50">
                   <span className="text-gray-500 text-xs">Nhà cung cấp:</span>
@@ -622,7 +603,6 @@ export default function AdminPayoutsPage() {
                 )}
               </div>
 
-              {/* Actions in detail modal if PENDING */}
               {selectedPayout.status === 'PENDING' && (
                 <div className="flex gap-2.5 mt-5">
                   <button
@@ -649,7 +629,6 @@ export default function AdminPayoutsPage() {
                 </div>
               )}
 
-              {/* Close Button */}
               <div className="mt-4">
                 <button
                   onClick={() => setSelectedPayout(null)}
@@ -663,7 +642,6 @@ export default function AdminPayoutsPage() {
         )}
       </AnimatePresence>
 
-      {/* Approve Confirmation Modal */}
       <AnimatePresence>
         {approveConfirmPayout && (
           <div
@@ -748,7 +726,6 @@ export default function AdminPayoutsPage() {
         )}
       </AnimatePresence>
 
-      {/* Reject Modal with Reason */}
       <AnimatePresence>
         {rejectModalPayout && (
           <div

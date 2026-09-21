@@ -97,7 +97,6 @@ export default function PostForm({
   const isSubmittingRef = useRef(false);
   const isBusy = isSubmitting || isProcessing;
 
-  // Lấy danh mục từ Database
   useEffect(() => {
     getCategories().then(list => {
       if (list && list.length > 0) {
@@ -109,7 +108,6 @@ export default function PostForm({
     });
   }, [initialData?.categoryId]);
 
-  // Ở chế độ tạo mới: tự động điền địa chỉ quán nếu trường địa chỉ còn trống
   useEffect(() => {
     if (mode === 'create' && storeAddress && !form.pickupAddress) {
       selectedAddressRef.current = storeAddress;
@@ -117,7 +115,6 @@ export default function PostForm({
     }
   }, [mode, storeAddress]);
 
-  // Tìm kiếm địa chỉ tự động qua Geoapify khi người dùng nhập
   useEffect(() => {
     const query = form.pickupAddress.trim();
     if (query.length < 3 || query === selectedAddressRef.current) {
@@ -150,7 +147,6 @@ export default function PostForm({
     };
   }, [form.pickupAddress]);
 
-  // Đóng dropdown khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (locationDropdownRef.current && !locationDropdownRef.current.contains(e.target as Node)) {
@@ -285,7 +281,6 @@ export default function PostForm({
         animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-3xl border border-gray-100 p-5 md:p-6 shadow-sm flex flex-col"
       >
-        {/* HEADER: NÚT QUAY LẠI NẰM BÊN TRÁI TIÊU ĐỀ */}
         <div className="flex items-center gap-3 pb-3 mb-4 border-b border-gray-100">
           <button
             type="button"
@@ -302,13 +297,10 @@ export default function PostForm({
           </div>
         </div>
 
-        {/* FORM CHÍNH */}
         <form noValidate onSubmit={handleSubmit} className="flex flex-col">
           <div className="flex flex-col md:flex-row gap-5 items-start">
             
-            {/* CỘT TRÁI: HÌNH ẢNH & MÔ TẢ (ĐỒNG BỘ 2 CARD BO TRÒN GỌN GÀNG) */}
             <div className="w-full md:w-[270px] shrink-0 flex flex-col gap-3">
-              {/* Card hình ảnh vuông */}
               <div className="rounded-2xl border border-gray-100 bg-gray-50/50 p-3 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-gray-700">
@@ -394,7 +386,6 @@ export default function PostForm({
                 )}
               </div>
 
-              {/* Card mô tả */}
               <div className="rounded-2xl border border-gray-100 bg-gray-50/50 p-3 flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-gray-700">
                   Mô tả món ăn
@@ -409,10 +400,8 @@ export default function PostForm({
               </div>
             </div>
 
-            {/* CỘT PHẢI: CHI TIẾT THỰC PHẨM & GIAO NHẬN */}
             <div className="flex-1 flex flex-col gap-3 min-w-0">
               
-              {/* Dòng 1: Loại bài đăng & Giá (cùng 1 hàng ngang siêu gọn) */}
               <div className="flex items-center justify-between gap-3 p-2 rounded-2xl border border-gray-100 bg-gray-50/40 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-gray-700">Hình thức:</span>
@@ -471,7 +460,6 @@ export default function PostForm({
                 )}
               </div>
 
-              {/* Dòng 2: Tên món ăn */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Tên món ăn <span className="text-red-500">*</span>
@@ -486,7 +474,6 @@ export default function PostForm({
                 />
               </div>
 
-              {/* Dòng 3: Danh mục & Số lượng */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -517,7 +504,6 @@ export default function PostForm({
                 </div>
               </div>
 
-              {/* Dòng 4: Địa điểm nhận món (Chọn địa chỉ quán hoặc gợi ý Geoapify) */}
               <div className="relative" ref={locationDropdownRef}>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-gray-700">
@@ -592,7 +578,6 @@ export default function PostForm({
                   ) : null}
                 </div>
 
-                {/* Dropdown gợi ý tìm kiếm bằng Geoapify */}
                 {isLocationDropdownOpen && locationSuggestions.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto divide-y divide-gray-100">
                     <div className="px-3 py-1.5 bg-gray-50/90 text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center justify-between sticky top-0 backdrop-blur-xs">
@@ -621,7 +606,6 @@ export default function PostForm({
                 )}
               </div>
 
-              {/* Dòng 5: Thời gian nhận */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -655,7 +639,6 @@ export default function PostForm({
                 </div>
               </div>
 
-              {/* Dòng 6: Hạn sử dụng món ăn (kèm dòng lưu ý cân xứng 2 cột) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -681,7 +664,6 @@ export default function PostForm({
             </div>
           </div>
 
-          {/* THANH NÚT BẤM DƯỚI ĐÁY GỌN GÀNG, CÂN ĐỐI */}
           <div className="pt-4 mt-5 border-t border-gray-100 flex items-center justify-between flex-wrap gap-3">
             <p className="text-[11px] text-gray-400">
               <span className="text-red-500 font-bold">*</span> Vui lòng điền đầy đủ các thông tin bắt buộc

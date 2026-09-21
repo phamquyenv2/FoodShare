@@ -97,7 +97,6 @@ export default function WriteReviewPage() {
         <p className="text-sm text-gray-500 mb-6">Chia sẻ trải nghiệm của bạn để giúp cộng đồng tốt hơn</p>
 
         <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {/* Star Rating */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">Đánh giá <span className="text-red-500">*</span></label>
             <div className={`flex gap-2 justify-center rounded-xl p-2 ${ratingInvalid ? 'ring-2 ring-red-500/70 bg-red-50' : ''}`}>
@@ -131,7 +130,6 @@ export default function WriteReviewPage() {
             </p>
           </div>
 
-          {/* Comment */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Nhận xét</label>
             <textarea
@@ -143,7 +141,6 @@ export default function WriteReviewPage() {
             />
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={isLoading}

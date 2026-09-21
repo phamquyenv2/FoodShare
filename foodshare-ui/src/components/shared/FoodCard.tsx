@@ -42,7 +42,6 @@ export default function FoodCard({ post, rolePath, showDirectQuantity = true }: 
   const [cartQty, setCartQty] = useState<number>(0);
   const [justAdded, setJustAdded] = useState(false);
 
-  // Sync with current cart state
   useEffect(() => {
     if (!isOrganization) return;
     const sync = () => {
@@ -95,7 +94,6 @@ export default function FoodCard({ post, rolePath, showDirectQuantity = true }: 
       onClick={() => navigate(`/${rolePath}/posts/${post.id}`)}
       className="bg-white rounded-2xl border border-gray-100 hover:border-green-300 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col cursor-pointer group"
     >
-      {/* Food Image */}
       <div className="relative h-44 bg-gray-100 overflow-hidden">
         {post.images && post.images.length > 0 ? (
           <img
@@ -109,7 +107,6 @@ export default function FoodCard({ post, rolePath, showDirectQuantity = true }: 
           </div>
         )}
 
-        {/* Top-Left Badges */}
         {isFree ? (
           <div className="absolute top-2.5 left-2.5 bg-[#2db84c] text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm">
             Miễn phí
@@ -120,7 +117,6 @@ export default function FoodCard({ post, rolePath, showDirectQuantity = true }: 
           </div>
         ) : null}
 
-        {/* Top-Right In-Cart Badge */}
         {isOrganization && cartQty > 0 && (
           <div className="absolute top-2.5 right-2.5 bg-emerald-600/90 backdrop-blur-xs text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-sm flex items-center gap-1 border border-white/20">
             <Check size={12} />
@@ -128,13 +124,11 @@ export default function FoodCard({ post, rolePath, showDirectQuantity = true }: 
           </div>
         )}
 
-        {/* Quantity Remaining Pill */}
         <div className="absolute bottom-2.5 right-2.5 bg-black/60 backdrop-blur-xs text-white text-[11px] font-medium px-2 py-0.5 rounded-md">
           Còn lại: <strong className="font-bold text-white">{post.availableQuantity}</strong> phần
         </div>
       </div>
 
-      {/* Food Info */}
       <div className="p-4 flex-1 flex flex-col justify-between gap-3">
         <div>
           <h3 className="font-bold text-gray-900 text-base line-clamp-1 group-hover:text-[#2db84c] transition-colors">
@@ -152,7 +146,6 @@ export default function FoodCard({ post, rolePath, showDirectQuantity = true }: 
           )}
         </div>
 
-        {/* Price & Action Section */}
         <div className="pt-2.5 border-t border-gray-100 flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <div>
@@ -183,13 +176,11 @@ export default function FoodCard({ post, rolePath, showDirectQuantity = true }: 
             )}
           </div>
 
-          {/* Organization Multi-Quantity Selector & Add to Cart */}
           {isOrganization && showDirectQuantity && (
             <div
               className="mt-1 p-2.5 rounded-xl bg-gray-50/80 border border-gray-100 flex flex-col gap-2"
               onClick={e => e.stopPropagation()}
             >
-              {/* Presets if available >= 5 */}
               {maxAvailable >= 5 && (
                 <div className="flex items-center gap-1.5 text-[11px]">
                   <span className="text-gray-400 font-medium mr-0.5">Chọn nhanh:</span>
@@ -221,7 +212,6 @@ export default function FoodCard({ post, rolePath, showDirectQuantity = true }: 
                 </div>
               )}
 
-              {/* Stepper + Add Button */}
               <div className="flex items-center gap-2">
                 <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden shadow-xs">
                   <button

@@ -3,13 +3,11 @@ import MainLayout from '../layouts/MainLayout';
 import AuthLayout from '../layouts/AuthLayout';
 import AuthGuard from '../components/shared/AuthGuard';
 
-// Auth pages
 import LoginPage from '../pages/auth/LoginPage';
 import RegisterPage from '../pages/auth/RegisterPage';
 import CompleteProfilePage from '../pages/auth/CompleteProfilePage';
 import PendingVerificationPage from '../pages/auth/PendingVerificationPage';
 
-// Supplier pages
 import SupplierDashboard from '../pages/supplier/DashboardPage';
 import SupplierPostsPage from '../pages/supplier/PostsPage';
 import CreatePostPage from '../pages/supplier/CreatePostPage';
@@ -20,7 +18,6 @@ import ProfilePage from '../pages/supplier/ProfilePage';
 import ReviewsPage from '../pages/supplier/ReviewsPage';
 import NotificationsPage from '../pages/supplier/NotificationsPage';
 
-// Admin pages
 import AnalyticsPage from '../pages/admin/AnalyticsPage';
 import UsersPage from '../pages/admin/UsersPage';
 import ModerationPage from '../pages/admin/ModerationPage';
@@ -32,7 +29,6 @@ import AdminPayoutsPage from '../pages/admin/AdminPayoutsPage';
 import SettingsPage from '../pages/admin/SettingsPage';
 import AdminNotificationsPage from '../pages/admin/AdminNotificationsPage';
 
-// Recipient pages
 import ExplorePage from '../pages/recipient/ExplorePage';
 import StoreDetailPage from '../pages/recipient/StoreDetailPage';
 import FoodPostDetailPage from '../pages/recipient/FoodPostDetailPage';
@@ -45,7 +41,6 @@ import RecipientNotificationsPage from '../pages/recipient/NotificationsPage';
 import UserTransactionsPage from '../pages/recipient/UserTransactionsPage';
 import PaymentResultPage from '../pages/recipient/PaymentResultPage';
 
-// Organization pages
 import OrgExplorePage from '../pages/organization/OrgExplorePage';
 import OrgCartPage from '../pages/organization/OrgCartPage';
 import OrgOrdersPage from '../pages/organization/OrgOrdersPage';
@@ -69,9 +64,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: <MainLayout />,
     children: [
-      // Shared
       { path: ':role/report/:id',        element: <AuthGuard><ReportPage /></AuthGuard> },
-      // Supplier
       { path: 'supplier',                element: <AuthGuard allowedRoles={['SUPPLIER']}><SupplierDashboard /></AuthGuard> },
       { path: 'supplier/dashboard',      element: <AuthGuard allowedRoles={['SUPPLIER']}><SupplierDashboard /></AuthGuard> },
       { path: 'supplier/posts',          element: <AuthGuard allowedRoles={['SUPPLIER']}><SupplierPostsPage /></AuthGuard> },
@@ -83,7 +76,6 @@ export const router = createBrowserRouter([
       { path: 'supplier/reviews',        element: <AuthGuard allowedRoles={['SUPPLIER']}><ReviewsPage /></AuthGuard> },
       { path: 'supplier/reports',        element: <AuthGuard allowedRoles={['SUPPLIER']}><MyReportsPage /></AuthGuard> },
       { path: 'supplier/notifications',  element: <AuthGuard allowedRoles={['SUPPLIER']}><NotificationsPage /></AuthGuard> },
-      // Admin
       { path: 'admin',                   element: <AuthGuard allowedRoles={['ADMIN']}><AnalyticsPage /></AuthGuard> },
       { path: 'admin/dashboard',         element: <AuthGuard allowedRoles={['ADMIN']}><AnalyticsPage /></AuthGuard> },
       { path: 'admin/users',             element: <AuthGuard allowedRoles={['ADMIN']}><UsersPage /></AuthGuard> },
@@ -96,7 +88,6 @@ export const router = createBrowserRouter([
       { path: 'admin/notifications',     element: <AuthGuard allowedRoles={['ADMIN']}><AdminNotificationsPage /></AuthGuard> },
       { path: 'admin/settings',          element: <AuthGuard allowedRoles={['ADMIN']}><SettingsPage /></AuthGuard> },
       { path: 'admin/profile',           element: <AuthGuard allowedRoles={['ADMIN']}><ProfilePage /></AuthGuard> },
-      // Recipient
       { path: 'recipient',                         element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><ExplorePage /></AuthGuard> },
       { path: 'recipient/explore',                 element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><ExplorePage /></AuthGuard> },
       { path: 'recipient/stores/:id',              element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><StoreDetailPage /></AuthGuard> },
@@ -109,11 +100,9 @@ export const router = createBrowserRouter([
       { path: 'recipient/reports',                 element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><MyReportsPage /></AuthGuard> },
       { path: 'recipient/notifications',           element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><RecipientNotificationsPage /></AuthGuard> },
       { path: 'recipient/profile',                 element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><ProfilePage /></AuthGuard> },
-      // Payment Result Callback
       { path: 'payment/result',                    element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><PaymentResultPage /></AuthGuard> },
       { path: 'payment/callback',                  element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><PaymentResultPage /></AuthGuard> },
       { path: 'recipient/payment/result',          element: <AuthGuard allowedRoles={['RECIPIENT', 'ORGANIZATION']}><PaymentResultPage /></AuthGuard> },
-      // Organization
       { path: 'organization',                      element: <AuthGuard allowedRoles={['ORGANIZATION']}><OrgExplorePage /></AuthGuard> },
       { path: 'organization/explore',              element: <AuthGuard allowedRoles={['ORGANIZATION']}><OrgExplorePage /></AuthGuard> },
       { path: 'organization/stores/:id',           element: <AuthGuard allowedRoles={['ORGANIZATION']}><StoreDetailPage /></AuthGuard> },

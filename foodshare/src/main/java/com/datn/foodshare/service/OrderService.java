@@ -256,7 +256,9 @@ public class OrderService {
 
         com.datn.foodshare.domain.entity.Review review = reviewRepository.findByOrderId(orderId).orElse(null);
 
-        return OrderResponse.from(order, refundReport, review);
+        boolean hasActiveReport = hasActiveDispute(orderId);
+
+        return OrderResponse.from(order, refundReport, review, hasActiveReport);
     }
 
     @Transactional

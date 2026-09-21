@@ -42,20 +42,17 @@ export default function PaymentResultPage() {
     const handleVerify = async () => {
       setLoading(true);
 
-      // Extract MoMo parameters
       const momoOrderId = searchParams.get('orderId');
       const momoResultCode = searchParams.get('resultCode');
       const momoAmount = searchParams.get('amount');
       const momoMessage = searchParams.get('message');
 
-      // Extract ZaloPay parameters
       const zaloAppTransId = searchParams.get('apptransid');
       const zaloStatus = searchParams.get('status');
       const zaloAmount = searchParams.get('amount');
       const transactionToken = searchParams.get('zptranstoken');
       const returnCode = searchParams.get('returncode');
 
-      // Determine extracted order ID
       let resolvedOrderId: string | number | undefined = undefined;
       if (zaloAppTransId) {
         const parts = zaloAppTransId.split('_');
@@ -72,7 +69,6 @@ export default function PaymentResultPage() {
         resolvedOrderId = searchParams.get('orderId') || undefined;
       }
 
-      // Handle zptranstoken callback
       if (transactionToken && returnCode) {
         const returnMessage = searchParams.get('returnmessage');
         setPaymentDetails({ orderId: resolvedOrderId, provider: 'ZALOPAY' });
@@ -88,7 +84,6 @@ export default function PaymentResultPage() {
         return;
       }
 
-      // 1. ZALOPAY REDIRECT
       if (zaloAppTransId !== null && zaloStatus !== null) {
         const amountNum = zaloAmount ? Number(zaloAmount) : undefined;
         setPaymentDetails({
@@ -98,7 +93,6 @@ export default function PaymentResultPage() {
         });
 
         if (zaloStatus === '1') {
-          // Success from ZaloPay
           try {
             const res = await apiFetch<any>(
               `/payments/zalopay/result?apptransid=${encodeURIComponent(zaloAppTransId)}&status=${zaloStatus}${
@@ -119,12 +113,10 @@ export default function PaymentResultPage() {
               }));
             }
           } catch (err: any) {
-            // If already processed or verified
             setIsSuccess(true);
             setMessage('Thanh toán qua ZaloPay đã được hệ thống ghi nhận thành công.');
           }
         } else {
-          // Cancelled or Failed
           setIsSuccess(false);
           setMessage('Giao dịch ZaloPay đã bị huỷ hoặc chưa hoàn tất thanh toán.');
         }
@@ -132,7 +124,6 @@ export default function PaymentResultPage() {
         return;
       }
 
-      // 2. MOMO REDIRECT
       if (momoOrderId !== null && momoResultCode !== null) {
         const amountNum = momoAmount ? Number(momoAmount) : undefined;
         setPaymentDetails({
@@ -142,7 +133,6 @@ export default function PaymentResultPage() {
         });
 
         if (momoResultCode === '0') {
-          // Success from MoMo
           try {
             const res = await apiFetch<any>(
               `/payments/momo/result?orderId=${encodeURIComponent(momoOrderId)}&resultCode=${momoResultCode}${
@@ -167,7 +157,6 @@ export default function PaymentResultPage() {
             setMessage('Thanh toán qua MoMo đã được hệ thống ghi nhận thành công.');
           }
         } else {
-          // Cancelled or Failed
           setIsSuccess(false);
           setMessage(momoMessage || 'Giao dịch MoMo đã bị huỷ hoặc chưa hoàn tất.');
         }
@@ -175,7 +164,6 @@ export default function PaymentResultPage() {
         return;
       }
 
-      // 3. Fallback or generic query params (e.g. ?success=true&orderId=28)
       const genericSuccess = searchParams.get('success');
       if (genericSuccess !== null) {
         const ok = genericSuccess === 'true' || genericSuccess === '1';
@@ -190,7 +178,6 @@ export default function PaymentResultPage() {
         return;
       }
 
-      // Default fallback
       setIsSuccess(true);
       setMessage('Kết quả thanh toán đã được ghi nhận.');
       setPaymentDetails({ orderId: resolvedOrderId });
@@ -200,7 +187,6 @@ export default function PaymentResultPage() {
     handleVerify();
   }, [searchParams]);
 
-  // Try to load additional order info if missing orderCode/supplierName
   useEffect(() => {
     if (paymentDetails.orderId && !paymentDetails.orderCode) {
       apiFetch<any>(`/orders/${paymentDetails.orderId}`)
@@ -235,9 +221,7 @@ export default function PaymentResultPage() {
             <p className="text-sm text-gray-500">Vui lòng chờ trong giây lát, hệ thống đang đồng bộ dữ liệu.</p>
           </div>
         ) : isSuccess ? (
-          /* SUCCESS STATE */
           <div className="p-6 md:p-8 flex flex-col items-center text-center">
-            {/* Animated Check Icon */}
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -252,7 +236,6 @@ export default function PaymentResultPage() {
               Đơn hàng của bạn đã được thanh toán và chuyển trạng thái cho nhà cung cấp chuẩn bị.
             </p>
 
-            {/* Receipt Summary Card */}
             <div className="w-full bg-gray-50/80 border border-gray-100 rounded-2xl p-4 md:p-5 mb-6 text-left">
               {paymentDetails.amount != null && paymentDetails.amount > 0 && (
                 <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-gray-200/60">
@@ -314,7 +297,6 @@ export default function PaymentResultPage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="w-full flex flex-col gap-2.5">
               {paymentDetails.orderId ? (
                 <button
@@ -343,9 +325,7 @@ export default function PaymentResultPage() {
             </div>
           </div>
         ) : (
-          /* FAILED / CANCELLED STATE */
           <div className="p-6 md:p-8 flex flex-col items-center text-center">
-            {/* Animated Warning Icon */}
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -360,7 +340,6 @@ export default function PaymentResultPage() {
               {message || 'Giao dịch thanh toán qua ví điện tử đã bị huỷ hoặc xảy ra sự cố.'}
             </p>
 
-            {/* Info Notice */}
             <div className="w-full bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 mb-6 text-left flex items-start gap-3">
               <HelpCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
               <div className="text-xs text-amber-900 leading-relaxed">
@@ -371,7 +350,6 @@ export default function PaymentResultPage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="w-full flex flex-col gap-2.5">
               {paymentDetails.orderId ? (
                 <button

@@ -51,7 +51,6 @@ export default function OrgCartPage() {
     setCart([]);
   };
 
-  // Group items by supplier
   const grouped = cart.reduce<Record<string, CartItem[]>>((acc, item) => {
     const key = item.post.supplierName || 'Nhà cung cấp';
     if (!acc[key]) acc[key] = [];
@@ -160,7 +159,6 @@ export default function OrgCartPage() {
         </div>
       ) : (
         <>
-          {/* Grouped by supplier */}
           {Object.entries(grouped).map(([supplier, items]) => (
             <motion.div
               key={supplier}
@@ -251,7 +249,6 @@ export default function OrgCartPage() {
             </motion.div>
           ))}
 
-          {/* Summary */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}

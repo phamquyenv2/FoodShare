@@ -72,7 +72,6 @@ export default function UserTransactionsPage() {
   const [selectedTx, setSelectedTx] = useState<TransactionItem | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(q.trim());
@@ -81,7 +80,6 @@ export default function UserTransactionsPage() {
     return () => clearTimeout(timer);
   }, [q]);
 
-  // Fetch summary
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true);
     try {
@@ -92,13 +90,11 @@ export default function UserTransactionsPage() {
         totalTransactions: Number(res?.totalTransactions || 0),
       });
     } catch {
-      // Non-blocking for summary
     } finally {
       setSummaryLoading(false);
     }
   }, []);
 
-  // Fetch transactions list
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     try {
@@ -173,7 +169,6 @@ export default function UserTransactionsPage() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-6xl mx-auto flex flex-col gap-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -197,9 +192,7 @@ export default function UserTransactionsPage() {
         </button>
       </div>
 
-      {/* KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
-        {/* Card 1: Tổng chi */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -219,7 +212,6 @@ export default function UserTransactionsPage() {
           </div>
         </motion.div>
 
-        {/* Card 2: Tiền hoàn */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -240,7 +232,6 @@ export default function UserTransactionsPage() {
           </div>
         </motion.div>
 
-        {/* Card 3: Số giao dịch */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -262,11 +253,8 @@ export default function UserTransactionsPage() {
         </motion.div>
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="flex flex-col gap-3.5 bg-white p-4 rounded-2xl border border-gray-100 shadow-xs">
-        {/* Top filter row: Search + Method filter */}
         <div className="flex flex-col sm:flex-row gap-3">
-          {/* Search input */}
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
             <input
@@ -286,7 +274,6 @@ export default function UserTransactionsPage() {
             )}
           </div>
 
-          {/* Method Filter Dropdown */}
           <div className="flex items-center gap-2">
             <Filter size={16} className="text-gray-400 shrink-0 hidden sm:inline" />
             <select
@@ -305,7 +292,6 @@ export default function UserTransactionsPage() {
           </div>
         </div>
 
-        {/* Status Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {STATUS_TABS.map((tab) => {
             const active = status === tab.key;
@@ -329,7 +315,6 @@ export default function UserTransactionsPage() {
         </div>
       </div>
 
-      {/* Transactions List */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center gap-3">
           <div className="w-9 h-9 border-3 border-green-500 border-t-transparent rounded-full animate-spin" />
@@ -372,7 +357,6 @@ export default function UserTransactionsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white rounded-2xl border border-gray-100/90 p-4 sm:p-5 shadow-xs hover:border-gray-200 transition-all flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_140px_230px] items-start sm:items-center gap-3.5 sm:gap-4"
               >
-                {/* Left side: Order & Store Info */}
                 <div className="min-w-0 w-full">
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
@@ -389,7 +373,6 @@ export default function UserTransactionsPage() {
                     )}
                   </div>
 
-                  {/* Transaction reference & Date */}
                   <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 flex-wrap">
                     {tx.externalTransactionId ? (
                       <span className="inline-flex items-center gap-1 font-mono text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200/50">
@@ -412,12 +395,10 @@ export default function UserTransactionsPage() {
                   </div>
                 </div>
 
-                {/* Middle: Payment Method badge (MoMo / Tiền mặt / ZaloPay) */}
                 <div className="flex items-center sm:justify-center w-full">
                   {renderMethodBadge(tx.method)}
                 </div>
 
-                {/* Right side: Amount, Status Badge, View Detail */}
                 <div className="w-full flex items-center justify-between sm:justify-end gap-3 sm:gap-4 border-t sm:border-t-0 pt-2.5 sm:pt-0 border-gray-100">
                   <div className="text-left sm:text-right">
                     <div
@@ -452,7 +433,6 @@ export default function UserTransactionsPage() {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between py-2 border-t border-gray-100 text-sm">
           <p className="text-xs text-gray-500">
@@ -480,7 +460,6 @@ export default function UserTransactionsPage() {
         </div>
       )}
 
-      {/* Transaction Detail Modal */}
       <AnimatePresence>
         {selectedTx && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
@@ -490,7 +469,6 @@ export default function UserTransactionsPage() {
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-gray-100 flex flex-col gap-5 relative max-h-[90vh] overflow-y-auto"
             >
-              {/* Close Button */}
               <button
                 onClick={() => setSelectedTx(null)}
                 className="absolute right-4 top-4 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
@@ -498,7 +476,6 @@ export default function UserTransactionsPage() {
                 <X size={16} />
               </button>
 
-              {/* Modal Title & Amount Header */}
               <div className="text-center pt-2">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-green-50 text-[#2db84c] mb-2">
                   <CreditCard size={24} />
@@ -527,7 +504,6 @@ export default function UserTransactionsPage() {
                 </div>
               </div>
 
-              {/* Details breakdown */}
               <div className="divide-y divide-gray-100 bg-gray-50/70 rounded-2xl p-3.5 border border-gray-100 text-sm">
                 <div className="py-2.5 flex items-center justify-between gap-3">
                   <span className="text-gray-500 text-xs">Phương thức</span>
@@ -603,7 +579,6 @@ export default function UserTransactionsPage() {
                 )}
               </div>
 
-              {/* Action: Open Order */}
               <div className="flex gap-2">
                 <button
                   type="button"

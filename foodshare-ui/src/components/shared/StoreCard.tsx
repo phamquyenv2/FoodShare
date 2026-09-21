@@ -59,7 +59,6 @@ export default function StoreCard({ supplier, posts, ratingsMap, rolePath }: Sto
       onClick={goToStore}
       className="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md hover:border-[#2db84c]/40 transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between gap-3.5 cursor-pointer group"
     >
-      {/* Store Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-base font-bold shrink-0 shadow-xs overflow-hidden">
@@ -105,7 +104,6 @@ export default function StoreCard({ supplier, posts, ratingsMap, rolePath }: Sto
         </button>
       </div>
 
-      {/* Store Summary Footer */}
       <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 text-xs text-gray-600 font-medium">
           <UtensilsCrossed size={14} className="text-[#2db84c] shrink-0" />
@@ -114,7 +112,6 @@ export default function StoreCard({ supplier, posts, ratingsMap, rolePath }: Sto
           </span>
         </div>
 
-        {/* 2-3 thumbnail images */}
         <div className="flex items-center -space-x-2 overflow-hidden">
           {posts.slice(0, 3).map((p, i) => (
             <div

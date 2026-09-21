@@ -101,7 +101,6 @@ export default function AdminOrdersPage() {
       .finally(() => setLoading(false));
   }, [page, dq, status, showError]);
 
-  // Handle URL query orderId
   useEffect(() => {
     const id = Number(new URLSearchParams(window.location.search).get('orderId'));
     if (id) {
@@ -117,7 +116,6 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
-      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Quản lý đơn hàng</h1>
@@ -125,7 +123,6 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
-      {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <form
           onSubmit={(e) => {
@@ -175,7 +172,6 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
-      {/* Loading state */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-[#2db84c]" />
@@ -187,7 +183,6 @@ export default function AdminOrdersPage() {
         </div>
       ) : (
         <>
-          {/* Desktop Table */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -261,7 +256,6 @@ export default function AdminOrdersPage() {
             </div>
           </div>
 
-          {/* Mobile Card View */}
           <div className="md:hidden flex flex-col gap-3">
             {items.map((o, i) => {
               const st = ORDER_STATUS_MAP[o.orderStatus] || { label: o.orderStatus, cls: 'bg-gray-100 text-gray-600' };
@@ -307,7 +301,6 @@ export default function AdminOrdersPage() {
             })}
           </div>
 
-          {/* Pagination */}
           {meta.totalPages > 1 && (
             <div className="flex justify-center gap-2 mt-2">
               {Array.from({ length: Math.min(meta.totalPages, 10) }, (_, i) => (
@@ -328,7 +321,6 @@ export default function AdminOrdersPage() {
         </>
       )}
 
-      {/* Order Detail Modal */}
       <AnimatePresence>
         {selected && (
           <div
@@ -342,7 +334,6 @@ export default function AdminOrdersPage() {
               className="bg-white rounded-2xl w-full max-w-lg max-h-[88vh] overflow-y-auto p-6 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Modal Header */}
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center text-[#2db84c]">
@@ -361,7 +352,6 @@ export default function AdminOrdersPage() {
                 </button>
               </div>
 
-              {/* Status Banner */}
               <div className="my-4 p-3 rounded-xl bg-gray-50 flex items-center justify-between">
                 <span className="text-xs text-gray-500 font-medium">Trạng thái</span>
                 {(() => {
@@ -374,7 +364,6 @@ export default function AdminOrdersPage() {
                 })()}
               </div>
 
-              {/* Info Grid */}
               <div className="grid grid-cols-2 gap-3 text-xs mb-4">
                 <div className="p-3 bg-gray-50/70 rounded-xl">
                   <div className="flex items-center gap-1.5 text-gray-500 mb-1">
@@ -395,7 +384,6 @@ export default function AdminOrdersPage() {
                 </div>
               </div>
 
-              {/* Order Items */}
               <div className="mb-4">
                 <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Món ăn trong đơn</h4>
                 <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
@@ -420,7 +408,6 @@ export default function AdminOrdersPage() {
                 </div>
               </div>
 
-              {/* Total & Payment */}
               <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
                 <div className="flex items-center gap-1.5 text-gray-500 text-xs">
                   <CreditCard size={14} />
@@ -432,7 +419,6 @@ export default function AdminOrdersPage() {
                 </div>
               </div>
 
-              {/* Refund Button if SUCCESS */}
               {selected.paymentStatus === 'SUCCESS' && (
                 <div className="mt-4">
                   <button
@@ -446,7 +432,6 @@ export default function AdminOrdersPage() {
                 </div>
               )}
 
-              {/* Close Button */}
               <div className="mt-3">
                 <button
                   onClick={() => setSelected(null)}

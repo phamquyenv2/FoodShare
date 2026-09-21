@@ -21,7 +21,6 @@ export function setAccessToken(token: string) {
   try {
     localStorage.setItem(TOKEN_KEY, token);
   } catch (e) {
-    // ignore
   }
 }
 
@@ -30,7 +29,6 @@ export function clearAccessToken() {
   try {
     localStorage.removeItem(TOKEN_KEY);
   } catch (e) {
-    // ignore
   }
 }
 
@@ -56,7 +54,6 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   }
 
   const config = { ...options, headers };
-  // Make sure to include credentials for cookies (refresh token)
   config.credentials = 'include';
 
   let res = await fetch(`${API_BASE}${path}`, config);
@@ -81,7 +78,6 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
         isRefreshing = false;
         onRefreshed(newToken);
         
-        // Retry original request
         headers.set('Authorization', `Bearer ${newToken}`);
         res = await fetch(`${API_BASE}${path}`, { ...config, headers });
       } catch (err) {
@@ -94,7 +90,6 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
         throw err;
       }
     } else {
-      // Wait for refresh to complete and retry
       return new Promise((resolve, reject) => {
         refreshSubscribers.push({
           resolve: async (newToken: string) => {
@@ -108,7 +103,6 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
                     const errData = await retryRes.json();
                     if (errData.message) msg = Array.isArray(errData.message) ? errData.message.join('\n') : errData.message;
                   } catch (e) {
-                    // ignore
                   }
                 }
                 throw new Error(msg);
@@ -143,17 +137,14 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
         errorMessage = String(errorData.error);
       }
     } catch (e) {
-      // Keep generic message when server did not return JSON.
     }
     const err: any = new Error(errorMessage);
     if (errorMessages) err.messages = errorMessages;
     throw err;
   }
   
-  // Some endpoints might return empty response
   if (res.status === 204) return {} as T;
   
   const json = await res.json();
-  // Unwrap standard API response if present
   return json.data !== undefined ? json.data : json;
 }

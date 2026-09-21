@@ -7,11 +7,6 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.*;
 
-/**
- * Exact incremental allocation at connected-component granularity.
- * A receiver shared by posts couples their flows; disconnected components are independent.
- * Cache keys include every supply, selected edge weight and effective receiver capacity.
- */
 @Service
 @RequiredArgsConstructor
 public class IncrementalAllocationService {
@@ -26,7 +21,6 @@ public class IncrementalAllocationService {
         capacities.forEach((id, cap) -> {
             if (id == null || cap == null || cap < 0) throw new IllegalArgumentException("Invalid recipient capacity");
         });
-        // Preserve the batch solver's validation and request-time expiration semantics.
         List<TopKCandidateSet> valid = sets.stream()
                 .filter(s -> DynamicMatchingGraph.isEligible(s.foodPost(), now)).toList();
         Set<Long> seen = new HashSet<>();

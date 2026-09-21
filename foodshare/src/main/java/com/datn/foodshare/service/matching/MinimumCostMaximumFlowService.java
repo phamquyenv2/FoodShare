@@ -291,7 +291,6 @@ public class MinimumCostMaximumFlowService {
             long totalFlow = 0;
             double totalCost = 0;
             int nodeCount = adjacency.size();
-            // Initial forward costs are 1-score >= 0, hence zero potentials are feasible.
             double[] potential = new double[nodeCount];
             final double epsilon = 1e-12;
             while (true) {

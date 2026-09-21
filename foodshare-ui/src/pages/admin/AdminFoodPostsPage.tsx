@@ -161,7 +161,6 @@ export default function AdminFoodPostsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-5">
-      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Quản lý bài đăng thực phẩm</h1>
@@ -169,7 +168,6 @@ export default function AdminFoodPostsPage() {
         </div>
       </div>
 
-      {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <form onSubmit={(e) => { e.preventDefault(); setPage(0); }} className="flex-1 flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5">
           <Search size={16} className="text-gray-400" />
@@ -211,7 +209,6 @@ export default function AdminFoodPostsPage() {
         </div>
       ) : (
         <>
-          {/* Desktop Table */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-200 overflow-hidden">
             <table className="w-full table-fixed text-sm">
               <colgroup>
@@ -241,7 +238,6 @@ export default function AdminFoodPostsPage() {
                     transition={{ delay: i * 0.015 }}
                     className="hover:bg-gray-50/60 transition-colors"
                   >
-                    {/* Cột 1: Bài đăng */}
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3 min-w-0">
                         {post.images && post.images.length > 0 ? (
@@ -274,12 +270,10 @@ export default function AdminFoodPostsPage() {
                       </div>
                     </td>
 
-                    {/* Cột 2: Nhà cung cấp */}
                     <td className="px-4 py-3.5 text-gray-700 text-sm truncate" title={post.supplier?.name}>
                       {post.supplier?.name || '—'}
                     </td>
 
-                    {/* Cột 3: Loại hình (Không border, dùng bg màu chuẩn) */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       {post.postType === 'FREE' ? (
                         <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
@@ -292,7 +286,6 @@ export default function AdminFoodPostsPage() {
                       )}
                     </td>
 
-                    {/* Cột 4: Khiếu nại (Không border) */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       {(post.reportCount || 0) > 0 ? (
                         <button 
@@ -315,7 +308,6 @@ export default function AdminFoodPostsPage() {
                       )}
                     </td>
 
-                    {/* Cột 5: Trạng thái (Không border) */}
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                         post.postStatus === 'AVAILABLE'
@@ -330,7 +322,6 @@ export default function AdminFoodPostsPage() {
                       </span>
                     </td>
 
-                    {/* Cột 6: Hành động */}
                     <td className="px-3 py-2.5 whitespace-nowrap text-center">
                       <div className="flex items-center gap-2 justify-center">
                         <button 
@@ -367,7 +358,6 @@ export default function AdminFoodPostsPage() {
             </table>
           </div>
 
-          {/* Mobile Cards View */}
           <div className="md:hidden flex flex-col gap-2.5">
             {filteredPosts.map((post, i) => (
               <motion.div 
@@ -455,7 +445,6 @@ export default function AdminFoodPostsPage() {
             ))}
           </div>
 
-          {/* Compact Pagination */}
           {totalPages > 1 && (
             <div className="flex justify-center gap-1.5 mt-1">
               {Array.from({ length: Math.min(totalPages, 10) }, (_, index) => (
@@ -474,7 +463,6 @@ export default function AdminFoodPostsPage() {
         </>
       )}
 
-      {/* Confirmation Action Modal */}
       <AnimatePresence>
         {confirmAction && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -516,7 +504,6 @@ export default function AdminFoodPostsPage() {
         )}
       </AnimatePresence>
 
-      {/* Compact Squarish Post Detail Modal */}
       <AnimatePresence>
         {detail && (
           <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setDetail(null)}>
@@ -527,7 +514,6 @@ export default function AdminFoodPostsPage() {
               className="bg-white rounded-3xl p-5 sm:p-7 w-full max-w-[620px] shadow-2xl relative max-h-[90vh] overflow-y-auto border border-gray-100" 
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
               <div className="flex items-start justify-between pb-2.5 border-b border-gray-100">
                 <div className="min-w-0 pr-2">
                   <div className="flex items-center gap-2">
@@ -548,7 +534,6 @@ export default function AdminFoodPostsPage() {
                 </button>
               </div>
 
-              {/* Main Image */}
               {detail.images && detail.images.length > 0 ? (
                 <div className="mt-3 space-y-2">
                   <img 
@@ -578,14 +563,12 @@ export default function AdminFoodPostsPage() {
                 </div>
               )}
 
-              {/* Description */}
               {detail.description && (
                 <p className="text-xs text-gray-600 mt-2.5 p-2.5 bg-gray-50 rounded-xl leading-relaxed">
                   {detail.description}
                 </p>
               )}
 
-              {/* 2x2 Info Grid */}
               <div className="grid grid-cols-2 gap-2 mt-2.5 text-xs">
                 <div className="p-2.5 rounded-xl bg-gray-50">
                   <p className="text-gray-400 text-[10px] font-medium">Nhà cung cấp</p>
@@ -600,7 +583,6 @@ export default function AdminFoodPostsPage() {
                 </div>
               </div>
 
-              {/* Address & Expiry */}
               <div className="mt-2 p-2.5 rounded-xl bg-gray-50 text-xs space-y-1.5">
                 <div className="flex items-start gap-1.5">
                   <MapPin size={13} className="text-gray-400 shrink-0 mt-0.5" />
@@ -620,7 +602,6 @@ export default function AdminFoodPostsPage() {
                 )}
               </div>
 
-              {/* Reports Quick View */}
               <div 
                 className={`mt-2 flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-colors ${
                   (detail.reportCount || 0) > 0 
@@ -648,7 +629,6 @@ export default function AdminFoodPostsPage() {
                 )}
               </div>
 
-              {/* Footer Actions like UsersPage */}
               <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
                 <button 
                   onClick={() => setDetail(null)}
@@ -685,7 +665,6 @@ export default function AdminFoodPostsPage() {
         )}
       </AnimatePresence>
 
-      {/* Reports Detail Modal (Bấm vào khiếu nại là ra chi tiết các khiếu nại của bài này ngay lập tức) */}
       <AnimatePresence>
         {reportsPost && (
           <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setReportsPost(null)}>
@@ -696,7 +675,6 @@ export default function AdminFoodPostsPage() {
               className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-[620px] max-h-[88vh] flex flex-col shadow-2xl relative border border-gray-100" 
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
               <div className="flex items-start justify-between pb-3.5 border-b border-gray-100">
                 <div className="min-w-0 pr-3">
                   <div className="flex items-center gap-2">
@@ -717,7 +695,6 @@ export default function AdminFoodPostsPage() {
                 </button>
               </div>
 
-              {/* Reports List */}
               <div className="flex-1 overflow-y-auto py-3.5 space-y-3 my-1 pr-1">
                 {postReports.length === 0 ? (
                   <div className="py-12 text-center text-gray-400 text-sm">
@@ -767,7 +744,6 @@ export default function AdminFoodPostsPage() {
                 )}
               </div>
 
-              {/* Footer */}
               <div className="flex items-center gap-2.5 pt-3.5 border-t border-gray-100 mt-2">
                 <button 
                   onClick={() => setReportsPost(null)}

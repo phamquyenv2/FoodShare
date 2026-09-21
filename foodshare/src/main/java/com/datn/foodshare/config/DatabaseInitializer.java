@@ -55,7 +55,6 @@ public class DatabaseInitializer implements CommandLineRunner {
             jdbcTemplate.update("UPDATE notifications SET notification_type = 'REVIEW' WHERE notification_type = 'SYSTEM' AND title LIKE '%Đánh giá%'");
             jdbcTemplate.update("UPDATE notifications SET reference_type = NULL WHERE reference_type IS NOT NULL AND reference_type NOT IN ('ORDER', 'FOOD_POST', 'PAYMENT', 'REPORT')");
             
-            // Fix empty string enums in reports table
             jdbcTemplate.update("UPDATE reports SET report_status = 'PENDING' WHERE report_status = '' OR report_status IS NULL");
             jdbcTemplate.update("UPDATE reports SET report_type = 'COMPLAINT' WHERE report_type = '' OR report_type IS NULL OR report_type NOT IN ('COMPLAINT', 'ISSUE', 'FEEDBACK')");
             jdbcTemplate.update("UPDATE reports SET reference_type = 'USER' WHERE reference_type = '' OR reference_type IS NULL");
@@ -92,7 +91,6 @@ public class DatabaseInitializer implements CommandLineRunner {
             log.info("Tài khoản ADMIN đã tồn tại trong hệ thống. Bỏ qua bước khởi tạo.");
         }
 
-        // Clean up the dummy demo notification
         jdbcTemplate.update("DELETE FROM notifications WHERE title = 'Đăng ký hồ sơ mới (Mẫu demo)'");
     }
 }

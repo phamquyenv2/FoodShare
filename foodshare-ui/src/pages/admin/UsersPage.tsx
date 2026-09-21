@@ -91,7 +91,6 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <form onSubmit={handleSearch} className="flex-1 flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5">
           <Search size={16} className="text-gray-400" />
@@ -119,7 +118,6 @@ export default function UsersPage() {
         </div>
       ) : (
         <>
-          {/* Desktop Table */}
           <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -175,7 +173,6 @@ export default function UsersPage() {
             </div>
           </div>
 
-          {/* Mobile Cards */}
           <div className="md:hidden flex flex-col gap-3">
             {users.map((u, i) => (
               <motion.div key={u.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
@@ -203,7 +200,6 @@ export default function UsersPage() {
             ))}
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex justify-center gap-2 mt-2">
               {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => (
@@ -215,7 +211,6 @@ export default function UsersPage() {
         </>
       )}
 
-      {/* User Detail Modal */}
       {selectedUser && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setSelectedUser(null)}>
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}

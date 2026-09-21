@@ -77,7 +77,6 @@ export default function AnalyticsPage() {
             totalFoodSaved: 0,
           });
 
-          // Compute status for pie chart
           const completed = res.overview.completedOrders || 0;
           const cancelled = res.overview.cancelledOrders || 0;
           const total = res.overview.totalOrders || 0;
@@ -134,7 +133,6 @@ export default function AnalyticsPage() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Xin chào, {formatDisplayName(user?.fullName, 'Quản trị viên')}</h1>
           <p className="text-sm text-gray-500 mt-0.5">Thống kê hoạt động nền tảng FoodShare</p>
         </div>
-        {/* Date Range Filter */}
         <div className="flex items-center gap-2 flex-wrap">
           {[
             { key: '7d', label: '7 ngày' },
@@ -161,7 +159,6 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {/* Stat Cards */}
       <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" variants={stagger} initial="hidden" animate="show">
         {STAT_CARDS.map(s => (
           <motion.div key={s.label} variants={fadeUp}
@@ -178,9 +175,7 @@ export default function AnalyticsPage() {
         ))}
       </motion.div>
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* User Growth Line Chart */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
           className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-4">
@@ -203,7 +198,6 @@ export default function AnalyticsPage() {
           )}
         </motion.div>
 
-        {/* Orders Bar Chart */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
           className="bg-white rounded-2xl border border-gray-100 p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Tổng đơn hàng theo ngày</h3>
@@ -224,7 +218,6 @@ export default function AnalyticsPage() {
         </motion.div>
       </div>
 
-      {/* Pie Chart - Order Distribution */}
       {orderByStatus.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
           className="bg-white rounded-2xl border border-gray-100 p-5">
