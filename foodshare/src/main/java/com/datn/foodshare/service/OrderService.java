@@ -73,6 +73,7 @@ public class OrderService {
     private final BusinessProfileRepository businessProfileRepository;
     private final com.datn.foodshare.repository.ReportRepository reportRepository;
     private final com.datn.foodshare.repository.ReviewRepository reviewRepository;
+    private final com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) throws PermissionException {
@@ -130,6 +131,8 @@ public class OrderService {
                 .referenceId(savedOrder.getId())
                 .channels(pushChannels(false))
                 .build());
+
+        matchingGraphSynchronizer.userChangedAfterCommit(currentUser.getId());
 
         return OrderResponse.from(savedOrder);
     }
@@ -223,6 +226,8 @@ public class OrderService {
                     .build());
         }
 
+        matchingGraphSynchronizer.userChangedAfterCommit(currentUser.getId());
+
         return responses;
     }
 
@@ -302,6 +307,8 @@ public class OrderService {
         if (refunded) {
             publishRefundNotification(savedOrder);
         }
+
+        matchingGraphSynchronizer.userChangedAfterCommit(currentUser.getId());
 
         return OrderResponse.from(savedOrder);
     }
@@ -391,6 +398,9 @@ public class OrderService {
 
         Order responseOrder = orderRepository.findByIdWithDetails(savedOrder.getId()).orElse(savedOrder);
         orderRepository.findAllWithPaymentsByIdIn(List.of(savedOrder.getId()));
+
+        matchingGraphSynchronizer.userChangedAfterCommit(order.getReceiver().getId());
+
         return OrderResponse.from(responseOrder);
     }
 

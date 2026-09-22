@@ -68,6 +68,8 @@ class OrderReliabilityTest {
     private com.datn.foodshare.repository.ReportRepository reportRepository;
     @Mock
     private com.datn.foodshare.repository.ReviewRepository reviewRepository;
+    @Mock
+    private com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
     private PermissionService permissionService;
 
     private OrderService orderService;
@@ -94,7 +96,8 @@ class OrderReliabilityTest {
                 permissionService,
                 businessProfileRepository,
                 reportRepository,
-                reviewRepository
+                reviewRepository,
+                matchingGraphSynchronizer
         );
         lenient().when(businessProfileRepository.findByUserId(ORGANIZATION_USER_ID))
                 .thenReturn(Optional.of(organizationBusinessProfile()));

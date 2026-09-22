@@ -120,7 +120,7 @@ public class DynamicMatchingGraph {
             List<FoodPostNode> owned = posts.values().stream().filter(p -> p.supplierId() == supplier.getId()).toList();
             for (FoodPostNode p : owned) {
                 FoodPostNode updated = new FoodPostNode(p.id(), p.availableQuantity(), p.postStatus(), p.postType(),
-                        p.expiresAt(), p.pickupAddress(), p.pickupLatitude(), p.pickupLongitude(),
+                        p.expiresAt(), p.pickupAddress(), supplier.getLatitude(), supplier.getLongitude(),
                         p.supplierId(), p.pickupEndAt(), p.createdAt());
                 removePost(p.id());
                 posts.put(p.id(), updated);
@@ -219,6 +219,7 @@ public class DynamicMatchingGraph {
                     CandidateNode c = candidates.get(edge.candidateId());
                     long count = activeOrders.getOrDefault(c.id(), 0L);
                     if (globallyEligible(c)
+                            && (c.role() != Role.RECIPIENT || count < 2)
                             && (p.postType() != PostType.FREE || freeQuantitiesToday.getOrDefault(c.id(), 0L) < 3)
                             && (c.role() != Role.RECIPIENT || !requestedPosts.getOrDefault(c.id(), Set.of()).contains(id))) scores.add(edge.evaluate(c, p.expiresAt(), count, now));
                 }

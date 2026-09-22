@@ -96,6 +96,8 @@ class OrderServiceTest {
     private com.datn.foodshare.repository.ReportRepository reportRepository;
     @Mock
     private com.datn.foodshare.repository.ReviewRepository reviewRepository;
+    @Mock
+    private com.datn.foodshare.service.matching.DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
     private PermissionService permissionService;
 
     @BeforeEach
@@ -113,7 +115,8 @@ class OrderServiceTest {
                 permissionService,
                 businessProfileRepository,
                 reportRepository,
-                reviewRepository
+                reviewRepository,
+                matchingGraphSynchronizer
         );
         lenient().when(businessProfileRepository.findByUserId(ORGANIZATION_USER_ID))
                 .thenReturn(Optional.of(organizationBusinessProfile(com.datn.foodshare.util.constant.VerificationStatus.VERIFIED)));
