@@ -74,6 +74,10 @@ class PhaseOneContractIntegrationTest extends IntegrationTestSupport {
     @ValueSource(booleans = {false, true})
     void organizationBatchReceivesBothItemsAndGroupsBySupplier(boolean separateSuppliers) throws Exception {
         User organization = createUser(Role.ORGANIZATION, true);
+        businessProfileRepository.saveAndFlush(BusinessProfile.builder()
+                .user(organization).name("QuyenPA Org " + organization.getId())
+                .profileType(ProfileType.ORGANIZATION)
+                .verificationStatus(VerificationStatus.VERIFIED).build());
         BusinessProfile firstSupplier = createSupplierProfile(createUser(Role.SUPPLIER, true));
         BusinessProfile secondSupplier = separateSuppliers
                 ? createSupplierProfile(createUser(Role.SUPPLIER, true)) : firstSupplier;
