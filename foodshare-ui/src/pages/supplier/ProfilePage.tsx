@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { apiFetch } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import LocationField from '../../components/shared/LocationField';
+import { autocompleteAddress } from '../../services/locationApi';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDisplayName } from '../../utils/format';
 
@@ -85,13 +86,37 @@ export default function SupplierProfilePage() {
   const handleSave = async () => {
     setIsLoading(true);
     try {
+      let lat = form.latitude;
+      let lng = form.longitude;
+      let addr = form.specificAddress.trim();
+
+      // If coordinates are null but address is provided, auto-resolve with Geoapify
+      if ((lat === null || lng === null) && addr.length >= 3) {
+        try {
+          const suggestions = await autocompleteAddress(addr);
+          if (suggestions && suggestions.length > 0) {
+            lat = suggestions[0].latitude;
+            lng = suggestions[0].longitude;
+            addr = suggestions[0].formattedAddress;
+            setForm(prev => ({
+              ...prev,
+              specificAddress: addr,
+              latitude: lat,
+              longitude: lng,
+            }));
+          }
+        } catch {
+          // ignore geocode error and continue
+        }
+      }
+
       await apiFetch('/users/me', {
         method: 'PATCH',
         body: JSON.stringify({
           fullName: form.fullName,
-          specificAddress: form.specificAddress,
-          latitude: form.latitude,
-          longitude: form.longitude,
+          specificAddress: addr,
+          latitude: lat,
+          longitude: lng,
         }),
       });
       await checkAuth();

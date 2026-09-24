@@ -144,6 +144,49 @@ export default function LocationField({
     );
   };
 
+  const autoResolveCoordinates = async (addressText: string) => {
+    const query = addressText.trim();
+    if (query.length < 3) return;
+
+    // If suggestions are already available, pick the first one
+    if (suggestions.length > 0) {
+      selectSuggestion(suggestions[0]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const results = await autocompleteAddress(query);
+      if (results && results.length > 0) {
+        selectSuggestion(results[0]);
+      }
+    } catch {
+      // ignore geocode error
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleBlur = () => {
+    // Delay slightly so click events on suggestions dropdown can fire first
+    window.setTimeout(() => {
+      if (value.address.trim().length >= 3 && (value.latitude === null || value.longitude === null)) {
+        autoResolveCoordinates(value.address);
+      }
+    }, 250);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (suggestions.length > 0) {
+        selectSuggestion(suggestions[0]);
+      } else if (value.address.trim().length >= 3) {
+        autoResolveCoordinates(value.address);
+      }
+    }
+  };
+
   return (
     <div>
       <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
@@ -160,6 +203,8 @@ export default function LocationField({
               onFocus={() => {
                 if (value.address !== resolvedAddress.current) resolvedAddress.current = '';
               }}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
               placeholder={placeholder}
               required={required}
               aria-invalid={hasLocationError}

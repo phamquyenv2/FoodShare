@@ -27,3 +27,6 @@ dist-ssr
 
 # Capacitor Android native project
 android/
+
+# Firebase cache
+.firebase/
