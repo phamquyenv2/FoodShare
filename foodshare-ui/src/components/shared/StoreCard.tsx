@@ -5,6 +5,7 @@ import { MapPin, ChevronRight, Star, UtensilsCrossed } from 'lucide-react';
 export interface StoreSupplier {
   name: string;
   avatar?: string;
+  avatarUrl?: string;
   businessProfileId?: number;
   address?: string;
   phone?: string;
@@ -62,8 +63,8 @@ export default function StoreCard({ supplier, posts, ratingsMap, rolePath }: Sto
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-base font-bold shrink-0 shadow-xs overflow-hidden">
-            {supplier.avatar ? (
-              <img src={supplier.avatar} className="w-full h-full object-cover" alt={supplier.name} />
+            {(supplier.avatar || supplier.avatarUrl) ? (
+              <img src={supplier.avatar || supplier.avatarUrl} className="w-full h-full object-cover" alt={supplier.name} />
             ) : (
               (supplier.name?.charAt(0) || 'Q').toUpperCase()
             )}

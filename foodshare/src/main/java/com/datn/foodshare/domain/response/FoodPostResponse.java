@@ -48,6 +48,7 @@ public class FoodPostResponse {
         private Long businessProfileId;
         private String name;
         private String description;
+        private String avatarUrl;
     }
 
     public static FoodPostResponse from(FoodPost post) {
@@ -58,6 +59,11 @@ public class FoodPostResponse {
         List<String> imageUrls = post.getImages().stream()
                 .map(img -> img.getImageUrl())
                 .toList();
+
+        String supplierAvatarUrl = null;
+        if (post.getBusinessProfile() != null && post.getBusinessProfile().getUser() != null) {
+            supplierAvatarUrl = post.getBusinessProfile().getUser().getAvatarUrl();
+        }
 
         return FoodPostResponse.builder()
                 .id(post.getId())
@@ -78,11 +84,12 @@ public class FoodPostResponse {
                 .pickupStartAt(post.getPickupStartAt())
                 .pickupEndAt(post.getPickupEndAt())
                 .images(imageUrls)
-                .supplier(SupplierInfo.builder()
+                .supplier(post.getBusinessProfile() != null ? SupplierInfo.builder()
                         .businessProfileId(post.getBusinessProfile().getId())
                         .name(post.getBusinessProfile().getName())
                         .description(post.getBusinessProfile().getDescription())
-                        .build())
+                        .avatarUrl(supplierAvatarUrl)
+                        .build() : null)
                 .distanceKm(distanceKm)
                 .matchScore(matchScore)
                 .createdAt(post.getCreatedAt())

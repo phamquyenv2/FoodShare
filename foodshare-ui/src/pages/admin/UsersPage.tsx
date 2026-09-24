@@ -17,6 +17,7 @@ interface UserItem {
   createdAt: string;
   orderCount?: number;
   avatar?: string;
+  avatarUrl?: string;
 }
 
 const ROLE_FILTERS = [
@@ -134,8 +135,8 @@ export default function UsersPage() {
                       className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedUser(u)}>
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                            {u.avatar ? <img src={u.avatar} className="w-full h-full rounded-full object-cover" alt="" /> : u.fullName.charAt(0)}
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+                            {(u.avatarUrl || u.avatar) ? <img src={u.avatarUrl || u.avatar} className="w-full h-full rounded-full object-cover" alt="" /> : u.fullName.charAt(0)}
                           </div>
                           <span className="font-medium text-gray-900 hover:text-[#2db84c] transition-colors">{u.fullName}</span>
                         </div>
@@ -178,8 +179,8 @@ export default function UsersPage() {
               <motion.div key={u.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
                 className="bg-white rounded-2xl border border-gray-100 p-4">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-sm font-bold">
-                    {u.fullName.charAt(0)}
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-sm font-bold overflow-hidden shrink-0">
+                    {(u.avatarUrl || u.avatar) ? <img src={u.avatarUrl || u.avatar} className="w-full h-full rounded-full object-cover" alt="" /> : u.fullName.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0" onClick={() => setSelectedUser(u)}>
                     <p className="font-semibold text-gray-900 text-sm truncate cursor-pointer">{u.fullName}</p>
@@ -220,8 +221,12 @@ export default function UsersPage() {
               <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={18} /></button>
             </div>
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xl font-bold">
-                {selectedUser.fullName.charAt(0)}
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xl font-bold overflow-hidden shrink-0">
+                {(selectedUser.avatarUrl || selectedUser.avatar) ? (
+                  <img src={selectedUser.avatarUrl || selectedUser.avatar} className="w-full h-full object-cover" alt="" />
+                ) : (
+                  selectedUser.fullName.charAt(0)
+                )}
               </div>
               <div>
                 <p className="font-bold text-gray-900">{selectedUser.fullName}</p>

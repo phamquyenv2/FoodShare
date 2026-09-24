@@ -143,7 +143,7 @@ export default function ExplorePage() {
         groups[key] = {
           supplier: {
             name: supplierName,
-            avatar: post.supplierAvatar,
+            avatar: (post.supplier as any)?.avatarUrl || post.supplierAvatar || (post.supplier as any)?.avatar,
             businessProfileId: bpId,
             address: post.pickupAddress,
           },
