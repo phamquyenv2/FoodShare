@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { User, Camera, Phone, Mail, Save, Loader2, LogOut, Flag, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,8 +12,10 @@ export default function SupplierProfilePage() {
   const { user, checkAuth, logout } = useAuth();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [form, setForm] = useState({
     fullName: '',
     phone: '',
@@ -35,6 +37,50 @@ export default function SupplierProfilePage() {
       });
     }
   }, [user]);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showError('Vui lòng chọn file hình ảnh hợp lệ (PNG, JPG, JPEG, WebP)');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showError('Kích thước ảnh tối đa là 5MB');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await apiFetch<{ url: string }>('/media/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res?.url) {
+        throw new Error('Không nhận được đường dẫn ảnh từ máy chủ');
+      }
+
+      await apiFetch('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ avatarUrl: res.url }),
+      });
+
+      await checkAuth();
+      showSuccess('Cập nhật ảnh đại diện thành công!');
+    } catch (err: any) {
+      showError(err.message || 'Tải ảnh đại diện lên thất bại');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const handleSave = async () => {
     setIsLoading(true);
@@ -59,6 +105,7 @@ export default function SupplierProfilePage() {
   };
 
   const fadeUp = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
+  const currentAvatar = user?.avatarUrl || (user as any)?.avatar;
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-5">
@@ -69,15 +116,44 @@ export default function SupplierProfilePage() {
         className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col items-center gap-4"
       >
         <div className="relative">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-green-500/20">
-            {(user as any)?.avatar ? (
-              <img src={(user as any).avatar} className="w-full h-full rounded-full object-cover" alt="avatar" />
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleAvatarChange}
+            accept="image/*"
+            className="hidden"
+          />
+          <div 
+            onClick={() => !isUploadingAvatar && fileInputRef.current?.click()}
+            className="w-24 h-24 rounded-full bg-gradient-to-br from-[#2db84c] to-[#1a9e3a] flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-green-500/20 overflow-hidden cursor-pointer relative group"
+            title="Nhấn để đổi ảnh đại diện"
+          >
+            {currentAvatar ? (
+              <img src={currentAvatar} className="w-full h-full rounded-full object-cover" alt="avatar" />
             ) : (
               (user as any)?.fullName?.charAt(0)?.toUpperCase() || <User size={32} />
             )}
+            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Camera size={22} className="text-white drop-shadow-md" />
+            </div>
+            {isUploadingAvatar && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                <Loader2 size={24} className="animate-spin text-white" />
+              </div>
+            )}
           </div>
-          <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm cursor-pointer hover:bg-gray-50 transition-colors">
-            <Camera size={14} className="text-gray-600" />
+          <button 
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingAvatar}
+            className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-md cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-50"
+            title="Đổi ảnh đại diện"
+          >
+            {isUploadingAvatar ? (
+              <Loader2 size={14} className="animate-spin text-gray-600" />
+            ) : (
+              <Camera size={14} className="text-gray-600" />
+            )}
           </button>
         </div>
         <div className="text-center">

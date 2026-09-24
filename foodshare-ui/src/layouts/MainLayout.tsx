@@ -249,8 +249,12 @@ function MobileHeader() {
             className="md:hidden fixed top-14 left-0 right-0 bg-white border-b border-gray-200 shadow-lg z-30 p-4"
           >
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold">
-                {user?.fullName?.charAt(0) || 'U'}
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold overflow-hidden shrink-0">
+                {user?.avatarUrl || (user as any)?.avatar ? (
+                  <img src={user?.avatarUrl || (user as any)?.avatar} className="w-full h-full object-cover" alt="" />
+                ) : (
+                  user?.fullName?.charAt(0) || 'U'
+                )}
               </div>
               <div>
                 <p className="font-semibold text-gray-900">{formatDisplayName(user?.fullName)}</p>
@@ -341,8 +345,12 @@ function DesktopHeader() {
         onClick={() => navigate(`/${role.toLowerCase()}/profile`)}
         className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
       >
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xs font-bold">
-          {user?.fullName?.charAt(0) || 'U'}
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden shrink-0">
+          {user?.avatarUrl || (user as any)?.avatar ? (
+            <img src={user?.avatarUrl || (user as any)?.avatar} className="w-full h-full object-cover" alt="" />
+          ) : (
+            user?.fullName?.charAt(0) || 'U'
+          )}
         </div>
         <span className="text-sm font-medium text-gray-700">{formatDisplayName(user?.fullName)}</span>
       </div>

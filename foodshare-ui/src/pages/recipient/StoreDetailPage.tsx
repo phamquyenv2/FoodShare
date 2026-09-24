@@ -83,7 +83,7 @@ export default function StoreDetailPage() {
     reviewCount: number;
   }>({
     name: stateSupplier?.name || 'Quán ăn',
-    avatar: stateSupplier?.avatar || '',
+    avatar: stateSupplier?.avatar || (stateSupplier as any)?.avatarUrl || '',
     address: stateSupplier?.address || (initialPosts[0]?.pickupAddress || ''),
     description: stateSupplier?.description || '',
     phone: stateSupplier?.phone || '',
@@ -175,7 +175,7 @@ export default function StoreDetailPage() {
         setSupplierInfo(prev => ({
           ...prev,
           name: first.supplier?.name || prev.name,
-          avatar: first.supplierAvatar || prev.avatar,
+          avatar: (first.supplier as any)?.avatarUrl || first.supplierAvatar || (first.supplier as any)?.avatar || prev.avatar,
           address: first.pickupAddress || prev.address,
           description: first.supplier?.description || prev.description,
         }));
