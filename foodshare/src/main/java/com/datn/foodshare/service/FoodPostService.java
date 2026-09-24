@@ -38,8 +38,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import com.datn.foodshare.domain.response.LocationSuggestionResponse;
+
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class FoodPostService {
 
@@ -51,6 +53,44 @@ public class FoodPostService {
     private final DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
     private final ApplicationEventPublisher eventPublisher;
     private final PermissionService permissionService;
+    private final LocationService locationService;
+
+    @Autowired
+    public FoodPostService(
+            FoodPostRepository foodPostRepository,
+            CategoryRepository categoryRepository,
+            BusinessProfileRepository businessProfileRepository,
+            UserRepository userRepository,
+            CloudinaryService cloudinaryService,
+            DynamicMatchingGraphSynchronizer matchingGraphSynchronizer,
+            ApplicationEventPublisher eventPublisher,
+            PermissionService permissionService,
+            @Autowired(required = false) LocationService locationService
+    ) {
+        this.foodPostRepository = foodPostRepository;
+        this.categoryRepository = categoryRepository;
+        this.businessProfileRepository = businessProfileRepository;
+        this.userRepository = userRepository;
+        this.cloudinaryService = cloudinaryService;
+        this.matchingGraphSynchronizer = matchingGraphSynchronizer;
+        this.eventPublisher = eventPublisher;
+        this.permissionService = permissionService;
+        this.locationService = locationService;
+    }
+
+    public FoodPostService(
+            FoodPostRepository foodPostRepository,
+            CategoryRepository categoryRepository,
+            BusinessProfileRepository businessProfileRepository,
+            UserRepository userRepository,
+            CloudinaryService cloudinaryService,
+            DynamicMatchingGraphSynchronizer matchingGraphSynchronizer,
+            ApplicationEventPublisher eventPublisher,
+            PermissionService permissionService
+    ) {
+        this(foodPostRepository, categoryRepository, businessProfileRepository, userRepository,
+                cloudinaryService, matchingGraphSynchronizer, eventPublisher, permissionService, null);
+    }
 
     @Transactional
     public FoodPostResponse create(CreateFoodPostRequest request) throws PermissionException {
@@ -61,10 +101,32 @@ public class FoodPostService {
         BusinessProfile businessProfile = resolveBusinessProfile(currentUser);
         requireVerifiedBusinessProfile(businessProfile);
         Category category = resolveCategory(request.getCategoryId());
-        BigDecimal pickupLatitude = request.getPickupLatitude() != null
-                ? request.getPickupLatitude() : currentUser.getLatitude();
-        BigDecimal pickupLongitude = request.getPickupLongitude() != null
-                ? request.getPickupLongitude() : currentUser.getLongitude();
+
+        BigDecimal pickupLatitude = request.getPickupLatitude();
+        BigDecimal pickupLongitude = request.getPickupLongitude();
+        String pickupAddress = request.getPickupAddress().trim();
+
+        if (pickupLatitude == null || pickupLongitude == null) {
+            if (currentUser.getSpecificAddress() != null && pickupAddress.equalsIgnoreCase(currentUser.getSpecificAddress().trim())
+                    && currentUser.getLatitude() != null && currentUser.getLongitude() != null) {
+                pickupLatitude = currentUser.getLatitude();
+                pickupLongitude = currentUser.getLongitude();
+            } else if (locationService != null) {
+                try {
+                    List<LocationSuggestionResponse> suggestions = locationService.autocomplete(pickupAddress);
+                    if (suggestions != null && !suggestions.isEmpty()) {
+                        pickupLatitude = suggestions.get(0).latitude();
+                        pickupLongitude = suggestions.get(0).longitude();
+                    }
+                } catch (Exception e) {
+                    log.warn("Không thể tự động geocode pickupAddress: {}", pickupAddress, e);
+                }
+            }
+            if (pickupLatitude == null || pickupLongitude == null) {
+                pickupLatitude = currentUser.getLatitude();
+                pickupLongitude = currentUser.getLongitude();
+            }
+        }
 
         validatePrice(request.getPostType(), request.getUnitPrice());
         validatePickupWindow(request.getPickupStartAt(), request.getPickupEndAt());
@@ -234,11 +296,34 @@ public class FoodPostService {
         post.setExpiresAt(newExpiresAt);
 
         if (request.getPickupAddress() != null) {
-            post.setPickupAddress(request.getPickupAddress().trim());
-            post.setPickupLatitude(request.getPickupLatitude() != null
-                    ? request.getPickupLatitude() : currentUser.getLatitude());
-            post.setPickupLongitude(request.getPickupLongitude() != null
-                    ? request.getPickupLongitude() : currentUser.getLongitude());
+            String pickupAddress = request.getPickupAddress().trim();
+            post.setPickupAddress(pickupAddress);
+            BigDecimal pickupLat = request.getPickupLatitude();
+            BigDecimal pickupLng = request.getPickupLongitude();
+
+            if (pickupLat == null || pickupLng == null) {
+                if (currentUser.getSpecificAddress() != null && pickupAddress.equalsIgnoreCase(currentUser.getSpecificAddress().trim())
+                        && currentUser.getLatitude() != null && currentUser.getLongitude() != null) {
+                    pickupLat = currentUser.getLatitude();
+                    pickupLng = currentUser.getLongitude();
+                } else if (locationService != null) {
+                    try {
+                        List<LocationSuggestionResponse> suggestions = locationService.autocomplete(pickupAddress);
+                        if (suggestions != null && !suggestions.isEmpty()) {
+                            pickupLat = suggestions.get(0).latitude();
+                            pickupLng = suggestions.get(0).longitude();
+                        }
+                    } catch (Exception e) {
+                        log.warn("Không thể tự động geocode pickupAddress trong update: {}", pickupAddress, e);
+                    }
+                }
+                if (pickupLat == null || pickupLng == null) {
+                    pickupLat = currentUser.getLatitude();
+                    pickupLng = currentUser.getLongitude();
+                }
+            }
+            post.setPickupLatitude(pickupLat);
+            post.setPickupLongitude(pickupLng);
         }
 
         if (request.getImages() != null) {

@@ -39,9 +39,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
+import com.datn.foodshare.domain.response.LocationSuggestionResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
-@RequiredArgsConstructor
+@Slf4j
 public class UserService {
 
     private static final Pattern PHONE_PATTERN =
@@ -53,6 +56,38 @@ public class UserService {
     private final DynamicMatchingGraphSynchronizer matchingGraphSynchronizer;
     private final JwtTokenProvider jwtTokenProvider;
     private final ApplicationEventPublisher eventPublisher;
+    private final LocationService locationService;
+
+    @Autowired
+    public UserService(
+            UserRepository userRepository,
+            BusinessProfileRepository businessProfileRepository,
+            NotificationRepository notificationRepository,
+            DynamicMatchingGraphSynchronizer matchingGraphSynchronizer,
+            JwtTokenProvider jwtTokenProvider,
+            ApplicationEventPublisher eventPublisher,
+            @Autowired(required = false) LocationService locationService
+    ) {
+        this.userRepository = userRepository;
+        this.businessProfileRepository = businessProfileRepository;
+        this.notificationRepository = notificationRepository;
+        this.matchingGraphSynchronizer = matchingGraphSynchronizer;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.eventPublisher = eventPublisher;
+        this.locationService = locationService;
+    }
+
+    public UserService(
+            UserRepository userRepository,
+            BusinessProfileRepository businessProfileRepository,
+            NotificationRepository notificationRepository,
+            DynamicMatchingGraphSynchronizer matchingGraphSynchronizer,
+            JwtTokenProvider jwtTokenProvider,
+            ApplicationEventPublisher eventPublisher
+    ) {
+        this(userRepository, businessProfileRepository, notificationRepository, matchingGraphSynchronizer,
+                jwtTokenProvider, eventPublisher, null);
+    }
 
     @Value("${app.upload.max-documents:5}")
     private int maxDocuments = 5;
@@ -85,13 +120,30 @@ public class UserService {
         if (request.getSpecificAddress() != null
                 || request.getLatitude() != null
                 || request.getLongitude() != null) {
-            validateLocationPair(request.getLatitude(), request.getLongitude());
             if (!hasText(request.getSpecificAddress())) {
                 throw new BusinessException("Địa chỉ là bắt buộc khi cập nhật vị trí");
             }
-            user.setSpecificAddress(request.getSpecificAddress().trim());
-            user.setLatitude(request.getLatitude());
-            user.setLongitude(request.getLongitude());
+            String address = request.getSpecificAddress().trim();
+            BigDecimal lat = request.getLatitude();
+            BigDecimal lng = request.getLongitude();
+
+            // Auto-resolve coordinates if not provided and locationService is available
+            if ((lat == null || lng == null) && locationService != null) {
+                try {
+                    List<LocationSuggestionResponse> suggestions = locationService.autocomplete(address);
+                    if (suggestions != null && !suggestions.isEmpty()) {
+                        lat = suggestions.get(0).latitude();
+                        lng = suggestions.get(0).longitude();
+                    }
+                } catch (Exception e) {
+                    log.warn("Không thể tự động geocode địa chỉ: {}", address, e);
+                }
+            }
+
+            validateLocationPair(lat, lng);
+            user.setSpecificAddress(address);
+            user.setLatitude(lat);
+            user.setLongitude(lng);
             locationChanged = true;
         }
 
@@ -122,10 +174,28 @@ public class UserService {
 
         updatePhoneWhenRequired(user, request.getPhone(), request.getPhoneRegistrationToken());
         validateRequiredUserFields(user);
-        validateLocationPair(request.getLatitude(), request.getLongitude());
-        user.setSpecificAddress(request.getSpecificAddress().trim());
-        user.setLatitude(request.getLatitude());
-        user.setLongitude(request.getLongitude());
+
+        BigDecimal lat = request.getLatitude();
+        BigDecimal lng = request.getLongitude();
+        String address = request.getSpecificAddress() != null ? request.getSpecificAddress().trim() : "";
+
+        // Auto-resolve coordinates if not provided and locationService is available
+        if ((lat == null || lng == null) && hasText(address) && locationService != null) {
+            try {
+                List<LocationSuggestionResponse> suggestions = locationService.autocomplete(address);
+                if (suggestions != null && !suggestions.isEmpty()) {
+                    lat = suggestions.get(0).latitude();
+                    lng = suggestions.get(0).longitude();
+                }
+            } catch (Exception e) {
+                log.warn("Không thể tự động geocode địa chỉ trong updateProfile: {}", address, e);
+            }
+        }
+
+        validateLocationPair(lat, lng);
+        user.setSpecificAddress(address);
+        user.setLatitude(lat);
+        user.setLongitude(lng);
 
         BusinessProfile businessProfile = switch (user.getRole()) {
             case RECIPIENT -> completeRecipientProfile(request);

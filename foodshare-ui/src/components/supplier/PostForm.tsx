@@ -79,8 +79,8 @@ export default function PostForm({
     unitPrice: initialData?.unitPrice || 0,
     originalPrice: initialData?.originalPrice || 0,
     pickupAddress: initialData?.pickupAddress || (mode === 'create' ? storeAddress : ''),
-    pickupLatitude: initialData?.pickupLatitude,
-    pickupLongitude: initialData?.pickupLongitude,
+    pickupLatitude: initialData?.pickupLatitude ?? (mode === 'create' ? (user as any)?.latitude : undefined),
+    pickupLongitude: initialData?.pickupLongitude ?? (mode === 'create' ? (user as any)?.longitude : undefined),
     pickupStartAt: initialData?.pickupStartAt || '',
     pickupEndAt: initialData?.pickupEndAt || '',
     expiresAt: initialData?.expiresAt || '',
@@ -111,9 +111,14 @@ export default function PostForm({
   useEffect(() => {
     if (mode === 'create' && storeAddress && !form.pickupAddress) {
       selectedAddressRef.current = storeAddress;
-      setForm(prev => prev.pickupAddress ? prev : { ...prev, pickupAddress: storeAddress });
+      setForm(prev => ({
+        ...prev,
+        pickupAddress: prev.pickupAddress || storeAddress,
+        pickupLatitude: prev.pickupLatitude ?? (user as any)?.latitude,
+        pickupLongitude: prev.pickupLongitude ?? (user as any)?.longitude,
+      }));
     }
-  }, [mode, storeAddress]);
+  }, [mode, storeAddress, user]);
 
   useEffect(() => {
     const query = form.pickupAddress.trim();
@@ -250,6 +255,31 @@ export default function PostForm({
       const isDraftSubmit = (e.nativeEvent as any).submitter?.name === 'draft';
       const isDraft = (mode === 'create' || postStatus === 'DRAFT') ? isDraftSubmit : false;
 
+      let finalLat = form.pickupLatitude;
+      let finalLng = form.pickupLongitude;
+      let finalAddress = form.pickupAddress.trim();
+
+      if ((finalLat == null || finalLng == null) && finalAddress.length >= 3) {
+        if (locationSuggestions.length > 0) {
+          finalLat = locationSuggestions[0].latitude;
+          finalLng = locationSuggestions[0].longitude;
+          finalAddress = locationSuggestions[0].formattedAddress;
+        } else {
+          try {
+            const res = await autocompleteAddress(finalAddress);
+            if (res && res.length > 0) {
+              finalLat = res[0].latitude;
+              finalLng = res[0].longitude;
+              finalAddress = res[0].formattedAddress;
+            }
+          } catch {}
+        }
+        if (finalLat == null || finalLng == null) {
+          finalLat = (user as any)?.latitude;
+          finalLng = (user as any)?.longitude;
+        }
+      }
+
       await onSubmit({
         name: form.name.trim(),
         description: form.description.trim(),
@@ -258,9 +288,9 @@ export default function PostForm({
         postType: form.postType,
         unitPrice: form.postType === 'FREE' ? 0 : form.unitPrice,
         originalPrice: form.postType === 'FREE' ? 0 : form.originalPrice,
-        pickupAddress: form.pickupAddress.trim(),
-        pickupLatitude: form.pickupLatitude,
-        pickupLongitude: form.pickupLongitude,
+        pickupAddress: finalAddress,
+        pickupLatitude: finalLat,
+        pickupLongitude: finalLng,
         pickupStartAt: form.pickupStartAt,
         pickupEndAt: form.pickupEndAt,
         expiresAt: form.expiresAt,
@@ -553,6 +583,30 @@ export default function PostForm({
                     }}
                     onFocus={() => {
                       if (locationSuggestions.length > 0) setIsLocationDropdownOpen(true);
+                    }}
+                    onBlur={() => {
+                      window.setTimeout(async () => {
+                        if (form.pickupAddress.trim().length >= 3 && (form.pickupLatitude == null || form.pickupLongitude == null)) {
+                          if (locationSuggestions.length > 0) {
+                            const top = locationSuggestions[0];
+                            update('pickupAddress', top.formattedAddress);
+                            update('pickupLatitude', top.latitude);
+                            update('pickupLongitude', top.longitude);
+                            selectedAddressRef.current = top.formattedAddress;
+                            setIsLocationDropdownOpen(false);
+                          } else {
+                            try {
+                              const res = await autocompleteAddress(form.pickupAddress.trim());
+                              if (res && res.length > 0) {
+                                update('pickupAddress', res[0].formattedAddress);
+                                update('pickupLatitude', res[0].latitude);
+                                update('pickupLongitude', res[0].longitude);
+                                selectedAddressRef.current = res[0].formattedAddress;
+                              }
+                            } catch {}
+                          }
+                        }
+                      }, 250);
                     }}
                     placeholder="VD: 928 Lê Văn Lương, Xã Nhà Bè, TP. Hồ Chí Minh..."
                     className="w-full pl-9 pr-8 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2db84c]/20 focus:border-[#2db84c] transition-all"
